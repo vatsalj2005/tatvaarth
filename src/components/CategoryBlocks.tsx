@@ -6,8 +6,7 @@ import { Music, BookOpen, Library, FileText, ScrollText } from 'lucide-react';
 const categories = [
   { key: 'bhajan', path: '/bhajan', icon: Music, ready: true },
   { key: 'pooja', path: '/pooja', icon: BookOpen, ready: false },
-  { key: 'granth', path: '/granth', icon: Library, ready: false },
-  { key: 'teeka', path: '/teeka', icon: FileText, ready: false },
+  { key: 'granth', path: '/shastra', icon: Library, ready: true },
   { key: 'paath', path: '/paath', icon: ScrollText, ready: false },
 ] as const;
 
@@ -26,7 +25,7 @@ const CategoryBlocks = () => {
           {t('categories')}
         </motion.h2>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl mx-auto">
           {categories.map((cat, i) => {
             const Icon = cat.icon;
             const descKey = `${cat.key}Desc` as const;

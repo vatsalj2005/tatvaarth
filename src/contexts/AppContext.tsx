@@ -47,8 +47,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const root = document.documentElement;
     Object.values(themeClassMap).forEach(cls => cls && root.classList.remove(cls));
+    root.classList.remove('dark');
+    
     const cls = themeClassMap[state.theme];
     if (cls) root.classList.add(cls);
+    
+    // Add Tailwind dark mode class for dark-based themes
+    if (state.theme === 'dark' || state.theme === 'soft-dark') {
+      root.classList.add('dark');
+    }
+    
     root.lang = state.language;
   }, [state.theme, state.language]);
 
