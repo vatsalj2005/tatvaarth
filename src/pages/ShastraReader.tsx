@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '@/contexts/AppContext';
@@ -20,9 +20,12 @@ const ShastraReader = () => {
   const [showSanskritTeeka, setShowSanskritTeeka] = useState<Record<string, boolean>>({}); // Mapping: gathaNum_commentator -> boolean
   const [isAutoFollow, setIsAutoFollow] = useState(true);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [gathas, setGathas] = useState<Array<{ item: GathaItem; content: GathaContent; chapterName: string }>>([]);
+  const [isLoadingGathas, setIsLoadingGathas] = useState(true);
 
   const observerRef = useRef<IntersectionObserver | null>(null);
   const gathaRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const isManualScrollingRef = useRef(false);
 
   const formatGathaText = (text: string, isGadya: boolean = false) => {
     return text.split('\n').map((line, i, arr) => {
@@ -42,7 +45,7 @@ const ShastraReader = () => {
             if (part.match(/^[॥|]+\s*[\d\u0966-\u096F]+\s*[॥|]+$/)) {
               if (isGadya) {
                 return (
-                  <span key={j} className="text-emerald-600 dark:text-emerald-500 font-semibold ml-1">
+                  <span key={j} className="text-teal-700 dark:text-teal-400 font-semibold ml-1">
                     {part}
                   </span>
                 );
@@ -70,20 +73,33 @@ const ShastraReader = () => {
     }
   }, [shastraSlug]);
 
-  // 2. Load all gatha contents
-  const gathas = useMemo(() => {
-    const list: { item: GathaItem; content: GathaContent; chapterName: string }[] = [];
-    if (!shastraIndex || !shastraSlug) return list;
-
-    shastraIndex.chapters.forEach(chapter => {
-      chapter.items.forEach(item => {
-        const content = getGathaContent(shastraSlug, item.file);
-        if (content) {
-          list.push({ item, content, chapterName: chapter.name });
-        }
+  // 2. Load all gatha contents asynchronously
+  useEffect(() => {
+    let isActive = true;
+    if (!shastraIndex || !shastraSlug) return;
+    
+    setIsLoadingGathas(true);
+    
+    // Defer the heavy parsing to let React render the skeleton
+    const timer = setTimeout(() => {
+      if (!isActive) return;
+      const list: { item: GathaItem; content: GathaContent; chapterName: string }[] = [];
+      shastraIndex.chapters.forEach(chapter => {
+        chapter.items.forEach(item => {
+          const content = getGathaContent(shastraSlug, item.file);
+          if (content) {
+            list.push({ item, content, chapterName: chapter.name });
+          }
+        });
       });
-    });
-    return list;
+      setGathas(list);
+      setIsLoadingGathas(false);
+    }, 50);
+
+    return () => {
+      isActive = false;
+      clearTimeout(timer);
+    };
   }, [shastraIndex, shastraSlug]);
 
   // Initialize commentator tabs when gathas load
@@ -119,7 +135,7 @@ const ShastraReader = () => {
         });
 
         // Find the top-most intersecting gatha
-        if (intersectingGathas.size > 0) {
+        if (intersectingGathas.size > 0 && !isManualScrollingRef.current) {
           let topGathaNum = '';
           let minTop = Infinity;
 
@@ -189,6 +205,7 @@ const ShastraReader = () => {
   const scrollToGatha = (gathaNum: string) => {
     const el = document.getElementById(`gatha-${gathaNum}`);
     if (el) {
+      isManualScrollingRef.current = true;
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       setActiveGathaNum(gathaNum);
       
@@ -196,8 +213,11 @@ const ShastraReader = () => {
       if (window.innerWidth < 768) {
         setIsSidebarOpen(false);
       }
-      // Re-enable auto-follow since user explicitly selected a gatha
-      setIsAutoFollow(true);
+      
+      // Re-enable auto-follow and tracking after scroll finishes
+      setTimeout(() => {
+        isManualScrollingRef.current = false;
+      }, 1000); // 1s is enough for smooth scroll to finish
     }
   };
 
@@ -452,30 +472,60 @@ const ShastraReader = () => {
           </div>
 
           {/* Verses Scroller */}
-          <div className="space-y-24">
-            {gathas.map(({ item, content, chapterName }) => {
+          {isLoadingGathas ? (
+            <div className="space-y-24 animate-pulse pt-8">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="border-b border-border/20 pb-16">
+                  <div className="flex justify-between mb-6">
+                    <div className="h-6 w-24 bg-secondary/80 rounded-full"></div>
+                    <div className="h-6 w-16 bg-gold/20 rounded"></div>
+                  </div>
+                  <div className="h-10 w-3/4 bg-rose-900/10 rounded-xl mb-6 mx-auto"></div>
+                  <div className="h-32 w-full bg-gold/5 rounded-2xl mb-6 border border-gold/10"></div>
+                  <div className="h-24 w-full bg-secondary/30 rounded-xl mb-6"></div>
+                  <div className="h-4 w-full bg-foreground/5 rounded mt-12"></div>
+                  <div className="h-4 w-full bg-foreground/5 rounded mt-3"></div>
+                  <div className="h-4 w-5/6 bg-foreground/5 rounded mt-3"></div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-24">
+            {gathas.map(({ item, content, chapterName }, index) => {
               const gathaNum = item.gathaNum;
               const currentComm = activeTeekaTabs[gathaNum] || (content.teekas[0]?.commentator);
               const activeTeeka = content.teekas.find(t => t.commentator === currentComm);
               const showSanskrit = showSanskritTeeka[`${gathaNum}_${currentComm}`] || false;
+              
+              const isFirstOfChapter = index === 0 || gathas[index - 1].chapterName !== chapterName;
 
               return (
-                <div
-                  key={gathaNum}
-                  id={`gatha-${gathaNum}`}
-                  data-gatha-num={gathaNum}
-                  ref={(el) => { gathaRefs.current[gathaNum] = el; }}
-                  className="scroll-mt-20 border-b border-border/20 pb-16"
-                >
-                  {/* Chapter Subtitle & Badge */}
-                  <div className="flex items-center justify-between gap-4 mb-6">
-                    <span className="text-xs px-2.5 py-1 bg-secondary text-gold/80 rounded-full font-medium devanagari-safe">
-                      📂 {chapterName}
-                    </span>
-                    <span className="text-lg font-heading text-gold font-bold">
-                      #{gathaNum}
-                    </span>
-                  </div>
+                <Fragment key={gathaNum}>
+                  {isFirstOfChapter && (
+                    <div className="flex flex-col items-center justify-center pt-8 pb-16 space-y-6">
+                      <div className="w-full max-w-2xl h-px bg-gradient-to-r from-transparent via-gold/60 to-transparent"></div>
+                      <h2 className="text-2xl md:text-4xl font-heading font-bold text-gold tracking-widest devanagari-safe text-center px-4">
+                        ------ {chapterName} ------
+                      </h2>
+                      <div className="w-full max-w-2xl h-px bg-gradient-to-r from-transparent via-gold/60 to-transparent"></div>
+                    </div>
+                  )}
+                  
+                  <div
+                    id={`gatha-${gathaNum}`}
+                    data-gatha-num={gathaNum}
+                    ref={(el) => { gathaRefs.current[gathaNum] = el; }}
+                    className="scroll-mt-20 border-b border-border/20 pb-16"
+                  >
+                    {/* Chapter Subtitle & Badge */}
+                    <div className="flex items-center justify-between gap-4 mb-6">
+                      <span className="text-xs px-2.5 py-1 bg-secondary text-gold/80 rounded-full font-medium devanagari-safe">
+                        📂 {chapterName}
+                      </span>
+                      <span className="text-lg font-heading text-gold font-bold">
+                        #{gathaNum}
+                      </span>
+                    </div>
 
                   {/* Header title */}
                   <h3 className="text-3xl font-heading text-center text-rose-900 dark:text-rose-900 font-bold mb-6 devanagari-safe" style={{ fontSize: `${contentFontSize * 1.4}px` }}>
@@ -611,12 +661,12 @@ const ShastraReader = () => {
                       </div>
                     </div>
                   )}
-
-
                 </div>
+                </Fragment>
               );
             })}
-          </div>
+            </div>
+          )}
         </main>
       </div>
 
