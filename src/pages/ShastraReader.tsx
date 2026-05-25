@@ -5,7 +5,7 @@ import { useApp } from '@/contexts/AppContext';
 import { getShastraIndex, getGathaContent, ShastraIndex, GathaContent, GathaItem } from '@/data/shastra-loader';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { ChevronRight, ListCollapse, Download, Type, ChevronLeft, Eye, EyeOff, LocateFixed } from 'lucide-react';
+import { ChevronRight, ListCollapse, Download, Type, ChevronLeft, Eye, EyeOff, LocateFixed, X } from 'lucide-react';
 import ShastraPrintTemplate from '@/components/ShastraPrintTemplate';
 
 const ShastraReader = () => {
@@ -246,9 +246,38 @@ const ShastraReader = () => {
     });
   };
 
+  // Helper to color specific lines in Bhavarth
+  const renderBhavarthText = (text: string) => {
+    return text.split('\n').map((line, i, arr) => {
+      const trimmed = line.trim();
+      const isSanskritColor = [
+        "॥ श्रीपरमगुरुवे नमः, परम्पराचार्यगुरुवे नमः ॥",
+        "॥ श्रोतारः सावधानतया शृणवन्तु ॥",
+        "(देव वंदना)",
+        "(शास्त्र वंदना)",
+        "(गुरु वंदना)"
+      ].includes(trimmed);
+
+      const isArthColor = trimmed.startsWith("(समस्त पापों का नाश करनेवाला");
+
+      const colorClass = isSanskritColor 
+        ? "text-teal-700 dark:text-teal-400 font-semibold" 
+        : isArthColor 
+          ? "text-foreground/95" 
+          : "text-orange-800 dark:text-orange-400";
+
+      return (
+        <span key={i} className={colorClass}>
+          {line}
+          {i < arr.length - 1 && <br />}
+        </span>
+      );
+    });
+  };
+
   // Helper to highlight bracketed terms in commentaries (like [स्वानुभूत्या चकासते] in dark red or gold)
   const highlightBracketedTerms = (text: string) => {
-    const parts = text.split(/(\*\*\[[^\]]+\]\*\*|\[[^\]]+\])/);
+    const parts = text.split(/(\*\*\[[^\]]+\]\*\*|\[[^\]]+\]|\([^\)]+\)|\{[^\}]+\})/);
     return parts.map((part, index) => {
       const boldMatch = part.match(/\*\*\[([^\]]+)\]\*\*/);
       if (boldMatch) {
@@ -269,6 +298,29 @@ const ShastraReader = () => {
             className="font-bold text-red-800 dark:text-gold px-0.5"
           >
             [{normalMatch[1]}]
+          </span>
+        );
+      }
+      const parenMatch = part.match(/^\(([^\)]+)\)$/);
+      // We exclude short numbers like (1) or (देव वंदना) if needed, but for now we format all matched parens 
+      if (parenMatch && !part.match(/^\(\s*\d+\s*\)$/) && !part.match(/^\(कलश-/)) {
+        return (
+          <span 
+            key={index} 
+            className="text-sky-700 dark:text-sky-400 font-medium px-0.5"
+          >
+            ({parenMatch[1]})
+          </span>
+        );
+      }
+      const curlyMatch = part.match(/^\{([^\}]+)\}$/);
+      if (curlyMatch) {
+        return (
+          <span 
+            key={index} 
+            className="text-orange-800 dark:text-orange-400 font-semibold px-0.5"
+          >
+            {curlyMatch[1]}
           </span>
         );
       }
@@ -297,7 +349,8 @@ const ShastraReader = () => {
         return (
           <div 
             key={index} 
-            className="text-center font-bold text-teal-700 dark:text-teal-400 my-3 text-sm devanagari-safe"
+            className="text-center font-bold text-teal-700 dark:text-teal-400 my-3 devanagari-safe"
+            style={{ fontSize: "1.05em" }}
           >
             {clean}
           </div>
@@ -313,17 +366,20 @@ const ShastraReader = () => {
         return (
           <div 
             key={index} 
-            className="text-center text-orange-800 dark:text-orange-400 font-semibold my-1 text-base leading-relaxed devanagari-safe"
+            className="text-center text-orange-800 dark:text-orange-400 font-semibold my-1.5 leading-relaxed devanagari-safe"
+            style={{ fontSize: "1.2em" }}
           >
             {clean}
           </div>
         );
       }
 
+      const isCenteredOrange = clean.startsWith('{') && clean.endsWith('}');
+      
       return (
         <div 
           key={index} 
-          className={`${colorClass} my-2 leading-loose text-left devanagari-safe`}
+          className={`${colorClass} my-2 leading-loose ${isCenteredOrange ? 'text-center' : 'text-left'} devanagari-safe`}
         >
           {highlightBracketedTerms(clean)}
         </div>
@@ -357,19 +413,21 @@ const ShastraReader = () => {
         </span>
       </button>
 
-      <div className={`flex-1 flex pt-16 relative transition-all duration-300 ${isSidebarOpen ? 'md:pl-[280px]' : ''}`}>
+      <div className={`flex-1 flex pt-16 relative transition-all duration-300 ${isSidebarOpen && !isLoadingGathas ? 'md:pl-[280px]' : ''}`}>
         {/* Toggle Sidebar Button for Desktop & Mobile */}
-        <button
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className={`fixed z-50 bottom-6 left-6 p-3 rounded-full bg-gold text-primary-foreground shadow-lg hover:opacity-90 transition-all flex items-center justify-center`}
-          title="Toggle Navigation Menu"
-        >
-          <ListCollapse className="w-5 h-5" />
-        </button>
+        {!isLoadingGathas && (
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className={`fixed z-50 bottom-6 left-6 p-3 rounded-full bg-gold text-primary-foreground shadow-lg hover:opacity-90 transition-all flex items-center justify-center`}
+            title="Toggle Navigation Menu"
+          >
+            <ListCollapse className="w-5 h-5" />
+          </button>
+        )}
 
         {/* 1. Sidebar Navigation Panel & Mobile Overlay */}
         <AnimatePresence>
-          {isSidebarOpen && (
+          {isSidebarOpen && !isLoadingGathas && (
             <>
               {/* Mobile Overlay */}
               <motion.div
@@ -388,27 +446,41 @@ const ShastraReader = () => {
                 transition={{ type: "tween", duration: 0.3 }}
                 className="fixed left-0 top-16 bottom-0 w-[80vw] max-w-[300px] md:w-[280px] bg-card border-r border-border/40 z-40 flex flex-col shadow-2xl md:shadow-none overflow-hidden"
               >
-              <div className="p-4 border-b border-border/40 flex items-center justify-between">
-                <h2 className="font-heading text-lg text-gradient-gold font-semibold devanagari-safe">
-                  {t('chapters')}
-                </h2>
-                <div className="flex items-center gap-2">
-                  {!isAutoFollow && (
+              <div className="p-4 border-b border-border/40 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-heading text-lg text-gradient-gold font-semibold devanagari-safe">
+                    {t('chapters')}
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    {!isAutoFollow && (
+                      <button 
+                        onClick={() => setIsAutoFollow(true)}
+                        className="flex items-center gap-1.5 text-xs bg-gold/10 text-gold hover:bg-gold/20 px-2.5 py-1.5 rounded-lg transition-colors font-medium"
+                        title={t('follow')}
+                      >
+                        <LocateFixed className="w-3.5 h-3.5" />
+                        {t('follow')}
+                      </button>
+                    )}
                     <button 
-                      onClick={() => setIsAutoFollow(true)}
-                      className="flex items-center gap-1.5 text-xs bg-gold/10 text-gold hover:bg-gold/20 px-2.5 py-1.5 rounded-lg transition-colors font-medium"
-                      title={t('follow')}
+                      onClick={() => setIsSidebarOpen(false)}
+                      className="md:hidden p-1 rounded-lg hover:bg-secondary"
                     >
-                      <LocateFixed className="w-3.5 h-3.5" />
-                      {t('follow')}
+                      <X className="w-5 h-5 text-muted-foreground" />
                     </button>
-                  )}
-                  <button 
-                    onClick={() => setIsSidebarOpen(false)}
-                    className="md:hidden p-1 rounded-lg hover:bg-secondary"
-                  >
-                    <ChevronLeft className="w-5 h-5 text-muted-foreground" />
-                  </button>
+                  </div>
+                </div>
+                
+                {/* Teeka Legend */}
+                <div className="flex flex-col gap-1.5 text-[11px] text-muted-foreground devanagari-safe font-medium mt-1">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-teal-600 dark:bg-teal-500 shadow-[0_0_8px_rgba(20,184,166,0.4)]"></span> 
+                    <span>अमृतचंद्राचार्य</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-orange-500 dark:bg-orange-400 shadow-[0_0_8px_rgba(249,115,22,0.4)]"></span> 
+                    <span>जयसेनाचार्य</span>
+                  </div>
                 </div>
               </div>
 
@@ -453,23 +525,47 @@ const ShastraReader = () => {
           )}
         </AnimatePresence>
 
-        {/* 2. Main Scripture Reading Container */}
-        <main className="flex-1 px-4 md:px-8 py-10 max-w-4xl mx-auto w-full transition-all duration-300">
-          {/* Granth Header Banner */}
-          <div className="text-center mb-16 border-b border-border/30 pb-10">
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-4 flex-wrap devanagari-safe">
-              <Link to="/shastra" className="hover:text-gold transition-colors">{t('shastra')}</Link>
-              <span>/</span>
-              <span className="text-foreground/80">{shastraIndex.title}</span>
+        {/* 2. Main Content Area */}
+        <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-32">
+          
+          {/* Shastra Cover Page */}
+          {!isLoadingGathas && shastraIndex?.cover && (
+            <div className="flex flex-col items-center justify-center min-h-[85vh] text-center py-16 mb-8 border-b border-gold/20 devanagari-safe">
+              {shastraIndex.cover.invocation && (
+                <h3 className="text-3xl md:text-4xl font-heading font-black text-gold drop-shadow-[0_2px_4px_rgba(212,175,55,0.4)] mb-12">
+                  {shastraIndex.cover.invocation}
+                </h3>
+              )}
+              
+              {shastraIndex.cover.authorPrefix && (
+                <h2 className="text-4xl md:text-5xl font-heading font-black text-foreground drop-shadow-[0_2px_6px_rgba(212,175,55,0.5)] mb-12">
+                  {shastraIndex.cover.authorPrefix}
+                </h2>
+              )}
+              
+              {shastraIndex.cover.title && (
+                <div className="flex flex-col items-center my-6">
+                  <span className="text-3xl md:text-4xl font-heading font-black text-foreground mb-4">श्री</span>
+                  <h1 className="text-7xl md:text-9xl font-heading font-black text-foreground drop-shadow-[0_4px_12px_rgba(212,175,55,0.8)] tracking-wide">
+                    {shastraIndex.cover.title.replace('श्री ', '')}
+                  </h1>
+                </div>
+              )}
+              
+              {shastraIndex.cover.subtitle && (
+                <p className="text-lg md:text-xl font-bold text-gold/90 max-w-4xl leading-relaxed mt-16 px-4 drop-shadow-sm">
+                  {shastraIndex.cover.subtitle}
+                </p>
+              )}
+              
+              {shastraIndex.cover.credits && (
+                <p className="text-sm md:text-base font-bold text-muted-foreground max-w-4xl leading-relaxed mt-16">
+                  {shastraIndex.cover.credits}
+                </p>
+              )}
             </div>
-            
-            <h1 className="text-7xl md:text-9xl font-heading font-bold text-gradient-gold mb-6 devanagari-safe">
-              {shastraIndex.title}
-            </h1>
-            <p className="text-sm text-gold/80 devanagari-safe">
-              ✍️ {t('author')}: {shastraIndex.author}
-            </p>
-          </div>
+          )}
+
 
           {/* Verses Scroller */}
           {isLoadingGathas ? (
@@ -528,7 +624,7 @@ const ShastraReader = () => {
                     </div>
 
                   {/* Header title */}
-                  <h3 className="text-3xl font-heading text-center text-rose-900 dark:text-rose-900 font-bold mb-6 devanagari-safe" style={{ fontSize: `${contentFontSize * 1.4}px` }}>
+                  <h3 className="font-heading text-center font-black text-foreground drop-shadow-[0_4px_12px_rgba(212,175,55,0.8)] mb-6 devanagari-safe tracking-wide" style={{ fontSize: `${contentFontSize * 1.6}px` }}>
                     {formatGathaText(content.title)}
                   </h3>
 
@@ -536,7 +632,7 @@ const ShastraReader = () => {
                   <div className="p-6 md:p-8 rounded-2xl bg-gold/5 border border-gold/20 shadow-sm relative mb-6">
                     <h4 className="text-xs uppercase tracking-wider text-gold font-medium mb-3">{t('prakrit')}</h4>
                     <p 
-                      className={`text-center text-xl md:text-2xl text-orange-800 dark:text-orange-400 font-semibold devanagari-safe leading-loose ${readingClass}`}
+                      className={`text-center text-xl md:text-2xl text-orange-800 dark:text-orange-400 drop-shadow-[0_4px_12px_rgba(234,88,12,0.7)] dark:drop-shadow-[0_4px_12px_rgba(251,146,60,0.8)] font-semibold devanagari-safe leading-loose ${readingClass}`}
                       style={{ fontSize: `${contentFontSize * 1.25}px`, lineHeight: lineSpacing }}
                     >
                       {formatGathaText(content.gatha)}
@@ -580,6 +676,18 @@ const ShastraReader = () => {
                       {renderHighlightedAnvayarth(content.anvayarth)}
                     </p>
                   </div>
+
+                  {/* Bhavarth (Special Meaning / Context) */}
+                  {content.bhavarth && (
+                    <div className="my-8 p-6 rounded-2xl bg-amber-900/5 dark:bg-amber-900/10 border border-gold/10 shadow-inner">
+                      <p 
+                        className="devanagari-safe leading-loose text-center"
+                        style={{ fontSize: `${contentFontSize * 1.1}px`, lineHeight: lineSpacing }}
+                      >
+                        {renderBhavarthText(content.bhavarth)}
+                      </p>
+                    </div>
+                  )}
 
                   {/* English meaning */}
                   {content.english && (

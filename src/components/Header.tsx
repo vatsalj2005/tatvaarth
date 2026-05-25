@@ -31,7 +31,6 @@ const Header = () => {
             <Link to="/bhajan" className="text-sm text-foreground/80 hover:text-gold transition-colors">{t('bhajan')}</Link>
             <Link to="/pooja" className="text-sm text-foreground/80 hover:text-gold transition-colors">{t('pooja')}</Link>
             <Link to="/granth" className="text-sm text-foreground/80 hover:text-gold transition-colors">{t('granth')}</Link>
-            <Link to="/teeka" className="text-sm text-foreground/80 hover:text-gold transition-colors">{t('teeka')}</Link>
             <Link to="/paath" className="text-sm text-foreground/80 hover:text-gold transition-colors">{t('paath')}</Link>
           </nav>
 
@@ -70,8 +69,8 @@ const Header = () => {
               className="md:hidden overflow-hidden border-t border-border/50 bg-background/95 backdrop-blur-xl"
             >
               <div className="container mx-auto px-4 py-4 flex flex-col gap-3">
-                {['/', '/bhajan', '/pooja', '/granth', '/teeka', '/paath'].map((path, i) => {
-                  const keys = ['home', 'bhajan', 'pooja', 'granth', 'teeka', 'paath'] as const;
+                {['/', '/bhajan', '/pooja', '/granth', '/paath'].map((path, i) => {
+                  const keys = ['home', 'bhajan', 'pooja', 'granth', 'paath'] as const;
                   return (
                     <Link
                       key={path}

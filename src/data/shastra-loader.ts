@@ -23,10 +23,19 @@ export interface Chapter {
   items: GathaItem[];
 }
 
+export interface ShastraCover {
+  invocation?: string;
+  authorPrefix?: string;
+  title?: string;
+  subtitle?: string;
+  credits?: string;
+}
+
 export interface ShastraIndex {
   title: string;
   author: string;
   category: string;
+  cover?: ShastraCover;
   chapters: Chapter[];
 }
 
@@ -42,6 +51,7 @@ export interface GathaContent {
   gathaS: string;
   gadya: string;
   anvayarth: string;
+  bhavarth: string;
   english: string;
   teekas: TeekaData[];
 }
@@ -71,6 +81,7 @@ export function parseGathaText(raw: string): GathaContent {
   const gathaS = sections["Sanskrit"] || "";
   const gadya = sections["Gadya"] || "";
   const anvayarth = sections["Anvayarth"] || "";
+  const bhavarth = sections["Bhavarth"] || "";
   const english = sections["English"] || "";
   
   const teekas: TeekaData[] = [];
@@ -96,6 +107,7 @@ export function parseGathaText(raw: string): GathaContent {
     gathaS,
     gadya,
     anvayarth,
+    bhavarth,
     english,
     teekas
   };
