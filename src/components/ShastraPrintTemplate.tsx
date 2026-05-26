@@ -523,20 +523,37 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
 
   // Helper to render bracketed words in Anvayarth
   const renderHighlightedAnvayarth = (text: string) => {
-    const parts = text.split(/(\*\*\[[^\]]+\]\*\*)/);
-    return parts.map((part, index) => {
-      const match = part.match(/\*\*\[([^\]]+)\]\*\*/);
-      if (match) {
-        return (
-          <span 
-            key={index} 
-            className="inline px-1 py-0.5 mx-0.5 rounded text-gold font-bold bg-gold/10 border border-gold/25 text-sm"
-          >
-            {match[1]}
-          </span>
-        );
-      }
-      return <span key={index}>{part}</span>;
+    return text.split('\n').map((line, lineIndex, arr) => {
+      const parts = line.split(/(\*\*\[[^\]]+\]\*\*|\([^\)]+\))/);
+      return (
+        <span key={lineIndex} className="block mb-1.5 last:mb-0">
+          {parts.map((part, index) => {
+            const boldMatch = part.match(/\*\*\[([^\]]+)\]\*\*/);
+            if (boldMatch) {
+              return (
+                <span 
+                  key={index} 
+                  className="inline px-1 py-0.5 mx-0.5 rounded text-gold font-bold bg-gold/10 border border-gold/25 text-sm"
+                >
+                  {boldMatch[1]}
+                </span>
+              );
+            }
+            const parenMatch = part.match(/^\(([^\)]+)\)$/);
+            if (parenMatch) {
+              return (
+                <span 
+                  key={index} 
+                  className="text-gold-light font-medium text-sm"
+                >
+                  ({parenMatch[1]})
+                </span>
+              );
+            }
+            return <span key={index}>{part}</span>;
+          })}
+        </span>
+      );
     });
   };
 

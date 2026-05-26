@@ -26,6 +26,8 @@ const ShastraReader = () => {
   const observerRef = useRef<IntersectionObserver | null>(null);
   const gathaRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const isManualScrollingRef = useRef(false);
+  const isProgrammaticScrollRef = useRef(false);
+  const programmaticScrollTimeoutRef = useRef<any>(null);
 
   const formatGathaText = (text: string, isGadya: boolean = false) => {
     return text.split('\n').map((line, i, arr) => {
@@ -59,6 +61,14 @@ const ShastraReader = () => {
       );
     });
   };
+
+  useEffect(() => {
+    return () => {
+      if (programmaticScrollTimeoutRef.current) {
+        clearTimeout(programmaticScrollTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // 1. Fetch shastra index
   useEffect(() => {
@@ -183,7 +193,16 @@ const ShastraReader = () => {
         
         if (isOutsideCenter) {
           const offset = itemRect.top - containerRect.top - (containerRect.height / 2) + (itemRect.height / 2);
+          
+          isProgrammaticScrollRef.current = true;
           container.scrollBy({ top: offset, behavior: 'smooth' });
+          
+          if (programmaticScrollTimeoutRef.current) {
+            clearTimeout(programmaticScrollTimeoutRef.current);
+          }
+          programmaticScrollTimeoutRef.current = setTimeout(() => {
+            isProgrammaticScrollRef.current = false;
+          }, 1000);
         }
       }
     }
@@ -214,11 +233,25 @@ const ShastraReader = () => {
         setIsSidebarOpen(false);
       }
       
+      // Temporarily block scroll detection in sidebar on navigation click
+      isProgrammaticScrollRef.current = true;
+      if (programmaticScrollTimeoutRef.current) {
+        clearTimeout(programmaticScrollTimeoutRef.current);
+      }
+      programmaticScrollTimeoutRef.current = setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+      }, 1000);
+
       // Re-enable auto-follow and tracking after scroll finishes
       setTimeout(() => {
         isManualScrollingRef.current = false;
       }, 1000); // 1s is enough for smooth scroll to finish
     }
+  };
+
+  const handleSidebarScroll = () => {
+    if (isProgrammaticScrollRef.current) return;
+    setIsAutoFollow(false);
   };
 
   // PDF generation for the entire shastra
@@ -229,20 +262,37 @@ const ShastraReader = () => {
 
   // Helper to highlight bracketed words in Anvayarth
   const renderHighlightedAnvayarth = (text: string) => {
-    const parts = text.split(/(\*\*\[[^\]]+\]\*\*)/);
-    return parts.map((part, index) => {
-      const match = part.match(/\*\*\[([^\]]+)\]\*\*/);
-      if (match) {
-        return (
-          <span 
-            key={index} 
-            className="inline-block px-1 py-0.5 mx-0.5 rounded text-gold font-semibold bg-gold/10 border border-gold/10 devanagari-safe"
-          >
-            {match[1]}
-          </span>
-        );
-      }
-      return <span key={index}>{part}</span>;
+    return text.split('\n').map((line, lineIndex, arr) => {
+      const parts = line.split(/(\*\*\[[^\]]+\]\*\*|\([^\)]+\))/);
+      return (
+        <span key={lineIndex} className="block mb-2 last:mb-0">
+          {parts.map((part, index) => {
+            const boldMatch = part.match(/\*\*\[([^\]]+)\]\*\*/);
+            if (boldMatch) {
+              return (
+                <span 
+                  key={index} 
+                  className="inline-block px-1 py-0.5 mx-0.5 rounded text-gold font-semibold bg-gold/10 border border-gold/10"
+                >
+                  {boldMatch[1]}
+                </span>
+              );
+            }
+            const parenMatch = part.match(/^\(([^\)]+)\)$/);
+            if (parenMatch) {
+              return (
+                <span 
+                  key={index} 
+                  className="text-gold-light font-medium"
+                >
+                  ({parenMatch[1]})
+                </span>
+              );
+            }
+            return <span key={index}>{part}</span>;
+          })}
+        </span>
+      );
     });
   };
 
@@ -455,7 +505,7 @@ const ShastraReader = () => {
                     {!isAutoFollow && (
                       <button 
                         onClick={() => setIsAutoFollow(true)}
-                        className="flex items-center gap-1.5 text-xs bg-gold/10 text-gold hover:bg-gold/20 px-2.5 py-1.5 rounded-lg transition-colors font-medium"
+                        className="flex items-center gap-1.5 text-xs bg-gold/10 text-gold hover:bg-gold/20 px-2.5 py-1.5 rounded-lg transition-colors font-medium animate-fade-in"
                         title={t('follow')}
                       >
                         <LocateFixed className="w-3.5 h-3.5" />
@@ -487,6 +537,7 @@ const ShastraReader = () => {
               <div 
                 id="sidebar-scroll-container"
                 className="flex-1 overflow-y-auto p-3 scrollbar-thin"
+                onScroll={handleSidebarScroll}
               >
                 {shastraIndex.chapters.map((chapter, chapIdx) => (
                   <div key={chapIdx} className="mb-6 relative">
@@ -669,12 +720,12 @@ const ShastraReader = () => {
                     <h4 className="text-sm font-semibold text-gold mb-3 devanagari-safe">
                       🔍 {t('anvayarth')}
                     </h4>
-                    <p 
+                    <div 
                       className="text-foreground/95 devanagari-safe leading-loose"
                       style={{ fontSize: `${contentFontSize}px`, lineHeight: lineSpacing }}
                     >
                       {renderHighlightedAnvayarth(content.anvayarth)}
-                    </p>
+                    </div>
                   </div>
 
                   {/* Bhavarth (Special Meaning / Context) */}
