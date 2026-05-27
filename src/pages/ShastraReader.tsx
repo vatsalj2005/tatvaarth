@@ -312,10 +312,10 @@ const ShastraReader = () => {
       const isArthColor = trimmed.startsWith("(समस्त पापों का नाश करनेवाला");
 
       const colorClass = isSanskritColor 
-        ? "text-teal-700 dark:text-teal-400 font-semibold" 
+        ? "text-pink-700 dark:text-pink-400 font-semibold" 
         : isArthColor 
           ? "text-foreground/95" 
-          : "text-orange-800 dark:text-orange-400";
+          : "text-green-800 dark:text-green-600";
 
       return (
         <span key={i} className={colorClass}>
@@ -415,7 +415,7 @@ const ShastraReader = () => {
         return (
           <div 
             key={index} 
-            className="text-center font-bold text-teal-700 dark:text-teal-400 my-3 devanagari-safe"
+            className="text-center font-bold text-pink-700 dark:text-pink-400 my-3 devanagari-safe"
             style={{ fontSize: "1.05em" }}
           >
             {unwrapped}
@@ -433,7 +433,7 @@ const ShastraReader = () => {
         return (
           <div 
             key={index} 
-            className="text-center text-orange-800 dark:text-orange-400 font-semibold my-1.5 leading-relaxed devanagari-safe"
+            className="text-center text-green-800 dark:text-green-600 font-semibold my-1.5 leading-relaxed devanagari-safe"
             style={{ fontSize: "1.2em" }}
           >
             {unwrapped}
@@ -719,7 +719,11 @@ const ShastraReader = () => {
                   <div className="p-6 md:p-8 rounded-2xl bg-gold/5 border border-gold/20 shadow-sm relative mb-6">
                     <h4 className="text-xs uppercase tracking-wider text-gold font-medium mb-3">{t('prakrit')}</h4>
                     <p 
-                      className={`text-center text-xl md:text-2xl text-orange-800 dark:text-orange-400 drop-shadow-[0_4px_12px_rgba(234,88,12,0.7)] dark:drop-shadow-[0_4px_12px_rgba(251,146,60,0.8)] font-semibold devanagari-safe leading-loose ${readingClass}`}
+                      className={`text-center text-xl md:text-2xl font-semibold devanagari-safe leading-loose ${readingClass} ${
+                        content.gatha.includes('ओंकारं बिन्दुसंयुक्तं')
+                          ? 'text-gold drop-shadow-[0_0_15px_rgba(212,175,55,0.8)]'
+                          : 'text-orange-800 dark:text-orange-400 drop-shadow-[0_4px_12px_rgba(234,88,12,0.7)] dark:drop-shadow-[0_4px_12px_rgba(251,146,60,0.8)]'
+                      }`}
                       style={{ fontSize: `${contentFontSize * 1.25}px`, lineHeight: lineSpacing }}
                     >
                       {formatGathaText(content.gatha)}
