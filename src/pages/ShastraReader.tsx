@@ -327,8 +327,19 @@ const ShastraReader = () => {
 
   // Helper to highlight bracketed terms in commentaries (like [स्वानुभूत्या चकासते] in dark red or gold)
   const highlightBracketedTerms = (text: string) => {
-    const parts = text.split(/(\*\*\[[^\]]+\]\*\*|\[[^\]]+\]|\([^\)]+\)|\{[^\}]+\})/);
+    const parts = text.split(/(\*\*\[[^\]]+\]\*\*|\[[^\]]+\]|\([^\)]+\)|\{[^\}]+\}|समाधान\s*[–-])/);
     return parts.map((part, index) => {
+      const solutionMatch = part.match(/^समाधान\s*([–-])$/);
+      if (solutionMatch) {
+        return (
+          <span 
+            key={index} 
+            className="text-emerald-700 dark:text-emerald-400 font-bold pr-1"
+          >
+            समाधान {solutionMatch[1]}
+          </span>
+        );
+      }
       const boldMatch = part.match(/\*\*\[([^\]]+)\]\*\*/);
       if (boldMatch) {
         return (
@@ -391,8 +402,12 @@ const ShastraReader = () => {
         return <div key={index} className="h-2" />;
       }
 
+      // Check if it is wrapped in curly braces (used for centered text blocks)
+      const isWrapped = clean.startsWith('{') && clean.endsWith('}');
+      const unwrapped = isWrapped ? clean.slice(1, -1).trim() : clean;
+
       // Check if it is a meter header (like (कलश-दोहा))
-      const isMeterHeader = clean.startsWith('(') && clean.endsWith(')') && clean.length <= 50;
+      const isMeterHeader = /^[(（].*?[)）]$/.test(unwrapped) && unwrapped.length <= 50;
 
       if (isMeterHeader) {
         inVerse = true;
@@ -402,13 +417,14 @@ const ShastraReader = () => {
             className="text-center font-bold text-teal-700 dark:text-teal-400 my-3 devanagari-safe"
             style={{ fontSize: "1.05em" }}
           >
-            {clean}
+            {unwrapped}
           </div>
         );
       }
 
       // Check if verse mode should end
-      if (inVerse && (clean.startsWith('[') || clean.startsWith('**['))) {
+      const cleanForVerseEnd = unwrapped;
+      if (inVerse && (cleanForVerseEnd.startsWith('[') || cleanForVerseEnd.startsWith('**['))) {
         inVerse = false;
       }
 
@@ -419,19 +435,38 @@ const ShastraReader = () => {
             className="text-center text-orange-800 dark:text-orange-400 font-semibold my-1.5 leading-relaxed devanagari-safe"
             style={{ fontSize: "1.2em" }}
           >
-            {clean}
+            {unwrapped}
           </div>
         );
       }
 
-      const isCenteredOrange = clean.startsWith('{') && clean.endsWith('}');
+      const isQuestion = unwrapped.startsWith('प्रश्न –') || unwrapped.startsWith('प्रश्न -');
+      const isCenteredOrange = isWrapped && !isMeterHeader;
+      const isBullet = clean.startsWith('•');
       
+      let displayClasses = '';
+      if (isQuestion) {
+        displayClasses = 'text-red-600 dark:text-red-400 font-semibold text-left';
+      } else if (isCenteredOrange) {
+        displayClasses = 'text-orange-800 dark:text-orange-400 font-semibold text-center';
+      } else {
+        displayClasses = `${colorClass} text-left`;
+      }
+
       return (
         <div 
           key={index} 
-          className={`${colorClass} my-2 leading-loose ${isCenteredOrange ? 'text-center' : 'text-left'} devanagari-safe`}
+          className={`${displayClasses} ${isBullet ? 'my-0.5' : 'my-2'} leading-loose devanagari-safe`}
+          style={isBullet ? { 
+            marginLeft: '1.5rem',
+            paddingLeft: '1.2rem', 
+            textIndent: '-1.2rem',
+            marginTop: '2px',
+            marginBottom: '2px',
+            lineHeight: '1.4'
+          } : undefined}
         >
-          {highlightBracketedTerms(clean)}
+          {highlightBracketedTerms(unwrapped)}
         </div>
       );
     });

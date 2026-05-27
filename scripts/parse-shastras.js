@@ -11,7 +11,29 @@ const outDir = path.join(__dirname, '..', 'src', 'content', 'granth');
 // Helper to strip HTML tags
 function stripHtml(html) {
   if (!html) return "";
-  return html
+  
+  let text = html;
+  
+  // Convert <div class=gadya>...</div> to separate lines wrapped in { }
+  text = text.replace(/<div[^>]*class=["']?gadya["']?[^>]*>([\s\S]*?)<\/div>/gi, (match, p1) => {
+    let content = p1.replace(/<br\s*\/?>/gi, '\n');
+    content = content.replace(/<[^>]+>/g, '').trim();
+    return '\n' + content.split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .map(line => `{${line}}`)
+      .join('\n') + '\n';
+  });
+
+  // Convert list items to markdown bullet points
+  text = text.replace(/<li>/gi, '\n• ');
+  text = text.replace(/<\/li>/gi, '');
+  text = text.replace(/<ul[^>]*>/gi, '');
+  text = text.replace(/<\/ul>/gi, '\n');
+  text = text.replace(/<ol[^>]*>/gi, '');
+  text = text.replace(/<\/ol>/gi, '\n');
+
+  return text
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n')
     .replace(/<[^>]+>/g, '')
@@ -278,7 +300,7 @@ function pilotRun() {
   fs.mkdirSync(destShastraPath, { recursive: true });
 
   // Read all HTML files in the directory
-  const files = fs.readdirSync(htmlFolder).filter(f => f.endsWith('.html') && f !== 'index.html');
+  const files = fs.readdirSync(htmlFolder).filter(f => f.endsWith('.html') && f !== 'index.html' && !f.startsWith('0000_'));
   
   let processedCount = 0;
   for (const file of files) {
@@ -312,13 +334,24 @@ function pilotRun() {
   }
 
   // Write index.json manifest inside the shastra folder
+  const destIndexJsonPath = path.join(destShastraPath, 'index.json');
+  let existingIndex = {};
+  if (fs.existsSync(destIndexJsonPath)) {
+    try {
+      existingIndex = JSON.parse(fs.readFileSync(destIndexJsonPath, 'utf-8'));
+    } catch (e) {
+      console.error("Failed to read existing index.json", e);
+    }
+  }
+
   const shastraIndexJson = {
     title: "समयसार",
     author: "कुन्दकुन्दाचार्य",
     category: "द्रव्यानुयोग",
-    chapters: chapters
+    cover: existingIndex.cover,
+    chapters: existingIndex.chapters || chapters
   };
-  fs.writeFileSync(path.join(destShastraPath, 'index.json'), JSON.stringify(shastraIndexJson, null, 2), 'utf-8');
+  fs.writeFileSync(destIndexJsonPath, JSON.stringify(shastraIndexJson, null, 2), 'utf-8');
 
   // Generate the global manifest.json
   const globalManifest = [
