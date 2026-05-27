@@ -1,5 +1,5 @@
 /**
- * Smart Search Engine for Tatvo Ka Arth
+ * Smart Search Engine for Tatvaarth
  * 
  * Handles:
  * - Hinglish → Hindi transliteration

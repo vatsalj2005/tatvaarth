@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://vatsalj2005.github.io/tatva-ka-arth/sitemap.xml
+Sitemap: https://vatsalj2005.github.io/tatvaarth/sitemap.xml

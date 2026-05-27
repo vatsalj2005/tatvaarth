@@ -14,7 +14,7 @@ import ScrollToTop from "./components/ScrollToTop";
 export default function App() {
   return (
     <AppProvider>
-      <BrowserRouter basename="/tatva-ka-arth">
+      <BrowserRouter basename="/tatvaarth">
         <ScrollToTop />
         <Routes>
           <Route path="/" element={<Index />} />

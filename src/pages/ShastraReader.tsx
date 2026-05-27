@@ -227,6 +227,7 @@ const ShastraReader = () => {
       isManualScrollingRef.current = true;
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       setActiveGathaNum(gathaNum);
+      setIsAutoFollow(true);
       
       // On mobile, close sidebar automatically on selection
       if (window.innerWidth < 768) {

@@ -2,7 +2,7 @@ export type Language = 'hi' | 'en';
 
 const translations = {
   hi: {
-    siteName: 'तत्वो का अर्थ',
+    siteName: 'तत्त्वार्थ',
     siteTagline: 'जैन शास्त्र डिजिटल पुस्तकालय',
     home: 'मुख्य पृष्ठ',
     search: 'खोजें...',
@@ -81,7 +81,7 @@ const translations = {
     downloadFullPdf: 'संपूर्ण ग्रन्थ PDF',
   },
   en: {
-    siteName: 'Tatvo Ka Arth',
+    siteName: 'Tatvaarth',
     siteTagline: 'Jain Shastra Digital Library',
     home: 'Home',
     search: 'Search...',

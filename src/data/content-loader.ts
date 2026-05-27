@@ -3,6 +3,8 @@
  * Automatically discovers bhajans from /src/content/ at build time.
  */
 
+import { transliterateToRoman } from '../lib/transliterate';
+
 export interface BhajanData {
   id: string;
   slug: string;
@@ -35,6 +37,18 @@ const hindiStopwords = new Set([
   'का', 'के', 'की', 'को', 'में', 'से', 'है', 'हैं', 'था', 'थे', 'थी', 'हो', 'और', 'या', 'तो', 'ही',
   'भी', 'तुम', 'तुम्हारी', 'तुम्हारा', 'मैं', 'हम', 'यह', 'वह', 'इस', 'उस', 'एक', 'दो', 'तीन',
 ]);
+
+/**
+ * Clean and romanize Devanagari slugs for URLs
+ */
+function getRomanizedSlug(originalSlug: string): string {
+  const roman = transliterateToRoman(originalSlug);
+  return roman
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
 
 /**
  * Generate title from filename
@@ -115,20 +129,21 @@ function buildBhajans(): BhajanData[] {
     if (!pathMatch) continue;
 
     const subdivision = pathMatch[1];
-    const slug = pathMatch[2];
+    const originalSlug = pathMatch[2];
+    const romanizedSlug = getRomanizedSlug(originalSlug);
     
     // Parse content (support both old metadata format and new plain text)
     const { metadata, content } = parseFrontmatter(rawContent);
     
     // Generate title from filename
-    const title = metadata.title || generateTitleFromFilename(slug);
+    const title = metadata.title || generateTitleFromFilename(originalSlug);
     
     // Extract tags dynamically from content
     const tags = extractTags(content);
 
     results.push({
-      id: `${subdivision}/${slug}`,
-      slug,
+      id: `${subdivision}/${romanizedSlug}`,
+      slug: romanizedSlug,
       subdivision,
       title,
       singer: metadata.singer,

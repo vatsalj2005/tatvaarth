@@ -16,8 +16,8 @@ const Header = () => {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <img 
-              src="/tatva-ka-arth/favicon.ico" 
-              alt="Tatva Ka Arth" 
+              src="/tatvaarth/favicon.ico" 
+              alt="Tatvaarth" 
               className="w-8 h-8 object-contain"
             />
             <span className="text-xl font-heading text-gold font-semibold tracking-wide">

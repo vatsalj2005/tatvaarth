@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="src/assets/hero-1.jpg" alt="Tatvo Ka Arth — Jain Shastra Digital Library" width="100%" style="border-radius: 12px;" />
+  <img src="src/assets/hero-1.jpg" alt="Tatvaarth — Jain Shastra Digital Library" width="100%" style="border-radius: 12px;" />
 </p>
 
-<h1 align="center">🙏 तत्वो का अर्थ — Tatvo Ka Arth</h1>
+<h1 align="center">🙏 तत्त्वार्थ — Tatvaarth</h1>
 
 <p align="center">
   <strong>जैन शास्त्र डिजिटल पुस्तकालय — Jain Shastra Digital Library</strong>
@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://vatsalj2005.github.io/tatva-ka-arth/">
+  <a href="https://vatsalj2005.github.io/tatvaarth/">
     <img src="https://img.shields.io/badge/🌐_Live_Demo-Visit_Site-D4A853?style=for-the-badge" alt="Live Demo" />
   </a>
   &nbsp;
@@ -28,7 +28,7 @@
 
 ## 📖 About
 
-**Tatvo Ka Arth** (तत्वो का अर्थ) is a modern, open-source digital library dedicated to preserving and making accessible the sacred texts of Jainism. Built as a fast, offline-capable static web app, it provides a beautiful reading experience for devotional bhajans and philosophical scriptures — complete with multi-language support, smart search, transliteration, and PDF export.
+**Tatvaarth** (तत्त्वार्थ) is a modern, open-source digital library dedicated to preserving and making accessible the sacred texts of Jainism. Built as a fast, offline-capable static web app, it provides a beautiful reading experience for devotional bhajans and philosophical scriptures — complete with multi-language support, smart search, transliteration, and PDF export.
 
 ### 🎯 Mission
 
@@ -169,8 +169,8 @@ A feature-rich reader for deep scriptural study:
 
 ```bash
 # Clone the repository
-git clone https://github.com/vatsalj2005/tatva-ka-arth.git
-cd tatva-ka-arth
+git clone https://github.com/vatsalj2005/tatvaarth.git
+cd tatvaarth
 
 # Install dependencies
 npm install
@@ -200,7 +200,7 @@ npm run preview
 ## 📁 Project Structure
 
 ```
-tatva_ka_arth/
+tatvaarth/
 ├── .github/workflows/
 │   └── deploy.yml                  # GitHub Actions CI/CD pipeline
 ├── public/
@@ -303,7 +303,7 @@ npm run build
 
 ### Configuration
 
-- **Base path**: Set in `vite.config.ts` (`base: "/tatva-ka-arth/"`) and `App.tsx` (`basename="/tatva-ka-arth"`)
+- **Base path**: Set in `vite.config.ts` (`base: "/tatvaarth/"`) and `App.tsx` (`basename="/tatvaarth"`)
 - **SPA routing**: The `public/404.html` handles client-side routing on GitHub Pages by redirecting all 404s back to `index.html` with the original path encoded as a query parameter
 
 ---
