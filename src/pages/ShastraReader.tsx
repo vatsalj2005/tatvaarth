@@ -328,86 +328,109 @@ const ShastraReader = () => {
 
   // Helper to highlight bracketed terms in commentaries (like [स्वानुभूत्या चकासते] in dark red or gold)
   const highlightBracketedTerms = (text: string) => {
-    const parts = text.split(/(\*\*\[[^\]]+\]\*\*|\[[^\]]+\]|\([^\)]+\)|\{[^\}]+\}|समाधान\s*[–-])/);
-    return parts.map((part, index) => {
-      const solutionMatch = part.match(/^समाधान\s*([–-])$/);
-      if (solutionMatch) {
-        return (
-          <span 
-            key={index} 
-            className="text-emerald-700 dark:text-emerald-400 font-bold pr-1"
-          >
-            समाधान {solutionMatch[1]}
+    let prefix: string | null = null;
+    let restText = text;
+    
+    // Check for list items like "१. जीवत्वशक्ति -" or "३३-३८. भाव-अभावादि छह शक्तियाँ -"
+    const prefixMatch = text.match(/^([०-९0-9]+(?:-[०-९0-9]+)?\.\s+.*?[\s]*[-–]+(?:[\s]+|$))(.*)$/);
+    if (prefixMatch) {
+      prefix = prefixMatch[1];
+      restText = prefixMatch[2];
+    }
+
+    const processText = (t: string) => {
+      const parts = t.split(/(\*\*\[[^\]]+\]\*\*|\[[^\]]+\]|\([^\)]+\)|\{[^\}]+\}|(?:समाधान|उत्तर)\s*[–-])/);
+      return parts.map((part, index) => {
+        const solutionMatch = part.match(/^(समाधान|उत्तर)\s*([–-])$/);
+        if (solutionMatch) {
+          return (
+            <span 
+              key={index} 
+              className="text-emerald-700 dark:text-emerald-400 font-bold pr-1"
+            >
+              {solutionMatch[1]} {solutionMatch[2]}
+            </span>
+          );
+        }
+        const boldMatch = part.match(/\*\*\[([^\]]+)\]\*\*/);
+        if (boldMatch) {
+          return (
+            <span 
+              key={index} 
+              className="font-bold text-red-800 dark:text-gold px-0.5"
+            >
+              [{boldMatch[1]}]
+            </span>
+          );
+        }
+        const normalMatch = part.match(/^\[([^\]]+)\]$/);
+        if (normalMatch) {
+          return (
+            <span 
+              key={index} 
+              className="font-bold text-red-800 dark:text-gold px-0.5"
+            >
+              [{normalMatch[1]}]
+            </span>
+          );
+        }
+        const parenMatch = part.match(/^\(([^\)]+)\)$/);
+        // We exclude short numbers like (1) or (देव वंदना) if needed, but for now we format all matched parens 
+        if (parenMatch && !part.match(/^\(\s*\d+\s*\)$/) && !part.match(/^\(कलश-/)) {
+          return (
+            <span 
+              key={index} 
+              className="text-sky-700 dark:text-sky-400 font-medium px-0.5"
+            >
+              ({parenMatch[1]})
+            </span>
+          );
+        }
+        const curlyMatch = part.match(/^\{([^\}]+)\}$/);
+        if (curlyMatch) {
+          return (
+            <span 
+              key={index} 
+              className="text-orange-800 dark:text-orange-400 font-semibold px-0.5"
+            >
+              {curlyMatch[1]}
+            </span>
+          );
+        }
+        return <span key={index}>{part}</span>;
+      });
+    };
+
+    if (prefix) {
+      return (
+        <span className="inline-block">
+          <span className="inline-block px-1 py-0.5 mr-1 rounded text-gold font-semibold bg-gold/10 border border-gold/10">
+            {prefix.trim()}
           </span>
-        );
-      }
-      const boldMatch = part.match(/\*\*\[([^\]]+)\]\*\*/);
-      if (boldMatch) {
-        return (
-          <span 
-            key={index} 
-            className="font-bold text-red-800 dark:text-gold px-0.5"
-          >
-            [{boldMatch[1]}]
-          </span>
-        );
-      }
-      const normalMatch = part.match(/^\[([^\]]+)\]$/);
-      if (normalMatch) {
-        return (
-          <span 
-            key={index} 
-            className="font-bold text-red-800 dark:text-gold px-0.5"
-          >
-            [{normalMatch[1]}]
-          </span>
-        );
-      }
-      const parenMatch = part.match(/^\(([^\)]+)\)$/);
-      // We exclude short numbers like (1) or (देव वंदना) if needed, but for now we format all matched parens 
-      if (parenMatch && !part.match(/^\(\s*\d+\s*\)$/) && !part.match(/^\(कलश-/)) {
-        return (
-          <span 
-            key={index} 
-            className="text-sky-700 dark:text-sky-400 font-medium px-0.5"
-          >
-            ({parenMatch[1]})
-          </span>
-        );
-      }
-      const curlyMatch = part.match(/^\{([^\}]+)\}$/);
-      if (curlyMatch) {
-        return (
-          <span 
-            key={index} 
-            className="text-orange-800 dark:text-orange-400 font-semibold px-0.5"
-          >
-            {curlyMatch[1]}
-          </span>
-        );
-      }
-      return <span key={index}>{part}</span>;
-    });
+          {processText(restText)}
+        </span>
+      );
+    }
+
+    return processText(text);
   };
 
   // Helper to render commentary lines dynamically (centering कलश-दोहा and verses, highlighting brackets)
   const renderFormattedCommentary = (text: string, colorClass: string = "text-foreground/90") => {
-    const lines = text.split('\n');
+    if (!text) return null;
+
+    const paragraphs = text.split('\n');
     let inVerse = false;
 
-    return lines.map((lineText, index) => {
-      // Strip BOM (\ufeff) and zero-width characters
-      const clean = lineText.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+    return paragraphs.map((paragraph, index) => {
+      let clean = paragraph.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
       if (!clean) {
-        if (inVerse) return null; // Remove line space between doha lines
+        if (inVerse) return null;
         return <div key={index} className="h-2" />;
       }
 
-      // Check if it is wrapped in curly braces (used for centered text blocks)
       const isWrapped = clean.startsWith('{') && clean.endsWith('}');
       const unwrapped = isWrapped ? clean.slice(1, -1).trim() : clean;
-
-      // Check if it is a meter header (like (कलश-दोहा))
       const isMeterHeader = /^[(（].*?[)）]$/.test(unwrapped) && unwrapped.length <= 50;
 
       if (isMeterHeader) {
@@ -423,9 +446,7 @@ const ShastraReader = () => {
         );
       }
 
-      // Check if verse mode should end
-      const cleanForVerseEnd = unwrapped;
-      if (inVerse && (cleanForVerseEnd.startsWith('[') || cleanForVerseEnd.startsWith('**['))) {
+      if (inVerse && (unwrapped.startsWith('[') || unwrapped.startsWith('**['))) {
         inVerse = false;
       }
 
@@ -441,7 +462,7 @@ const ShastraReader = () => {
         );
       }
 
-      const isQuestion = unwrapped.startsWith('प्रश्न –') || unwrapped.startsWith('प्रश्न -');
+      const isQuestion = unwrapped.startsWith('प्रश्न –') || unwrapped.startsWith('प्रश्न -') || unwrapped.startsWith('शंका –') || unwrapped.startsWith('शंका -');
       const isCenteredOrange = isWrapped && !isMeterHeader;
       const isBullet = clean.startsWith('•');
       
@@ -597,7 +618,7 @@ const ShastraReader = () => {
                             }`}
                           >
                             <span className="truncate pr-2">
-                              {item.gathaNum} — {item.title}
+                              {item.gathaNum.replace('-parishisht', '')} — {item.title}
                             </span>
                             <ChevronRight className="w-3.5 h-3.5 opacity-50 flex-shrink-0" />
                           </button>
@@ -706,7 +727,7 @@ const ShastraReader = () => {
                         📂 {chapterName}
                       </span>
                       <span className="text-lg font-heading text-gold font-bold">
-                        #{gathaNum}
+                        #{gathaNum.replace('-parishisht', '-परिशिष्ट')}
                       </span>
                     </div>
 
@@ -716,19 +737,21 @@ const ShastraReader = () => {
                   </h3>
 
                   {/* Prakrit verse */}
-                  <div className="p-6 md:p-8 rounded-2xl bg-gold/5 border border-gold/20 shadow-sm relative mb-6">
-                    <h4 className="text-xs uppercase tracking-wider text-gold font-medium mb-3">{t('prakrit')}</h4>
-                    <p 
-                      className={`text-center text-xl md:text-2xl font-semibold devanagari-safe leading-loose ${readingClass} ${
-                        content.gatha.includes('ओंकारं बिन्दुसंयुक्तं')
-                          ? 'text-gold drop-shadow-[0_0_15px_rgba(212,175,55,0.8)]'
-                          : 'text-orange-800 dark:text-orange-400 drop-shadow-[0_4px_12px_rgba(234,88,12,0.7)] dark:drop-shadow-[0_4px_12px_rgba(251,146,60,0.8)]'
-                      }`}
-                      style={{ fontSize: `${contentFontSize * 1.25}px`, lineHeight: lineSpacing }}
-                    >
-                      {formatGathaText(content.gatha)}
-                    </p>
-                  </div>
+                  {chapterName !== 'परिशिष्ट' && (
+                    <div className="p-6 md:p-8 rounded-2xl bg-gold/5 border border-gold/20 shadow-sm relative mb-6">
+                      <h4 className="text-xs uppercase tracking-wider text-gold font-medium mb-3">{t('prakrit')}</h4>
+                      <p 
+                        className={`text-center text-xl md:text-2xl font-semibold devanagari-safe leading-loose ${readingClass} ${
+                          content.gatha.includes('ओंकारं बिन्दुसंयुक्तं')
+                            ? 'text-gold drop-shadow-[0_0_15px_rgba(212,175,55,0.8)]'
+                            : 'text-orange-800 dark:text-orange-400 drop-shadow-[0_4px_12px_rgba(234,88,12,0.7)] dark:drop-shadow-[0_4px_12px_rgba(251,146,60,0.8)]'
+                        }`}
+                        style={{ fontSize: `${contentFontSize * 1.25}px`, lineHeight: lineSpacing }}
+                      >
+                        {formatGathaText(content.gatha)}
+                      </p>
+                    </div>
+                  )}
 
                   {/* Sanskrit verse */}
                   {content.gathaS && (
@@ -744,7 +767,7 @@ const ShastraReader = () => {
                   )}
 
                   {/* Hindi Poetic Verse (Gadya) */}
-                  {content.gadya && (
+                  {content.gadya && chapterName !== 'परिशिष्ट' && (
                     <div className="text-center italic text-foreground/90 font-serif my-8 px-6 devanagari-safe border-l-2 border-r-2 border-gold/30">
                       <p 
                         className="leading-relaxed"
@@ -756,17 +779,19 @@ const ShastraReader = () => {
                   )}
 
                   {/* Anvayarth (Word Meanings) */}
-                  <div className="my-8">
-                    <h4 className="text-sm font-semibold text-gold mb-3 devanagari-safe">
-                      🔍 {t('anvayarth')}
-                    </h4>
-                    <div 
-                      className="text-foreground/95 devanagari-safe leading-loose"
-                      style={{ fontSize: `${contentFontSize}px`, lineHeight: lineSpacing }}
-                    >
-                      {renderHighlightedAnvayarth(content.anvayarth)}
+                  {chapterName !== 'परिशिष्ट' && (
+                    <div className="my-8">
+                      <h4 className="text-sm font-semibold text-gold mb-3 devanagari-safe">
+                        🔍 {t('anvayarth')}
+                      </h4>
+                      <div 
+                        className="text-foreground/95 devanagari-safe leading-loose"
+                        style={{ fontSize: `${contentFontSize}px`, lineHeight: lineSpacing }}
+                      >
+                        {renderHighlightedAnvayarth(content.anvayarth)}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Bhavarth (Special Meaning / Context) */}
                   {content.bhavarth && (
