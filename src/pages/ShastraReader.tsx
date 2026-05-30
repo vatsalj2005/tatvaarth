@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useRef, Fragment } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '@/contexts/AppContext';
@@ -180,33 +180,78 @@ const ShastraReader = () => {
 
   // 4. Auto-follow sidebar scroll
   useEffect(() => {
-    if (isAutoFollow && activeGathaNum) {
-      const activeSidebarItem = document.getElementById(`sidebar-link-${activeGathaNum}`);
-      const container = document.getElementById('sidebar-scroll-container');
+    if (isAutoFollow && activeGathaNum && isSidebarOpen) {
+      isProgrammaticScrollRef.current = true; // Block scroll events immediately during mount/animation
       
-      if (activeSidebarItem && container) {
-        const containerRect = container.getBoundingClientRect();
-        const itemRect = activeSidebarItem.getBoundingClientRect();
+      // Always block manual scroll detection for 1 full second when auto-following or mounting
+      // to prevent the browser's native scroll-restoration from triggering it
+      if (programmaticScrollTimeoutRef.current) {
+        clearTimeout(programmaticScrollTimeoutRef.current);
+      }
+      programmaticScrollTimeoutRef.current = setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+      }, 1000);
+
+      // Need a small timeout to ensure the sidebar DOM is fully mounted and animated before scrolling
+      const timer = setTimeout(() => {
+        const activeSidebarItem = document.getElementById(`sidebar-link-${activeGathaNum}`);
+        const container = document.getElementById('sidebar-scroll-container');
         
-        // Only scroll if item is outside the visible center bounds (buffer of 50px)
-        const isOutsideCenter = itemRect.top < containerRect.top + 50 || itemRect.bottom > containerRect.bottom - 50;
-        
-        if (isOutsideCenter) {
-          const offset = itemRect.top - containerRect.top - (containerRect.height / 2) + (itemRect.height / 2);
+        if (activeSidebarItem && container) {
+          const containerRect = container.getBoundingClientRect();
+          const itemRect = activeSidebarItem.getBoundingClientRect();
           
-          isProgrammaticScrollRef.current = true;
-          container.scrollBy({ top: offset, behavior: 'smooth' });
+          // Only scroll if item is outside the visible center bounds (buffer of 50px)
+          const isOutsideCenter = itemRect.top < containerRect.top + 50 || itemRect.bottom > containerRect.bottom - 50;
           
-          if (programmaticScrollTimeoutRef.current) {
-            clearTimeout(programmaticScrollTimeoutRef.current);
+          if (isOutsideCenter) {
+            const offset = itemRect.top - containerRect.top - (containerRect.height / 2) + (itemRect.height / 2);
+            container.scrollBy({ top: offset, behavior: 'smooth' });
           }
-          programmaticScrollTimeoutRef.current = setTimeout(() => {
-            isProgrammaticScrollRef.current = false;
-          }, 1000);
         }
+      }, 50); // Short delay ensures Framer Motion has mounted the container
+      
+      return () => clearTimeout(timer);
+    }
+  }, [activeGathaNum, isAutoFollow, isSidebarOpen]);
+
+  // Preserve scroll position when sidebar toggles
+  const layoutPreserveRef = useRef<number | null>(null);
+  
+  const handleSidebarToggle = (newState: boolean) => {
+    if (activeGathaNum) {
+      const el = document.getElementById(`gatha-${activeGathaNum}`);
+      if (el) {
+        layoutPreserveRef.current = el.getBoundingClientRect().top;
       }
     }
-  }, [activeGathaNum, isAutoFollow]);
+    
+    // Pre-emptively block scroll events BEFORE the sidebar mounts to catch any
+    // immediate scroll restorations fired by the browser during the paint phase.
+    isProgrammaticScrollRef.current = true;
+    if (programmaticScrollTimeoutRef.current) {
+      clearTimeout(programmaticScrollTimeoutRef.current);
+    }
+    programmaticScrollTimeoutRef.current = setTimeout(() => {
+      isProgrammaticScrollRef.current = false;
+    }, 1000);
+
+    setIsSidebarOpen(newState);
+  };
+
+  useLayoutEffect(() => {
+    if (layoutPreserveRef.current !== null && activeGathaNum) {
+      const el = document.getElementById(`gatha-${activeGathaNum}`);
+      if (el) {
+        const currentY = el.getBoundingClientRect().top;
+        const diff = currentY - layoutPreserveRef.current;
+        if (Math.abs(diff) > 0) {
+          window.scrollBy(0, diff);
+        }
+      }
+      layoutPreserveRef.current = null;
+    }
+  }, [isSidebarOpen, activeGathaNum]);
 
   if (!shastraIndex) {
     return (
@@ -421,6 +466,7 @@ const ShastraReader = () => {
 
     const paragraphs = text.split('\n');
     let inVerse = false;
+    let wasLastLineWrapped = false;
 
     return paragraphs.map((paragraph, index) => {
       let clean = paragraph.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
@@ -435,6 +481,7 @@ const ShastraReader = () => {
 
       if (isMeterHeader) {
         inVerse = true;
+        wasLastLineWrapped = isWrapped;
         return (
           <div 
             key={index} 
@@ -446,15 +493,21 @@ const ShastraReader = () => {
         );
       }
 
-      if (inVerse && (unwrapped.startsWith('[') || unwrapped.startsWith('**['))) {
-        inVerse = false;
+      if (inVerse) {
+        if (unwrapped.startsWith('[') || unwrapped.startsWith('**[')) {
+          inVerse = false;
+        } else if (wasLastLineWrapped && !isWrapped) {
+          inVerse = false;
+        }
       }
+      
+      wasLastLineWrapped = isWrapped;
 
       if (inVerse) {
         return (
           <div 
             key={index} 
-            className="text-center text-green-800 dark:text-green-600 font-semibold my-1.5 leading-relaxed devanagari-safe"
+            className="text-center text-green-800 dark:text-green-600 font-semibold !m-0 !leading-tight devanagari-safe"
             style={{ fontSize: "1.2em" }}
           >
             {unwrapped}
@@ -520,11 +573,11 @@ const ShastraReader = () => {
         </span>
       </button>
 
-      <div className={`flex-1 flex pt-16 relative transition-all duration-300 ${isSidebarOpen && !isLoadingGathas ? 'md:pl-[280px]' : ''}`}>
+      <div className={`flex-1 flex pt-16 relative ${isSidebarOpen && !isLoadingGathas ? 'md:pl-[280px]' : ''}`}>
         {/* Toggle Sidebar Button for Desktop & Mobile */}
         {!isLoadingGathas && (
           <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            onClick={() => handleSidebarToggle(!isSidebarOpen)}
             className={`fixed z-50 bottom-6 left-6 p-3 rounded-full bg-gold text-primary-foreground shadow-lg hover:opacity-90 transition-all flex items-center justify-center`}
             title="Toggle Navigation Menu"
           >
@@ -542,7 +595,7 @@ const ShastraReader = () => {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                onClick={() => setIsSidebarOpen(false)}
+                onClick={() => handleSidebarToggle(false)}
                 className="md:hidden fixed inset-0 z-30 bg-background/60 backdrop-blur-sm top-16"
               />
 
@@ -570,7 +623,7 @@ const ShastraReader = () => {
                       </button>
                     )}
                     <button 
-                      onClick={() => setIsSidebarOpen(false)}
+                      onClick={() => handleSidebarToggle(false)}
                       className="md:hidden p-1 rounded-lg hover:bg-secondary"
                     >
                       <X className="w-5 h-5 text-muted-foreground" />
