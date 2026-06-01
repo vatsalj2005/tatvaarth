@@ -368,8 +368,14 @@ const ShastraReader = () => {
           ? "text-foreground/95" 
           : "text-green-800 dark:text-green-600";
 
+      const style = trimmed === "आर्हत भक्ति"
+        ? { fontSize: "2.1em" }
+        : trimmed === "पण्डित-जुगल-किशोर कृत"
+          ? { fontSize: "0.55em" }
+          : undefined;
+
       return (
-        <span key={i} className={colorClass}>
+        <span key={i} className={colorClass} style={style}>
           {line}
           {i < arr.length - 1 && <br />}
         </span>
