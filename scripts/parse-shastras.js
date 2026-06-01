@@ -58,9 +58,14 @@ function parseGathaHtml(filePath) {
     
     // Gatha
     let gatha = "";
-    const gathaMatch = html.match(/<div[^>]*class=["']?gatha["']?[^>]*>([\s\S]*?)<\/div>/i);
-    if (gathaMatch) {
-      gatha = stripHtml(gathaMatch[1]);
+    const bronzeMatch = html.match(/<span[^>]*?(?:color=["']?bronze["']?|color:\s*bronze)[^>]*?>([\s\S]*?)<\/span>/i);
+    if (bronzeMatch) {
+      gatha = "!! नम: श्रीसर्वज्ञवीतरागाय !!\n\n" + stripHtml(bronzeMatch[1]);
+    } else {
+      const gathaMatch = html.match(/<div[^>]*class=["']?gatha["']?[^>]*>([\s\S]*?)<\/div>/i);
+      if (gathaMatch) {
+        gatha = stripHtml(gathaMatch[1]);
+      }
     }
     
     // Anvayarth
@@ -72,9 +77,9 @@ function parseGathaHtml(filePath) {
     
     // Bhavarth
     let bhavarth = "";
-    const commentIndex = html.indexOf('class=comment');
-    if (commentIndex !== -1) {
-      const restHtml = html.substring(commentIndex + 'class=comment'.length);
+    if (commentMatch) {
+      const firstCommentEndIndex = commentMatch.index + commentMatch[0].length;
+      const restHtml = html.substring(firstCommentEndIndex);
       const endBlockIndex = restHtml.indexOf('<br><div class=teekakaar>');
       const rawBhavarth = endBlockIndex !== -1 ? restHtml.substring(0, endBlockIndex) : restHtml;
       bhavarth = stripHtml(rawBhavarth);
