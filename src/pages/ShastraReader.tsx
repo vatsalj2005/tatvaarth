@@ -311,16 +311,31 @@ const ShastraReader = () => {
   // Helper to highlight bracketed words in Anvayarth
   const renderHighlightedAnvayarth = (text: string) => {
     return text.split('\n').map((line, lineIndex, arr) => {
+      const trimmed = line.trim();
+      const isStarLine = trimmed.startsWith('*');
+      
       const parts = line.split(/(\*\*\[[^\]]+\]\*\*|\([^\)]+\))/);
+      
+      const displayClasses = isStarLine
+        ? "block mb-1 last:mb-0 text-gold-light font-medium leading-normal"
+        : "block mb-2 last:mb-0";
+        
+      const displayStyle = isStarLine
+        ? { fontSize: '0.55em' }
+        : undefined;
+
       return (
-        <span key={lineIndex} className="block mb-2 last:mb-0">
+        <span key={lineIndex} className={displayClasses} style={displayStyle}>
           {parts.map((part, index) => {
             const boldMatch = part.match(/\*\*\[([^\]]+)\]\*\*/);
             if (boldMatch) {
               return (
                 <span 
                   key={index} 
-                  className="inline-block px-1 py-0.5 mx-0.5 rounded text-gold font-semibold bg-gold/10 border border-gold/10"
+                  className={isStarLine 
+                    ? "text-gold font-bold px-0.5"
+                    : "inline-block px-1 py-0.5 mx-0.5 rounded text-gold font-semibold bg-gold/10 border border-gold/10"
+                  }
                 >
                   {boldMatch[1]}
                 </span>

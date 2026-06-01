@@ -616,16 +616,31 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
   // Helper to render bracketed words in Anvayarth
   const renderHighlightedAnvayarth = (text: string) => {
     return text.split('\n').map((line, lineIndex, arr) => {
+      const trimmed = line.trim();
+      const isStarLine = trimmed.startsWith('*');
+
       const parts = line.split(/(\*\*\[[^\]]+\]\*\*|\([^\)]+\))/);
+
+      const displayClasses = isStarLine
+        ? "block mb-0.5 last:mb-0 text-gold-light font-medium leading-normal"
+        : "block mb-1.5 last:mb-0";
+
+      const displayStyle = isStarLine
+        ? { fontSize: '0.55em' }
+        : undefined;
+
       return (
-        <span key={lineIndex} className="block mb-1.5 last:mb-0">
+        <span key={lineIndex} className={displayClasses} style={displayStyle}>
           {parts.map((part, index) => {
             const boldMatch = part.match(/\*\*\[([^\]]+)\]\*\*/);
             if (boldMatch) {
               return (
                 <span 
                   key={index} 
-                  className="inline px-1 py-0.5 mx-0.5 rounded text-gold font-bold bg-gold/10 border border-gold/25 text-sm"
+                  className={isStarLine 
+                    ? "text-gold font-bold px-0.5 text-sm"
+                    : "inline px-1 py-0.5 mx-0.5 rounded text-gold font-bold bg-gold/10 border border-gold/25 text-sm"
+                  }
                 >
                   {boldMatch[1]}
                 </span>
