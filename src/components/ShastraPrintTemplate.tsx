@@ -617,7 +617,7 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
   const renderHighlightedAnvayarth = (text: string) => {
     return text.split('\n').map((line, lineIndex, arr) => {
       const trimmed = line.trim();
-      const isStarLine = trimmed.startsWith('*');
+      const isStarLine = trimmed.startsWith('*') && !trimmed.startsWith('**');
 
       const parts = line.split(/(\*\*\[[^\]]+\]\*\*|\([^\)]+\))/);
 
@@ -626,7 +626,7 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
         : "block mb-1.5 last:mb-0";
 
       const displayStyle = isStarLine
-        ? { fontSize: '0.55em' }
+        ? { fontSize: '0.55em', marginLeft: '2rem' }
         : undefined;
 
       return (
