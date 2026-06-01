@@ -369,9 +369,9 @@ const ShastraReader = () => {
           : "text-green-800 dark:text-green-600";
 
       const style = trimmed === "आर्हत भक्ति"
-        ? { fontSize: "2.1em" }
+        ? { fontSize: "2.1em", lineHeight: "1", display: "inline-block", marginBottom: "-0.4rem" }
         : trimmed === "पण्डित-जुगल-किशोर कृत"
-          ? { fontSize: "0.55em" }
+          ? { fontSize: "0.55em", lineHeight: "1", display: "inline-block", marginTop: "-0.4rem" }
           : undefined;
 
       return (
