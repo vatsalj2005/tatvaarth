@@ -371,7 +371,7 @@ const ShastraReader = () => {
       const style = trimmed === "आर्हत भक्ति"
         ? { fontSize: "2.1em", lineHeight: "1.1", display: "block", margin: "0.25rem 0" }
         : trimmed === "पण्डित-जुगल-किशोर कृत"
-          ? { fontSize: "0.55em", lineHeight: "1.1", display: "block", margin: "0.15rem 0" }
+          ? { fontSize: "0.55em", lineHeight: "1.1", display: "block", margin: "0.15rem 0 1.25rem 0" }
           : undefined;
 
       return (
