@@ -48,6 +48,38 @@ function cleanText(text) {
   return text.trim().replace(/\s+/g, ' ');
 }
 
+// Find matching div to handle nested divs safely
+function findMatchingDiv(html, startIdx) {
+  let depth = 1;
+  let pos = startIdx;
+  
+  // Find the end of the opening tag
+  const openTagEnd = html.indexOf('>', pos);
+  if (openTagEnd === -1) return null;
+  pos = openTagEnd + 1;
+  
+  const tagReg = /<\/?div\b/gi;
+  tagReg.lastIndex = pos;
+  
+  let match;
+  while ((match = tagReg.exec(html)) !== null) {
+    if (match[0].toLowerCase() === '<div') {
+      depth++;
+    } else {
+      depth--;
+      if (depth === 0) {
+        const closeTagEnd = html.indexOf('>', match.index);
+        return {
+          start: startIdx,
+          end: closeTagEnd !== -1 ? closeTagEnd + 1 : match.index + match[0].length,
+          content: html.substring(openTagEnd + 1, match.index)
+        };
+      }
+    }
+  }
+  return null;
+}
+
 // Parse a single HTML file of a gatha
 function parseGathaHtml(filePath) {
   const html = fs.readFileSync(filePath, 'utf-8');
@@ -190,10 +222,13 @@ function parseGathaHtml(filePath) {
 
     // Extract Sanskrit commentary if present
     let sanskrit = "";
-    const steekaMatch = teekaHtml.match(/<div[^>]*class=["']?steeka["']?[^>]*>([\s\S]*?)<\/div>/i);
-    if (steekaMatch) {
-      sanskrit = stripHtml(steekaMatch[1]);
-      teekaHtml = teekaHtml.replace(steekaMatch[0], '');
+    const steekaIndex = teekaHtml.search(/<div[^>]*class=["']?steeka["']?[^>]*>/i);
+    if (steekaIndex !== -1) {
+      const matchedDiv = findMatchingDiv(teekaHtml, steekaIndex);
+      if (matchedDiv) {
+        sanskrit = stripHtml(matchedDiv.content);
+        teekaHtml = teekaHtml.substring(0, matchedDiv.start) + teekaHtml.substring(matchedDiv.end);
+      }
     }
 
     // Remove the title/header part
