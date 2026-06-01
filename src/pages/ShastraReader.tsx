@@ -75,7 +75,9 @@ const ShastraReader = () => {
     if (shastraSlug) {
       const idx = getShastraIndex(shastraSlug);
       setShastraIndex(idx);
-      if (idx && idx.chapters.length > 0 && idx.chapters[0].items.length > 0) {
+      if (idx && idx.cover) {
+        setActiveGathaNum('cover');
+      } else if (idx && idx.chapters.length > 0 && idx.chapters[0].items.length > 0) {
         setActiveGathaNum(idx.chapters[0].items[0].gathaNum);
       }
       // Clear gatha refs when shastra changes
@@ -653,6 +655,32 @@ const ShastraReader = () => {
                 className="flex-1 overflow-y-auto p-3 scrollbar-thin"
                 onScroll={handleSidebarScroll}
               >
+                {/* Shastra Cover Page Link */}
+                {shastraIndex.cover && (
+                  <div className="mb-4 relative">
+                    <ul className="space-y-1 ml-1">
+                      <li id="sidebar-link-cover" className="relative font-bold">
+                        <div className={`absolute left-[11px] top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full z-10 ${
+                          activeGathaNum === 'cover' ? 'bg-gold shadow-[0_0_8px_rgba(234,179,8,0.8)]' : 'bg-gold/40'
+                        }`}></div>
+                        <button
+                          onClick={() => scrollToGatha('cover')}
+                          className={`w-full text-left pl-7 pr-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between devanagari-safe font-bold ${
+                            activeGathaNum === 'cover'
+                              ? 'bg-gold/15 text-gold shadow-sm font-bold'
+                              : 'text-foreground/80 hover:bg-secondary hover:text-foreground font-bold'
+                          }`}
+                        >
+                          <span className="truncate pr-2">
+                            📖 {shastraIndex.title}
+                          </span>
+                          <ChevronRight className="w-3.5 h-3.5 opacity-50 flex-shrink-0" />
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
+                )}
+
                 {shastraIndex.chapters.map((chapter, chapIdx) => (
                   <div key={chapIdx} className="mb-6 relative">
                     <div className="sticky top-0 bg-card z-10 py-1 mb-2 border-b-2 border-gold/20">
@@ -695,7 +723,12 @@ const ShastraReader = () => {
           
           {/* Shastra Cover Page */}
           {!isLoadingGathas && shastraIndex?.cover && (
-            <div className="flex flex-col items-center justify-center min-h-[85vh] text-center py-16 mb-8 border-b border-gold/20 devanagari-safe">
+            <div
+              id="gatha-cover"
+              data-gatha-num="cover"
+              ref={(el) => { gathaRefs.current['cover'] = el; }}
+              className="flex flex-col items-center justify-center min-h-[85vh] text-center py-16 mb-8 border-b border-gold/20 devanagari-safe scroll-mt-20"
+            >
               {shastraIndex.cover.invocation && (
                 <h3 className="text-3xl md:text-4xl font-heading font-black text-gold drop-shadow-[0_2px_4px_rgba(212,175,55,0.4)] mb-12">
                   {shastraIndex.cover.invocation}
