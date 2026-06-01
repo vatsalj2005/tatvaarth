@@ -473,7 +473,7 @@ const ShastraReader = () => {
     return paragraphs.map((paragraph, index) => {
       let clean = paragraph.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
       if (!clean) {
-        if (inVerse) return null;
+        inVerse = false;
         return <div key={index} className="h-2" />;
       }
 
@@ -499,6 +499,8 @@ const ShastraReader = () => {
         if (unwrapped.startsWith('[') || unwrapped.startsWith('**[')) {
           inVerse = false;
         } else if (wasLastLineWrapped && !isWrapped) {
+          inVerse = false;
+        } else if (unwrapped.length > 100 || unwrapped.startsWith('-')) {
           inVerse = false;
         }
       }
