@@ -34,32 +34,91 @@ interface PageData {
 }
 
 const highlightBracketedTerms = (text: string) => {
-  const parts = text.split(/(\*\*\[[^\]]+\]\*\*|\[[^\]]+\])/);
-  return parts.map((part, index) => {
-    const boldMatch = part.match(/\*\*\[([^\]]+)\]\*\*/);
-    if (boldMatch) {
-      return (
-        <span 
-          key={index} 
-          className="font-bold text-red-800 dark:text-gold px-0.5"
-        >
-          [{boldMatch[1]}]
+  let prefix: string | null = null;
+  let restText = text;
+  
+  // Check for list items like "१. जीवत्वशक्ति -" or "३३-३८. भाव-अभावादि छह शक्तियाँ -"
+  const prefixMatch = text.match(/^([०-९0-9]+(?:-[०-९0-9]+)?\.\s+.*?[\s]*[-–]+(?:[\s]+|$))(.*)$/);
+  if (prefixMatch) {
+    prefix = prefixMatch[1];
+    restText = prefixMatch[2];
+  }
+
+  const processText = (t: string) => {
+    const parts = t.split(/(\*\*\[[^\]]+\]\*\*|\[[^\]]+\]|\([^\)]+\)|\{[^\}]+\}|(?:समाधान|उत्तर)\s*[–-])/);
+    return parts.map((part, index) => {
+      const solutionMatch = part.match(/^(समाधान|उत्तर)\s*([–-])$/);
+      if (solutionMatch) {
+        return (
+          <span 
+            key={index} 
+            className="text-emerald-700 dark:text-emerald-400 font-bold pr-1"
+          >
+            {solutionMatch[1]} {solutionMatch[2]}
+          </span>
+        );
+      }
+      const boldMatch = part.match(/\*\*\[([^\]]+)\]\*\*/);
+      if (boldMatch) {
+        return (
+          <span 
+            key={index} 
+            className="font-bold text-red-800 dark:text-gold px-0.5"
+          >
+            [{boldMatch[1]}]
+          </span>
+        );
+      }
+      const normalMatch = part.match(/^\[([^\]]+)\]$/);
+      if (normalMatch) {
+        return (
+          <span 
+            key={index} 
+            className="font-bold text-red-800 dark:text-gold px-0.5"
+          >
+            [{normalMatch[1]}]
+          </span>
+        );
+      }
+      const parenMatch = part.match(/^\(([^\)]+)\)$/);
+      // We exclude short numbers like (1) or (देव वंदना) if needed, but for now we format all matched parens 
+      if (parenMatch && !part.match(/^\(\s*\d+\s*\)$/) && !part.match(/^\(कलश-/)) {
+        return (
+          <span 
+            key={index} 
+            className="text-sky-700 dark:text-sky-400 font-medium px-0.5"
+          >
+            ({parenMatch[1]})
+          </span>
+        );
+      }
+      const curlyMatch = part.match(/^\{([^\}]+)\}$/);
+      if (curlyMatch) {
+        return (
+          <span 
+            key={index} 
+            className="text-orange-800 dark:text-orange-400 font-semibold px-0.5"
+          >
+            {curlyMatch[1]}
+          </span>
+        );
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
+
+  if (prefix) {
+    return (
+      <span className="inline-block">
+        <span className="inline-block px-1 py-0.5 mr-1 rounded text-gold font-semibold bg-gold/10 border border-gold/10">
+          {prefix.trim()}
         </span>
-      );
-    }
-    const normalMatch = part.match(/^\[([^\]]+)\]$/);
-    if (normalMatch) {
-      return (
-        <span 
-          key={index} 
-          className="font-bold text-red-800 dark:text-gold px-0.5"
-        >
-          [{normalMatch[1]}]
-        </span>
-      );
-    }
-    return <span key={index}>{part}</span>;
-  });
+        {processText(restText)}
+      </span>
+    );
+  }
+
+  return processText(text);
 };
 
 const renderTableBlockHelper = (id: string, rows: string[]) => {
@@ -79,8 +138,8 @@ const renderTableBlockHelper = (id: string, rows: string[]) => {
   const bodyRows = tableData.slice(1);
 
   return (
-    <div key={id} data-block-id={id} className="overflow-x-auto my-4 rounded-xl border-4 border-double border-gold/30 shadow-md bg-card/50 p-1 w-full">
-      <table className="min-w-full border-collapse text-xs devanagari-safe font-heading">
+    <div key={id} data-block-id={id} className="inline-block max-w-full overflow-x-auto my-4 rounded-xl border-4 border-double border-gold/30 shadow-md bg-card/50 p-1">
+      <table className="border-collapse text-xs devanagari-safe font-heading">
         <thead className="bg-gold/15 dark:bg-gold/10 font-bold text-foreground">
           <tr>
             {headerRow.map((cell, cellIdx) => (
@@ -259,6 +318,7 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
             if (!clean) return;
 
             const isMeterHeader = clean.startsWith('(') && clean.endsWith(')') && clean.length <= 50;
+            const isStarLine = clean.startsWith('*') && !clean.startsWith('**');
 
             if (isMeterHeader) {
               inVerse = true;
@@ -267,7 +327,7 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                 type: 'teeka_content_para',
                 gathaNum,
                 chapterName,
-                data: { isSanskrit: true, text: clean, isMeterHeader: true, inVerse: false }
+                data: { isSanskrit: true, text: clean, isMeterHeader: true, inVerse: false, isStarLine: false }
               });
             } else if (inVerse && (clean.startsWith('[') || clean.startsWith('**['))) {
               inVerse = false;
@@ -276,7 +336,7 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                 type: 'teeka_content_para',
                 gathaNum,
                 chapterName,
-                data: { isSanskrit: true, text: clean, isMeterHeader: false, inVerse: false }
+                data: { isSanskrit: true, text: clean, isMeterHeader: false, inVerse: false, isStarLine: false }
               });
             } else if (inVerse) {
               list.push({
@@ -284,7 +344,7 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                 type: 'teeka_content_para',
                 gathaNum,
                 chapterName,
-                data: { isSanskrit: true, text: clean, isMeterHeader: false, inVerse: true }
+                data: { isSanskrit: true, text: clean, isMeterHeader: false, inVerse: true, isStarLine: false }
               });
             } else {
               list.push({
@@ -292,7 +352,7 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                 type: 'teeka_content_para',
                 gathaNum,
                 chapterName,
-                data: { isSanskrit: true, text: clean, isMeterHeader: false, inVerse: false }
+                data: { isSanskrit: true, text: clean, isMeterHeader: false, inVerse: false, isStarLine }
               });
             }
           });
@@ -331,6 +391,7 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
             if (!clean) return;
 
             const isMeterHeader = clean.startsWith('(') && clean.endsWith(')') && clean.length <= 50;
+            const isStarLine = clean.startsWith('*') && !clean.startsWith('**');
 
             if (isMeterHeader) {
               inVerse = true;
@@ -339,7 +400,7 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                 type: 'teeka_content_para',
                 gathaNum,
                 chapterName,
-                data: { isSanskrit: false, text: clean, isMeterHeader: true, inVerse: false }
+                data: { isSanskrit: false, text: clean, isMeterHeader: true, inVerse: false, isStarLine: false }
               });
             } else if (inVerse && (clean.startsWith('[') || clean.startsWith('**['))) {
               inVerse = false;
@@ -348,7 +409,7 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                 type: 'teeka_content_para',
                 gathaNum,
                 chapterName,
-                data: { isSanskrit: false, text: clean, isMeterHeader: false, inVerse: false }
+                data: { isSanskrit: false, text: clean, isMeterHeader: false, inVerse: false, isStarLine: false }
               });
             } else if (inVerse) {
               list.push({
@@ -356,7 +417,7 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                 type: 'teeka_content_para',
                 gathaNum,
                 chapterName,
-                data: { isSanskrit: false, text: clean, isMeterHeader: false, inVerse: true }
+                data: { isSanskrit: false, text: clean, isMeterHeader: false, inVerse: true, isStarLine: false }
               });
             } else {
               list.push({
@@ -364,7 +425,7 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                 type: 'teeka_content_para',
                 gathaNum,
                 chapterName,
-                data: { isSanskrit: false, text: clean, isMeterHeader: false, inVerse: false }
+                data: { isSanskrit: false, text: clean, isMeterHeader: false, inVerse: false, isStarLine }
               });
             }
           });
@@ -651,7 +712,7 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
               return (
                 <span 
                   key={index} 
-                  className="text-gold-light font-medium text-sm"
+                  className="text-sky-700 dark:text-sky-400 font-medium text-sm px-0.5"
                 >
                   ({parenMatch[1]})
                 </span>
@@ -803,12 +864,24 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
               case 'teeka_content_para': {
                 const isMeterHeader = block.data.isMeterHeader;
                 const inVerse = block.data.inVerse;
+                const isStarLine = block.data.isStarLine;
                 
                 let paraClass = "my-2 text-xs leading-loose ";
+                let paraStyle: React.CSSProperties | undefined = undefined;
+                
                 if (isMeterHeader) {
                   paraClass += "text-center font-bold text-teal-700 dark:text-teal-400 my-3 text-sm devanagari-safe";
                 } else if (inVerse) {
                   paraClass += "text-center text-orange-800 dark:text-orange-400 font-semibold my-1 text-base leading-relaxed devanagari-safe";
+                } else if (isStarLine) {
+                  paraClass += "text-gold-light text-left font-medium devanagari-safe";
+                  paraStyle = {
+                    fontSize: '0.55em',
+                    marginLeft: '2rem',
+                    marginTop: '1px',
+                    marginBottom: '1px',
+                    lineHeight: '1.4'
+                  };
                 } else {
                   paraClass += `text-foreground/90 text-left devanagari-safe ${block.data.isSanskrit ? 'bg-gold/5 p-2.5 rounded-lg border border-gold/10 italic text-foreground/80' : ''}`;
                 }
@@ -818,8 +891,9 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                     key={block.id} 
                     data-block-id={block.id} 
                     className={paraClass}
+                    style={paraStyle}
                   >
-                    {block.data.isSanskrit && !isMeterHeader && !inVerse && (
+                    {block.data.isSanskrit && !isMeterHeader && !inVerse && !isStarLine && (
                       <span className="font-bold text-[9px] uppercase text-gold block mb-1">संस्कृत</span>
                     )}
                     {isMeterHeader || inVerse 
@@ -997,12 +1071,24 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                           case 'teeka_content_para': {
                             const isMeterHeader = block.data.isMeterHeader;
                             const inVerse = block.data.inVerse;
+                            const isStarLine = block.data.isStarLine;
                             
                             let paraClass = "my-1 text-xs leading-loose ";
+                            let paraStyle: React.CSSProperties | undefined = undefined;
+                            
                             if (isMeterHeader) {
                               paraClass += "text-center font-bold text-teal-700 dark:text-teal-400 my-2 text-sm devanagari-safe";
                             } else if (inVerse) {
                               paraClass += "text-center text-orange-800 dark:text-orange-400 font-semibold my-0.5 text-base leading-relaxed devanagari-safe";
+                            } else if (isStarLine) {
+                              paraClass += "text-gold-light text-left font-medium devanagari-safe";
+                              paraStyle = {
+                                fontSize: '0.55em',
+                                marginLeft: '2rem',
+                                marginTop: '1px',
+                                marginBottom: '1px',
+                                lineHeight: '1.4'
+                              };
                             } else {
                               paraClass += `text-foreground/90 text-left devanagari-safe ${block.data.isSanskrit ? 'bg-gold/5 p-2.5 rounded-lg border border-gold/10 italic text-foreground/80' : ''}`;
                             }
@@ -1011,8 +1097,9 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                               <p 
                                 key={block.id} 
                                 className={paraClass}
+                                style={paraStyle}
                               >
-                                {block.data.isSanskrit && !isMeterHeader && !inVerse && (
+                                {block.data.isSanskrit && !isMeterHeader && !inVerse && !isStarLine && (
                                   <span className="font-bold text-[9px] uppercase text-gold block mb-1">संस्कृत</span>
                                 )}
                                 {isMeterHeader || inVerse 

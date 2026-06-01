@@ -346,7 +346,7 @@ const ShastraReader = () => {
               return (
                 <span 
                   key={index} 
-                  className="text-gold-light font-medium"
+                  className="text-sky-700 dark:text-sky-400 font-medium px-0.5"
                 >
                   ({parenMatch[1]})
                 </span>
@@ -520,8 +520,8 @@ const ShastraReader = () => {
       const bodyRows = tableData.slice(1);
 
       renderedElements.push(
-        <div key={`table-${keyIndex}`} className="overflow-x-auto my-6 rounded-xl border-4 border-double border-gold/30 shadow-md bg-card/50 p-1">
-          <table className="min-w-full border-collapse text-sm devanagari-safe font-heading">
+        <div key={`table-${keyIndex}`} className="inline-block max-w-full overflow-x-auto my-6 rounded-xl border-4 border-double border-gold/30 shadow-md bg-card/50 p-1">
+          <table className="border-collapse text-sm devanagari-safe font-heading">
             <thead className="bg-gold/15 dark:bg-gold/10 font-bold text-foreground">
               <tr>
                 {headerRow.map((cell, cellIdx) => (
@@ -607,12 +607,15 @@ const ShastraReader = () => {
         return;
       }
 
+      const isStarLine = unwrapped.startsWith('*') && !unwrapped.startsWith('**');
       const isQuestion = unwrapped.startsWith('प्रश्न –') || unwrapped.startsWith('प्रश्न -') || unwrapped.startsWith('शंका –') || unwrapped.startsWith('शंका -');
       const isCenteredOrange = isWrapped && !isMeterHeader;
       const isBullet = clean.startsWith('•');
       
       let displayClasses = '';
-      if (isQuestion) {
+      if (isStarLine) {
+        displayClasses = 'text-gold-light text-left font-medium leading-normal';
+      } else if (isQuestion) {
         displayClasses = 'text-red-600 dark:text-red-400 font-semibold text-left';
       } else if (isCenteredOrange) {
         displayClasses = 'text-orange-800 dark:text-orange-400 font-semibold text-center';
@@ -620,18 +623,30 @@ const ShastraReader = () => {
         displayClasses = `${colorClass} text-left`;
       }
 
+      const displayStyle = isStarLine 
+        ? { 
+            fontSize: '0.55em', 
+            marginLeft: '2rem', 
+            marginTop: '1px', 
+            marginBottom: '1px', 
+            lineHeight: '1.4' 
+          }
+        : isBullet 
+          ? { 
+              marginLeft: '1.5rem',
+              paddingLeft: '1.2rem', 
+              textIndent: '-1.2rem',
+              marginTop: '2px',
+              marginBottom: '2px',
+              lineHeight: '1.4'
+            } 
+          : undefined;
+
       renderedElements.push(
         <div 
           key={index} 
-          className={`${displayClasses} ${isBullet ? 'my-0.5' : 'my-2'} leading-loose devanagari-safe`}
-          style={isBullet ? { 
-            marginLeft: '1.5rem',
-            paddingLeft: '1.2rem', 
-            textIndent: '-1.2rem',
-            marginTop: '2px',
-            marginBottom: '2px',
-            lineHeight: '1.4'
-          } : undefined}
+          className={`${displayClasses} ${isStarLine ? 'my-0.5' : isBullet ? 'my-0.5' : 'my-2'} leading-loose devanagari-safe`}
+          style={displayStyle}
         >
           {highlightBracketedTerms(unwrapped)}
         </div>
