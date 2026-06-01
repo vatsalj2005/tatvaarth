@@ -642,11 +642,11 @@ const ShastraReader = () => {
 
       const displayStyle = isStarLine 
         ? { 
-            fontSize: '0.55em', 
+            fontSize: '0.85em', 
             marginLeft: '2rem', 
-            marginTop: '1px', 
-            marginBottom: '1px', 
-            lineHeight: '1.4' 
+            marginTop: '0px', 
+            marginBottom: '0px', 
+            lineHeight: '1.3' 
           }
         : isBullet 
           ? { 

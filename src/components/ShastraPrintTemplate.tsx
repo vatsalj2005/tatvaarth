@@ -899,11 +899,11 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                 } else if (isStarLine) {
                   paraClass += "text-gold-light text-left font-medium devanagari-safe";
                   paraStyle = {
-                    fontSize: '0.55em',
+                    fontSize: '0.85em',
                     marginLeft: '2rem',
-                    marginTop: '1px',
-                    marginBottom: '1px',
-                    lineHeight: '1.4'
+                    marginTop: '0px',
+                    marginBottom: '0px',
+                    lineHeight: '1.3'
                   };
                 } else if (isBoldTitle) {
                   paraClass += "text-gold text-center font-bold my-4 text-base devanagari-safe";
@@ -1109,11 +1109,11 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                             } else if (isStarLine) {
                               paraClass += "text-gold-light text-left font-medium devanagari-safe";
                               paraStyle = {
-                                fontSize: '0.55em',
+                                fontSize: '0.85em',
                                 marginLeft: '2rem',
-                                marginTop: '1px',
-                                marginBottom: '1px',
-                                lineHeight: '1.4'
+                                marginTop: '0px',
+                                marginBottom: '0px',
+                                lineHeight: '1.3'
                               };
                             } else if (isBoldTitle) {
                               paraClass += "text-gold text-center font-bold my-3 text-base devanagari-safe";
