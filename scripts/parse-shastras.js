@@ -13,6 +13,57 @@ function stripHtml(html) {
   if (!html) return "";
   
   let text = html;
+
+  // Convert HTML tables to Markdown tables
+  text = text.replace(/<table[^>]*>([\s\S]*?)<\/table>/gi, (tableMatch, tableBody) => {
+    const rows = [];
+    const rowMatches = tableBody.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi);
+    for (const rowMatch of rowMatches) {
+      const rowContent = rowMatch[1];
+      const cells = [];
+      const cellMatches = [...rowContent.matchAll(/<(td|th)[^>]*>([\s\S]*?)<\/\1>/gi)];
+      
+      if (cellMatches.length > 0) {
+        for (const cellMatch of cellMatches) {
+          let cellText = cellMatch[2].replace(/<br\s*\/?>/gi, ' ');
+          cellText = cellText.replace(/<[^>]+>/g, '').trim().replace(/\s+/g, ' ');
+          cells.push(cellText);
+        }
+      } else {
+        let rowText = rowContent.replace(/<br\s*\/?>/gi, ' ');
+        rowText = rowText.replace(/<[^>]+>/g, '').trim().replace(/\s+/g, ' ');
+        if (rowText) {
+          cells.push(rowText);
+        }
+      }
+      
+      if (cells.length > 0) {
+        rows.push(cells);
+      }
+    }
+    
+    if (rows.length === 0) return "";
+    
+    let markdownTable = "\n\n";
+    let startIndex = 0;
+    if (rows[0].length === 1) {
+      markdownTable += `**${rows[0][0]}**\n\n`;
+      startIndex = 1;
+    }
+    
+    if (startIndex < rows.length) {
+      const headerRow = rows[startIndex];
+      markdownTable += "| " + headerRow.join(" | ") + " |\n";
+      markdownTable += "| " + headerRow.map(() => "---").join(" | ") + " |\n";
+      
+      for (let i = startIndex + 1; i < rows.length; i++) {
+        markdownTable += "| " + rows[i].join(" | ") + " |\n";
+      }
+    }
+    
+    markdownTable += "\n";
+    return markdownTable;
+  });
   
   // Convert <div class=gadya>...</div> to separate lines wrapped in { }
   text = text.replace(/<div[^>]*class=["']?gadya["']?[^>]*>([\s\S]*?)<\/div>/gi, (match, p1) => {

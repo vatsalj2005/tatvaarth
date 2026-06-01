@@ -19,7 +19,7 @@ interface ShastraPrintTemplateProps {
 
 interface Block {
   id: string;
-  type: 'toc_header' | 'toc_row' | 'gatha_title' | 'prakrit' | 'sanskrit' | 'gadya' | 'anvayarth' | 'english' | 'teeka_header' | 'teeka_content_para';
+  type: 'toc_header' | 'toc_row' | 'gatha_title' | 'prakrit' | 'sanskrit' | 'gadya' | 'anvayarth' | 'english' | 'teeka_header' | 'teeka_content_para' | 'table';
   gathaNum?: string;
   chapterName?: string;
   data: any;
@@ -60,6 +60,50 @@ const highlightBracketedTerms = (text: string) => {
     }
     return <span key={index}>{part}</span>;
   });
+};
+
+const renderTableBlockHelper = (id: string, rows: string[]) => {
+  const tableData: string[][] = [];
+  rows.forEach(row => {
+    const cells = row.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+    if (cells.every(c => c.match(/^---+$/) || c === '')) {
+      // Skip separator
+    } else {
+      tableData.push(cells);
+    }
+  });
+
+  if (tableData.length === 0) return null;
+
+  const headerRow = tableData[0];
+  const bodyRows = tableData.slice(1);
+
+  return (
+    <div key={id} data-block-id={id} className="overflow-x-auto my-4 rounded-xl border-4 border-double border-gold/30 shadow-md bg-card/50 p-1 w-full">
+      <table className="min-w-full border-collapse text-xs devanagari-safe font-heading">
+        <thead className="bg-gold/15 dark:bg-gold/10 font-bold text-foreground">
+          <tr>
+            {headerRow.map((cell, cellIdx) => (
+              <th key={cellIdx} className="px-3 py-2 text-center font-bold text-gold border border-gold/20">
+                {highlightBracketedTerms(cell)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="bg-card">
+          {bodyRows.map((row, rowIdx) => (
+            <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-emerald-500/10 dark:bg-emerald-500/15' : 'bg-sky-500/10 dark:bg-sky-500/15'}>
+              {row.map((cell, cellIdx) => (
+                <td key={cellIdx} className="px-3 py-1.5 text-center text-foreground/90 border border-border/50">
+                  {highlightBracketedTerms(cell)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 };
 
 const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
@@ -187,8 +231,31 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
           const lines = teeka.sanskrit.split('\n');
           let inVerse = false;
           let pIdx = 0;
+          let currentTableRows: string[] = [];
+
+          const flushTableBlock = () => {
+            if (currentTableRows.length > 0) {
+              list.push({
+                id: `gatha-${gathaNum}-teeka-${comm}-sanskrit-table-${pIdx++}`,
+                type: 'table',
+                gathaNum,
+                chapterName,
+                data: [...currentTableRows]
+              });
+              currentTableRows = [];
+            }
+          };
+
           lines.forEach((lineText) => {
             const clean = lineText.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+
+            if (clean.startsWith('|')) {
+              currentTableRows.push(clean);
+              return;
+            } else {
+              flushTableBlock();
+            }
+
             if (!clean) return;
 
             const isMeterHeader = clean.startsWith('(') && clean.endsWith(')') && clean.length <= 50;
@@ -229,14 +296,38 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
               });
             }
           });
+          flushTableBlock();
         }
 
         if (teeka.hindi) {
           const lines = teeka.hindi.split('\n');
           let inVerse = false;
           let pIdx = 0;
+          let currentTableRows: string[] = [];
+
+          const flushTableBlock = () => {
+            if (currentTableRows.length > 0) {
+              list.push({
+                id: `gatha-${gathaNum}-teeka-${comm}-hindi-table-${pIdx++}`,
+                type: 'table',
+                gathaNum,
+                chapterName,
+                data: [...currentTableRows]
+              });
+              currentTableRows = [];
+            }
+          };
+
           lines.forEach((lineText) => {
             const clean = lineText.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+
+            if (clean.startsWith('|')) {
+              currentTableRows.push(clean);
+              return;
+            } else {
+              flushTableBlock();
+            }
+
             if (!clean) return;
 
             const isMeterHeader = clean.startsWith('(') && clean.endsWith(')') && clean.length <= 50;
@@ -277,6 +368,7 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
               });
             }
           });
+          flushTableBlock();
         }
       });
     });
@@ -723,6 +815,9 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                 );
               }
 
+              case 'table':
+                return renderTableBlockHelper(block.id, block.data);
+
               default:
                 return null;
             }
@@ -913,8 +1008,11 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                             );
                           }
 
-                          default:
-                            return null;
+                           case 'table':
+                             return renderTableBlockHelper(block.id, block.data);
+
+                           default:
+                             return null;
                         }
                       })}
                     </div>
