@@ -520,29 +520,31 @@ const ShastraReader = () => {
       const bodyRows = tableData.slice(1);
 
       renderedElements.push(
-        <div key={`table-${keyIndex}`} className="inline-block max-w-full overflow-x-auto my-6 rounded-xl border-4 border-double border-gold/30 shadow-md bg-card/50 p-1">
-          <table className="border-collapse text-sm devanagari-safe font-heading">
-            <thead className="bg-gold/15 dark:bg-gold/10 font-bold text-foreground">
-              <tr>
-                {headerRow.map((cell, cellIdx) => (
-                  <th key={cellIdx} className="px-4 py-3 text-center font-bold text-gold border border-gold/20">
-                    {highlightBracketedTerms(cell)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="bg-card">
-              {bodyRows.map((row, rowIdx) => (
-                <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-emerald-500/10 dark:bg-emerald-500/15' : 'bg-sky-500/10 dark:bg-sky-500/15'}>
-                  {row.map((cell, cellIdx) => (
-                    <td key={cellIdx} className="px-4 py-2.5 text-center text-foreground/90 border border-border/50">
+        <div key={`table-${keyIndex}`} className="w-full flex justify-center my-6">
+          <div className="inline-block max-w-full overflow-x-auto rounded-xl border-4 border-double border-gold/30 shadow-md bg-card/50 p-1">
+            <table className="border-collapse text-sm devanagari-safe font-heading">
+              <thead className="bg-gold/15 dark:bg-gold/10 font-bold text-foreground">
+                <tr>
+                  {headerRow.map((cell, cellIdx) => (
+                    <th key={cellIdx} className="px-4 py-3 text-center font-bold text-gold border border-gold/20">
                       {highlightBracketedTerms(cell)}
-                    </td>
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-card">
+                {bodyRows.map((row, rowIdx) => (
+                  <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-emerald-500/10 dark:bg-emerald-500/15' : 'bg-sky-500/10 dark:bg-sky-500/15'}>
+                    {row.map((cell, cellIdx) => (
+                      <td key={cellIdx} className="px-4 py-2.5 text-center text-foreground/90 border border-border/50">
+                        {highlightBracketedTerms(cell)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       );
     };
@@ -593,6 +595,21 @@ const ShastraReader = () => {
       }
       
       wasLastLineWrapped = isWrapped;
+
+      const isBoldTitle = unwrapped.startsWith('**') && unwrapped.endsWith('**') && !unwrapped.startsWith('**[');
+      if (isBoldTitle) {
+        const unwrappedTitle = unwrapped.slice(2, -2).trim();
+        renderedElements.push(
+          <div 
+            key={index} 
+            className="text-center font-bold text-gold my-4 devanagari-safe"
+            style={{ fontSize: "1.15em" }}
+          >
+            {highlightBracketedTerms(unwrappedTitle)}
+          </div>
+        );
+        return;
+      }
 
       if (inVerse) {
         renderedElements.push(
