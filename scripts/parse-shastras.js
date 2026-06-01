@@ -51,6 +51,46 @@ function cleanText(text) {
 // Parse a single HTML file of a gatha
 function parseGathaHtml(filePath) {
   const html = fs.readFileSync(filePath, 'utf-8');
+  const fileName = path.basename(filePath);
+
+  if (fileName.startsWith('0000_शास्त्र-मंगलाचरण')) {
+    const title = "शास्त्र-मंगलाचरण";
+    
+    // Gatha
+    let gatha = "";
+    const gathaMatch = html.match(/<div[^>]*class=["']?gatha["']?[^>]*>([\s\S]*?)<\/div>/i);
+    if (gathaMatch) {
+      gatha = stripHtml(gathaMatch[1]);
+    }
+    
+    // Anvayarth
+    let anvayarth = "";
+    const commentMatch = html.match(/<div[^>]*class=["']?comment["']?[^>]*>([\s\S]*?)<\/div>/i);
+    if (commentMatch) {
+      anvayarth = stripHtml(commentMatch[1]);
+    }
+    
+    // Bhavarth
+    let bhavarth = "";
+    const commentIndex = html.indexOf('class=comment');
+    if (commentIndex !== -1) {
+      const restHtml = html.substring(commentIndex + 'class=comment'.length);
+      const endBlockIndex = restHtml.indexOf('<br><div class=teekakaar>');
+      const rawBhavarth = endBlockIndex !== -1 ? restHtml.substring(0, endBlockIndex) : restHtml;
+      bhavarth = stripHtml(rawBhavarth);
+    }
+    
+    return {
+      title,
+      gatha,
+      gathaS: "",
+      gadya: "",
+      anvayarth,
+      english: "",
+      bhavarth,
+      teekas: []
+    };
+  }
 
   // 1. Title
   let title = "";
@@ -86,9 +126,10 @@ function parseGathaHtml(filePath) {
 
   // 5. Anvayarth (Paragraph)
   let anvayarth = "";
-  const anvayarthMatch = html.match(/<div[^>]*class=["']?paragraph["']?[^>]*>([\s\S]*?)<\/div>/i);
-  if (anvayarthMatch) {
-    let content = anvayarthMatch[1];
+  const anvayarthMatches = html.matchAll(/<div[^>]*class=["']?paragraph\b[^>]*>([\s\S]*?)<\/div>/gi);
+  const anvayarthContents = [];
+  for (const match of anvayarthMatches) {
+    let content = match[1];
     // Strip "अन्वयार्थ :" prefix if it exists
     content = content.replace(/<b><font color=[^>]*>अन्वयार्थ\s*:\s*<\/font><\/b>/i, '');
     content = content.replace(/<b>अन्वयार्थ\s*:\s*<\/b>/i, '');
@@ -97,28 +138,32 @@ function parseGathaHtml(filePath) {
     content = content.replace(/<font color=[^>]*>\s*(\[[^\]]+\])\s*<\/font>/gi, '**$1**');
     content = content.replace(/<font color=[^>]*>([\s\S]*?)<\/font>/gi, '$1');
     
-    // Also, ensure any raw brackets [word] are wrapped in bold **[word]** for styling
-    // unless they are already wrapped
     content = stripHtml(content);
     // Replace raw [word] with **[word]** if not already bolded
     content = content.replace(/(?<!\*\*)(\[[^\]]+\])(?!\*\*)/g, '**$1**');
     
-    anvayarth = content;
+    if (content.trim()) {
+      anvayarthContents.push(content.trim());
+    }
   }
+  anvayarth = anvayarthContents.join('\n\n');
 
   // 6. English Meaning (ParagraphE)
   let english = "";
-  const englishMatch = html.match(/<div[^>]*class=["']?paragraphE["']?[^>]*>([\s\S]*?)<\/div>/i);
-  if (englishMatch) {
-    let content = englishMatch[1];
+  const englishMatches = html.matchAll(/<div[^>]*class=["']?paragraphE\b[^>]*>([\s\S]*?)<\/div>/gi);
+  const englishContents = [];
+  for (const match of englishMatches) {
+    let content = match[1];
     content = content.replace(/<b><font color=[^>]*>Meaning\s*:\s*<\/font><\/b>/i, '');
     content = content.replace(/<b>Meaning\s*:\s*<\/b>/i, '');
-    english = stripHtml(content);
+    content = stripHtml(content);
+    if (content.trim()) {
+      englishContents.push(content.trim());
+    }
   }
+  english = englishContents.join('\n\n');
 
   // 7. Teekas (Commentaries)
-  // We parse the HTML structure for teekas.
-  // There are typically div ids: teeka0, teeka1, teeka2...
   const teekas = [];
   const teekaMatches = html.matchAll(/<div[^>]*id=["']?teeka(\d+)["']?[^>]*class=["']?teeka["']?[^>]*>([\s\S]*?)<\/div>\s*<\/td>/gi);
   
@@ -143,7 +188,6 @@ function parseGathaHtml(filePath) {
     const steekaMatch = teekaHtml.match(/<div[^>]*class=["']?steeka["']?[^>]*>([\s\S]*?)<\/div>/i);
     if (steekaMatch) {
       sanskrit = stripHtml(steekaMatch[1]);
-      // Remove the steeka div from the main teeka HTML so we can extract the Hindi part
       teekaHtml = teekaHtml.replace(steekaMatch[0], '');
     }
 
@@ -179,6 +223,9 @@ function formatGathaText(data) {
   out += `=== Sanskrit ===\n${data.gathaS}\n\n`;
   out += `=== Gadya ===\n${data.gadya}\n\n`;
   out += `=== Anvayarth ===\n${data.anvayarth}\n\n`;
+  if (data.bhavarth) {
+    out += `=== Bhavarth ===\n${data.bhavarth}\n\n`;
+  }
   out += `=== English ===\n${data.english}\n\n`;
 
   for (const teeka of data.teekas) {
@@ -209,10 +256,22 @@ function parseBlock(blockContent) {
     }
 
     const optionMatch = line.match(/value=['"]?([^'"]+)['"]?>\s*<b>([^<]+)<\/b>\s*-\s*﻿?([^<]+)<\/option>/i);
-    if (optionMatch && currentChapter) {
+    if (optionMatch) {
       const filename = optionMatch[1];
       const gathaNum = optionMatch[2].trim();
       const title = optionMatch[3].trim().replace(/^\s*-\s*/, '');
+      
+      if (filename.includes('index')) {
+        continue;
+      }
+      
+      if (!currentChapter) {
+        currentChapter = {
+          name: "मंगलाचरण",
+          items: []
+        };
+        chapters.push(currentChapter);
+      }
       
       // Avoid duplicate gathaNum in the same chapter
       if (!currentChapter.items.some(item => item.gathaNum === gathaNum)) {
@@ -231,14 +290,16 @@ function parseBlock(blockContent) {
 function parseMyItemJs(filePath) {
   const content = fs.readFileSync(filePath, 'utf-8');
   
-  // Try to find select-native-1 (which has the complete standard numbering 1-439)
+  // Try to find select-native-1 (which has the complete standard numbering)
   const select1Start = content.indexOf("select-native-1");
   if (select1Start === -1) {
-    // Fallback to parsing the whole file if select-native-1 is not found
     return parseBlock(content);
   }
   
   let select1End = content.indexOf("select-native-2", select1Start);
+  if (select1End === -1) {
+    select1End = content.indexOf("select-native-3", select1Start);
+  }
   if (select1End === -1) {
     select1End = content.length;
   }
@@ -246,22 +307,26 @@ function parseMyItemJs(filePath) {
   const select1Content = content.substring(select1Start, select1End);
   const chapters = parseBlock(select1Content);
   
-  // Also grab the "परिशिष्ट" (Parishisht) from select-native-0 if it exists
+  // Also grab the "परिशिष्ट" or "मंगलाचरण" from select-native-0 if it exists
   const select0Start = content.indexOf("select-native-0");
   if (select0Start !== -1) {
     const select0End = select1Start;
     const select0Content = content.substring(select0Start, select0End);
     const select0Chapters = parseBlock(select0Content);
-    const parishisht = select0Chapters.find(c => c.name.includes("परिशिष्ट"));
-    if (parishisht) {
-      // Avoid adding duplicate if select-native-1 already has it
-      if (!chapters.some(c => c.name.includes("परिशिष्ट"))) {
-        chapters.push(parishisht);
+    
+    for (const c of select0Chapters) {
+      if (c.name.includes("परिशिष्ट") || c.name.includes("मंगलाचरण")) {
+        if (!chapters.some(ch => ch.name.includes(c.name))) {
+          if (c.name.includes("मंगलाचरण")) {
+            chapters.unshift(c);
+          } else {
+            chapters.push(c);
+          }
+        }
       }
     }
   }
   
-  // In case there is no chapters or optgroups, create a default one
   if (chapters.length === 0) {
     chapters.push({
       name: "मूल ग्रंथ",
@@ -272,19 +337,16 @@ function parseMyItemJs(filePath) {
   return chapters;
 }
 
-
-// Pilot Run on Samaysar
-function pilotRun() {
-  const categoryDirName = "01_द्रव्यानुयोग";
-  const shastraDirName = "01_समयसार--कुन्दकुन्दाचार्य";
-
+// Convert a single shastra
+function convertShastra(config) {
+  const { categoryDirName, shastraDirName, title, author, category } = config;
   const sourceShastraPath = path.join(dbDir, categoryDirName, shastraDirName);
   if (!fs.existsSync(sourceShastraPath)) {
     console.error(`Source directory not found: ${sourceShastraPath}`);
-    process.exit(1);
+    return 0;
   }
 
-  console.log(`Starting pilot conversion for Samaysar...`);
+  console.log(`Starting conversion for ${title}...`);
 
   const htmlFolder = path.join(sourceShastraPath, 'html');
   const myItemPath = path.join(htmlFolder, 'myItem.js');
@@ -295,12 +357,29 @@ function pilotRun() {
     console.log(`Parsed chapters from myItem.js. Found ${chapters.length} chapters.`);
   }
 
+  // Prepend 0000_शास्त्र-मंगलाचरण if it exists but is not in chapters
+  const hasMangalacharan = fs.existsSync(path.join(htmlFolder, '0000_शास्त्र-मंगलाचरण.html'));
+  if (hasMangalacharan) {
+    let firstChapter = chapters[0];
+    if (!firstChapter) {
+      firstChapter = { name: "मंगलाचरण", items: [] };
+      chapters.unshift(firstChapter);
+    }
+    if (!firstChapter.items.some(item => item.file.startsWith('0000_शास्त्र-मंगलाचरण'))) {
+      firstChapter.items.unshift({
+        file: '0000_शास्त्र-मंगलाचरण.txt',
+        gathaNum: '000',
+        title: 'शास्त्र-मंगलाचरण'
+      });
+    }
+  }
+
   // Create output directory for this shastra
   const destShastraPath = path.join(outDir, categoryDirName, shastraDirName);
   fs.mkdirSync(destShastraPath, { recursive: true });
 
-  // Read all HTML files in the directory
-  const files = fs.readdirSync(htmlFolder).filter(f => f.endsWith('.html') && f !== 'index.html' && !f.startsWith('0000_'));
+  // Read all HTML files in the directory, excluding indexes
+  const files = fs.readdirSync(htmlFolder).filter(f => f.endsWith('.html') && !f.includes('index'));
   
   let processedCount = 0;
   for (const file of files) {
@@ -345,32 +424,71 @@ function pilotRun() {
   }
 
   const shastraIndexJson = {
-    title: "समयसार",
-    author: "कुन्दकुन्दाचार्य",
-    category: "द्रव्यानुयोग",
-    cover: existingIndex.cover,
+    title,
+    author,
+    category,
+    cover: existingIndex.cover || {
+      invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
+      authorPrefix: `श्रीमद्-भगवत्${author}-प्रणीत`,
+      title: `श्री ${title}`,
+      subtitle: `मूल प्राकृत गाथा, श्री अमृतचंद्राचार्य विरचित 'समय-व्याख्या' नामक संस्कृत टीका का हिंदी अनुवाद, श्री जयसेनाचार्य विरचित 'तात्पर्य-वृत्ति' नामक संस्कृत टीका का हिंदी अनुवाद सहित`,
+      credits: "आभार : विजय कुमार जैन"
+    },
     chapters: existingIndex.chapters || chapters
   };
   fs.writeFileSync(destIndexJsonPath, JSON.stringify(shastraIndexJson, null, 2), 'utf-8');
 
-  // Generate the global manifest.json
-  const globalManifest = [
-    {
-      id: "samaysar",
-      title: "समयसार",
-      author: "कुन्दकुन्दाचार्य",
-      categoryHi: "द्रव्यानुयोग",
-      categoryEn: "Dravyanuyog",
-      categorySlug: "dravyanuyog",
-      shastraSlug: "samaysar",
-      path: `01_द्रव्यानुयोग/01_समयसार--कुन्दकुन्दाचार्य`,
-      gathaCount: processedCount
-    }
-  ];
-  fs.writeFileSync(path.join(outDir, 'manifest.json'), JSON.stringify(globalManifest, null, 2), 'utf-8');
-
   console.log(`Successfully converted ${processedCount} gatha HTML files into plain text.`);
-  console.log(`Saved index.json and manifest.json.`);
+  return processedCount;
 }
 
-pilotRun();
+const configs = [
+  {
+    id: "samaysar",
+    title: "समयसार",
+    author: "कुन्दकुन्दाचार्य",
+    category: "द्रव्यानुयोग",
+    categoryHi: "द्रव्यानुयोग",
+    categoryEn: "Dravyanuyog",
+    categorySlug: "dravyanuyog",
+    shastraSlug: "samaysar",
+    categoryDirName: "01_द्रव्यानुयोग",
+    shastraDirName: "01_समयसार--कुन्दकुन्दाचार्य"
+  },
+  {
+    id: "pravachansar",
+    title: "प्रवचनसार",
+    author: "कुन्दकुन्दाचार्य",
+    category: "द्रव्यानुयोग",
+    categoryHi: "द्रव्यानुयोग",
+    categoryEn: "Dravyanuyog",
+    categorySlug: "dravyanuyog",
+    shastraSlug: "pravachansar",
+    categoryDirName: "01_द्रव्यानुयोग",
+    shastraDirName: "02_प्रवचनसार--कुन्दकुन्दाचार्य"
+  }
+];
+
+function main() {
+  const globalManifest = [];
+  for (const config of configs) {
+    const processedCount = convertShastra(config);
+    if (processedCount > 0) {
+      globalManifest.push({
+        id: config.id,
+        title: config.title,
+        author: config.author,
+        categoryHi: config.categoryHi,
+        categoryEn: config.categoryEn,
+        categorySlug: config.categorySlug,
+        shastraSlug: config.shastraSlug,
+        path: `${config.categoryDirName}/${config.shastraDirName}`,
+        gathaCount: processedCount
+      });
+    }
+  }
+  fs.writeFileSync(path.join(outDir, 'manifest.json'), JSON.stringify(globalManifest, null, 2), 'utf-8');
+  console.log(`Saved manifest.json.`);
+}
+
+main();

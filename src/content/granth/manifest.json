@@ -8,6 +8,17 @@
     "categorySlug": "dravyanuyog",
     "shastraSlug": "samaysar",
     "path": "01_द्रव्यानुयोग/01_समयसार--कुन्दकुन्दाचार्य",
-    "gathaCount": 221
+    "gathaCount": 222
+  },
+  {
+    "id": "pravachansar",
+    "title": "प्रवचनसार",
+    "author": "कुन्दकुन्दाचार्य",
+    "categoryHi": "द्रव्यानुयोग",
+    "categoryEn": "Dravyanuyog",
+    "categorySlug": "dravyanuyog",
+    "shastraSlug": "pravachansar",
+    "path": "01_द्रव्यानुयोग/02_प्रवचनसार--कुन्दकुन्दाचार्य",
+    "gathaCount": 304
   }
 ]
