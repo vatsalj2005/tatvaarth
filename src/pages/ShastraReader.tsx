@@ -312,7 +312,10 @@ const ShastraReader = () => {
   const renderHighlightedAnvayarth = (text: string) => {
     return text.split('\n').map((line, lineIndex, arr) => {
       const trimmed = line.trim();
-      const isStarLine = (trimmed.startsWith('*') && !trimmed.startsWith('**')) || (trimmed.includes(' = ') && !trimmed.startsWith('|') && !trimmed.startsWith('**'));
+      const isStarLine = 
+        (trimmed.startsWith('*') && !trimmed.startsWith('**')) || 
+        (trimmed.includes(' = ') && !trimmed.startsWith('|') && !trimmed.startsWith('**')) ||
+        (/^[०-९0-9]+(?:\s+)?[a-zA-Z\u0900-\u097F]/.test(trimmed) && !trimmed.startsWith('|') && !trimmed.startsWith('**'));
       
       const parts = line.split(/(\*\*\[[^\]]+\]\*\*|\([^\)]+\))/);
       
@@ -624,7 +627,10 @@ const ShastraReader = () => {
         return;
       }
 
-      const isStarLine = (unwrapped.startsWith('*') && !unwrapped.startsWith('**')) || (unwrapped.includes(' = ') && !unwrapped.startsWith('|') && !unwrapped.startsWith('**'));
+      const isStarLine = 
+        (unwrapped.startsWith('*') && !unwrapped.startsWith('**')) || 
+        (unwrapped.includes(' = ') && !unwrapped.startsWith('|') && !unwrapped.startsWith('**')) ||
+        (/^[०-९0-9]+(?:\s+)?[a-zA-Z\u0900-\u097F]/.test(unwrapped) && !unwrapped.startsWith('|') && !unwrapped.startsWith('**'));
       const isQuestion = unwrapped.startsWith('प्रश्न –') || unwrapped.startsWith('प्रश्न -') || unwrapped.startsWith('शंका –') || unwrapped.startsWith('शंका -');
       const isCenteredOrange = isWrapped && !isMeterHeader;
       const isBullet = clean.startsWith('•');

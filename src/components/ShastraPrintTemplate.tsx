@@ -320,7 +320,10 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
             if (!clean) return;
 
             const isMeterHeader = clean.startsWith('(') && clean.endsWith(')') && clean.length <= 50;
-            const isStarLine = (clean.startsWith('*') && !clean.startsWith('**')) || (clean.includes(' = ') && !clean.startsWith('|') && !clean.startsWith('**'));
+            const isStarLine = 
+              (clean.startsWith('*') && !clean.startsWith('**')) || 
+              (clean.includes(' = ') && !clean.startsWith('|') && !clean.startsWith('**')) ||
+              (/^[०-९0-9]+(?:\s+)?[a-zA-Z\u0900-\u097F]/.test(clean) && !clean.startsWith('|') && !clean.startsWith('**'));
             const isBoldTitle = clean.startsWith('**') && clean.endsWith('**') && !clean.startsWith('**[');
 
             if (isMeterHeader) {
@@ -403,7 +406,10 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
             if (!clean) return;
 
             const isMeterHeader = clean.startsWith('(') && clean.endsWith(')') && clean.length <= 50;
-            const isStarLine = (clean.startsWith('*') && !clean.startsWith('**')) || (clean.includes(' = ') && !clean.startsWith('|') && !clean.startsWith('**'));
+            const isStarLine = 
+              (clean.startsWith('*') && !clean.startsWith('**')) || 
+              (clean.includes(' = ') && !clean.startsWith('|') && !clean.startsWith('**')) ||
+              (/^[०-९0-9]+(?:\s+)?[a-zA-Z\u0900-\u097F]/.test(clean) && !clean.startsWith('|') && !clean.startsWith('**'));
             const isBoldTitle = clean.startsWith('**') && clean.endsWith('**') && !clean.startsWith('**[');
 
             if (isMeterHeader) {
@@ -700,7 +706,10 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
   const renderHighlightedAnvayarth = (text: string) => {
     return text.split('\n').map((line, lineIndex, arr) => {
       const trimmed = line.trim();
-      const isStarLine = (trimmed.startsWith('*') && !trimmed.startsWith('**')) || (trimmed.includes(' = ') && !trimmed.startsWith('|') && !trimmed.startsWith('**'));
+      const isStarLine = 
+        (trimmed.startsWith('*') && !trimmed.startsWith('**')) || 
+        (trimmed.includes(' = ') && !trimmed.startsWith('|') && !trimmed.startsWith('**')) ||
+        (/^[०-९0-9]+(?:\s+)?[a-zA-Z\u0900-\u097F]/.test(trimmed) && !trimmed.startsWith('|') && !trimmed.startsWith('**'));
 
       const parts = line.split(/(\*\*\[[^\]]+\]\*\*|\([^\)]+\))/);
 
