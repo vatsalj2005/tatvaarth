@@ -8,6 +8,36 @@ import Footer from '@/components/Footer';
 import { ChevronRight, ListCollapse, Download, Type, ChevronLeft, Eye, EyeOff, LocateFixed, X } from 'lucide-react';
 import ShastraPrintTemplate from '@/components/ShastraPrintTemplate';
 
+const devanagariToEnglish = (str: string): string => {
+  const map: Record<string, string> = {
+    '०': '0', '१': '1', '२': '2', '३': '3', '४': '4',
+    '५': '5', '६': '6', '७': '7', '८': '8', '९': '9'
+  };
+  return str.replace(/[०-९]/g, d => map[d] || d);
+};
+
+const getRowRange = (text: string) => {
+  if (!text) return null;
+  const englishText = devanagariToEnglish(text);
+  const match = englishText.match(/\(([^)]+)\)/);
+  if (!match) return null;
+  const rangeStr = match[1].trim();
+  
+  if (rangeStr.includes('-') || rangeStr.includes('से')) {
+    const parts = rangeStr.split(/[-–]|से/).map(p => parseInt(p.trim(), 10));
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      return { start: parts[0], end: parts[1] };
+    }
+  }
+  
+  const numbers = rangeStr.split(/[,व\s]+/).map(p => parseInt(p.trim(), 10)).filter(n => !isNaN(n));
+  if (numbers.length > 0) {
+    return { start: Math.min(...numbers), end: Math.max(...numbers) };
+  }
+  
+  return null;
+};
+
 const ShastraReader = () => {
   const { categorySlug, shastraSlug } = useParams<{ categorySlug: string; shastraSlug: string }>();
   const { t, language, fontSize, lineSpacing, useSerif, theme } = useApp();
@@ -408,7 +438,7 @@ const ShastraReader = () => {
     
     // Check for list items like "१. जीवत्वशक्ति -" or "३३-३८. भाव-अभावादि छह शक्तियाँ -"
     const prefixMatch = text.match(/^([०-९0-9]+(?:-[०-९0-9]+)?\.\s+.*?[\s]*[-–]+(?:[\s]+|$))(.*)$/);
-    if (prefixMatch) {
+    if (prefixMatch && prefixMatch[1].length <= 60) {
       prefix = prefixMatch[1];
       restText = prefixMatch[2];
     }
@@ -522,29 +552,161 @@ const ShastraReader = () => {
       const headerRow = tableData[0];
       const bodyRows = tableData.slice(1);
 
+      // 1. Resolve spanned texts to identify sub-groups and ranges
+      const resolvedSubGroups: string[] = [];
+      let currentSubGroupText = "";
+      bodyRows.forEach((row) => {
+        const col1Text = row[1] || "";
+        const col0Text = row[0] || "";
+        
+        if (col1Text) {
+          currentSubGroupText = col1Text;
+        } else if (col0Text && !col1Text) {
+          currentSubGroupText = col0Text;
+        }
+        resolvedSubGroups.push(currentSubGroupText);
+      });
+
+      // 2. Precalculate spans
+      const numRows = bodyRows.length;
+      const numCols = headerRow.length;
+      const spans: { rowSpan: number; skip: boolean }[][] = Array.from(
+        { length: numRows }, 
+        () => Array(numCols).fill({ rowSpan: 1, skip: false })
+      );
+
+      for (let colIdx = 0; colIdx < numCols; colIdx++) {
+        let rowIdx = 0;
+        while (rowIdx < numRows) {
+          const cellVal = bodyRows[rowIdx][colIdx] || "";
+          
+          const isCurrentTotal = rowIdx === numRows - 1 && 
+                                 bodyRows[rowIdx][0] === '' && 
+                                 bodyRows[rowIdx].some(c => c.includes('अधिकार') || c.includes('कुल') || c.includes('योग') || c.includes('जोड़') || c.includes('Total') || c.includes('Sum'));
+
+          if (isCurrentTotal) {
+            spans[rowIdx][colIdx] = { rowSpan: 1, skip: false };
+            rowIdx++;
+            continue;
+          }
+
+          if (cellVal !== "") {
+            let nextRowIdx = rowIdx + 1;
+            while (nextRowIdx < numRows) {
+              const isNextTotal = nextRowIdx === numRows - 1 && 
+                                  bodyRows[nextRowIdx][0] === '' && 
+                                  bodyRows[nextRowIdx].some(c => c.includes('अधिकार') || c.includes('कुल') || c.includes('योग') || c.includes('जोड़') || c.includes('Total') || c.includes('Sum'));
+              if (isNextTotal) break;
+              if (bodyRows[nextRowIdx][colIdx] !== "") break;
+              nextRowIdx++;
+            }
+            const spanCount = nextRowIdx - rowIdx;
+            spans[rowIdx][colIdx] = { rowSpan: spanCount, skip: false };
+            for (let r = rowIdx + 1; r < nextRowIdx; r++) {
+              spans[r][colIdx] = { rowSpan: 1, skip: true };
+            }
+            rowIdx = nextRowIdx;
+          } else {
+            spans[rowIdx][colIdx] = { rowSpan: 1, skip: false };
+            rowIdx++;
+          }
+        }
+      }
+
+      // 3. Determine active row status based on activeGathaNum
+      const activeGathaVal = activeGathaNum ? parseInt(devanagariToEnglish(activeGathaNum), 10) : NaN;
+
+      const isRowActive = (row: string[], resolvedSubGroupText: string) => {
+        if (isNaN(activeGathaVal)) return false;
+        const sgRange = getRowRange(resolvedSubGroupText);
+        if (sgRange && activeGathaVal >= sgRange.start && activeGathaVal <= sgRange.end) {
+          return true;
+        }
+        for (const cell of row) {
+          const range = getRowRange(cell);
+          if (range && activeGathaVal >= range.start && activeGathaVal <= range.end) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      const isSubGroupActive = resolvedSubGroups.map((sgText, rowIdx) => {
+        return isRowActive(bodyRows[rowIdx], sgText);
+      });
+
+      const isCellActive = (cellText: string, rowActive: boolean) => {
+        if (isNaN(activeGathaVal)) return false;
+        const range = getRowRange(cellText);
+        if (range) {
+          return activeGathaVal >= range.start && activeGathaVal <= range.end;
+        }
+        return rowActive;
+      };
+
       renderedElements.push(
         <div key={`table-${keyIndex}`} className="w-full flex justify-center my-6">
-          <div className="inline-block max-w-full overflow-x-auto rounded-xl border-4 border-double border-gold/30 shadow-md bg-card/50 p-1">
-            <table className="border-collapse text-sm devanagari-safe font-heading">
-              <thead className="bg-gold/15 dark:bg-gold/10 font-bold text-foreground">
+          <div className="inline-block max-w-full overflow-x-auto rounded-xl shadow-md bg-card/25 p-0.5">
+            <table 
+              className="text-sm devanagari-safe font-heading"
+              style={{ borderCollapse: 'separate', borderSpacing: '3px' }}
+            >
+              <thead>
                 <tr>
                   {headerRow.map((cell, cellIdx) => (
-                    <th key={cellIdx} className="px-4 py-3 text-center font-bold text-gold border border-gold/20">
+                    <th 
+                      key={cellIdx} 
+                      className="px-4 py-3 text-center font-bold text-amber-950 dark:text-amber-200 border-2 border-amber-600/30 dark:border-gold/30 bg-[#FFE699] dark:bg-amber-950/50 rounded"
+                    >
                       {highlightBracketedTerms(cell)}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="bg-card">
-                {bodyRows.map((row, rowIdx) => (
-                  <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-emerald-500/10 dark:bg-emerald-500/15' : 'bg-sky-500/10 dark:bg-sky-500/15'}>
-                    {row.map((cell, cellIdx) => (
-                      <td key={cellIdx} className="px-4 py-2.5 text-center text-foreground/90 border border-border/50">
-                        {highlightBracketedTerms(cell)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+              <tbody>
+                {bodyRows.map((row, rowIdx) => {
+                  const isTotalRow = rowIdx === bodyRows.length - 1 && 
+                                     row[0] === '' && 
+                                     row.some(c => c.includes('अधिकार') || c.includes('कुल') || c.includes('योग') || c.includes('जोड़') || c.includes('Total') || c.includes('Sum'));
+
+                  const isActive = isSubGroupActive[rowIdx];
+
+                  return (
+                    <tr key={rowIdx}>
+                      {row.map((cell, cellIdx) => {
+                        const cellSpan = spans[rowIdx]?.[cellIdx];
+                        if (cellSpan?.skip) return null;
+
+                        const isSpanned = cellSpan && cellSpan.rowSpan > 1;
+                        const cellActive = !isTotalRow && (isSpanned ? isCellActive(cell, false) : isActive);
+
+                        let cellBgClass = "";
+                        let cellBorderClass = "border-amber-600/30 dark:border-gold/30";
+
+                        if (isTotalRow) {
+                          cellBgClass = "bg-[#FFE699] dark:bg-amber-950/50 text-amber-950 dark:text-amber-100 font-bold";
+                        } else if (cellActive) {
+                          cellBgClass = "bg-[#A9F531] dark:bg-lime-600/70 text-black dark:text-white font-semibold";
+                          cellBorderClass = "border-emerald-600/40 dark:border-emerald-500/50";
+                        } else if (rowIdx % 2 === 0) {
+                          cellBgClass = "bg-[#DDEBF7] dark:bg-sky-950/40 text-sky-950 dark:text-sky-100";
+                        } else {
+                          cellBgClass = "bg-[#E2EFDA] dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-100";
+                        }
+
+                        return (
+                          <td 
+                            key={cellIdx} 
+                            rowSpan={cellSpan?.rowSpan || 1}
+                            className={`px-4 py-2.5 text-center border-2 rounded ${cellBorderClass} ${cellBgClass}`}
+                          >
+                            {highlightBracketedTerms(cell)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -627,6 +789,20 @@ const ShastraReader = () => {
         return;
       }
 
+      // Get leading whitespace to determine indentation level
+      const getIndentLevel = (line: string): number => {
+        const match = line.match(/^([ \t]+)/);
+        if (!match) return 0;
+        let spaces = 0;
+        for (const char of match[1]) {
+          if (char === '\t') spaces += 2;
+          else if (char === ' ') spaces += 1;
+        }
+        return Math.floor(spaces / 2);
+      };
+
+      const indentLevel = getIndentLevel(paragraph);
+
       const isStarLine = 
         (unwrapped.startsWith('*') && !unwrapped.startsWith('**')) || 
         (unwrapped.includes(' = ') && !unwrapped.startsWith('|') && !unwrapped.startsWith('**')) ||
@@ -656,7 +832,7 @@ const ShastraReader = () => {
           }
         : isBullet 
           ? { 
-              marginLeft: '1.5rem',
+              marginLeft: `${1.5 + indentLevel * 1.5}rem`,
               paddingLeft: '1.2rem', 
               textIndent: '-1.2rem',
               marginTop: '2px',
@@ -665,13 +841,18 @@ const ShastraReader = () => {
             } 
           : undefined;
 
+      let displayText = unwrapped;
+      if (isBullet && indentLevel > 0) {
+        displayText = unwrapped.replace(/^•/, '◦');
+      }
+
       renderedElements.push(
         <div 
           key={index} 
           className={`${displayClasses} ${isStarLine ? 'my-0.5' : isBullet ? 'my-0.5' : 'my-2'} leading-loose devanagari-safe`}
           style={displayStyle}
         >
-          {highlightBracketedTerms(unwrapped)}
+          {highlightBracketedTerms(displayText)}
         </div>
       );
     });
@@ -954,7 +1135,7 @@ const ShastraReader = () => {
                   </h3>
 
                   {/* Prakrit verse */}
-                  {chapterName !== 'परिशिष्ट' && (
+                  {chapterName !== 'परिशिष्ट' && content.gatha && (
                     <div className="p-6 md:p-8 rounded-2xl bg-gold/5 border border-gold/20 shadow-sm relative mb-6">
                       <h4 className="text-xs uppercase tracking-wider text-gold font-medium mb-3">{t('prakrit')}</h4>
                       <p 
@@ -996,7 +1177,7 @@ const ShastraReader = () => {
                   )}
 
                   {/* Anvayarth (Word Meanings) */}
-                  {chapterName !== 'परिशिष्ट' && (
+                  {chapterName !== 'परिशिष्ट' && content.anvayarth && (
                     <div className="my-8">
                       <h4 className="text-sm font-semibold text-gold mb-3 devanagari-safe">
                         🔍 {t('anvayarth')}

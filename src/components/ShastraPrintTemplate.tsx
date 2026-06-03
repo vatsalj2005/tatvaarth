@@ -39,7 +39,7 @@ const highlightBracketedTerms = (text: string) => {
   
   // Check for list items like "१. जीवत्वशक्ति -" or "३३-३८. भाव-अभावादि छह शक्तियाँ -"
   const prefixMatch = text.match(/^([०-९0-9]+(?:-[०-९0-9]+)?\.\s+.*?[\s]*[-–]+(?:[\s]+|$))(.*)$/);
-  if (prefixMatch) {
+  if (prefixMatch && prefixMatch[1].length <= 60) {
     prefix = prefixMatch[1];
     restText = prefixMatch[2];
   }
@@ -121,6 +121,36 @@ const highlightBracketedTerms = (text: string) => {
   return processText(text);
 };
 
+const devanagariToEnglish = (str: string): string => {
+  const map: Record<string, string> = {
+    '०': '0', '१': '1', '२': '2', '३': '3', '४': '4',
+    '५': '5', '६': '6', '७': '7', '८': '8', '९': '9'
+  };
+  return str.replace(/[०-९]/g, d => map[d] || d);
+};
+
+const getRowRange = (text: string) => {
+  if (!text) return null;
+  const englishText = devanagariToEnglish(text);
+  const match = englishText.match(/\(([^)]+)\)/);
+  if (!match) return null;
+  const rangeStr = match[1].trim();
+  
+  if (rangeStr.includes('-') || rangeStr.includes('से')) {
+    const parts = rangeStr.split(/[-–]|से/).map(p => parseInt(p.trim(), 10));
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      return { start: parts[0], end: parts[1] };
+    }
+  }
+  
+  const numbers = rangeStr.split(/[,व\s]+/).map(p => parseInt(p.trim(), 10)).filter(n => !isNaN(n));
+  if (numbers.length > 0) {
+    return { start: Math.min(...numbers), end: Math.max(...numbers) };
+  }
+  
+  return null;
+};
+
 const renderTableBlockHelper = (id: string, rows: string[]) => {
   const tableData: string[][] = [];
   rows.forEach(row => {
@@ -137,29 +167,105 @@ const renderTableBlockHelper = (id: string, rows: string[]) => {
   const headerRow = tableData[0];
   const bodyRows = tableData.slice(1);
 
+  // 1. Precalculate spans
+  const numRows = bodyRows.length;
+  const numCols = headerRow.length;
+  const spans: { rowSpan: number; skip: boolean }[][] = Array.from(
+    { length: numRows }, 
+    () => Array(numCols).fill({ rowSpan: 1, skip: false })
+  );
+
+  for (let colIdx = 0; colIdx < numCols; colIdx++) {
+    let rowIdx = 0;
+    while (rowIdx < numRows) {
+      const cellVal = bodyRows[rowIdx][colIdx] || "";
+      
+      const isCurrentTotal = rowIdx === numRows - 1 && 
+                             bodyRows[rowIdx][0] === '' && 
+                             bodyRows[rowIdx].some(c => c.includes('अधिकार') || c.includes('कुल') || c.includes('योग') || c.includes('जोड़') || c.includes('Total') || c.includes('Sum'));
+
+      if (isCurrentTotal) {
+        spans[rowIdx][colIdx] = { rowSpan: 1, skip: false };
+        rowIdx++;
+        continue;
+      }
+
+      if (cellVal !== "") {
+        let nextRowIdx = rowIdx + 1;
+        while (nextRowIdx < numRows) {
+          const isNextTotal = nextRowIdx === numRows - 1 && 
+                              bodyRows[nextRowIdx][0] === '' && 
+                              bodyRows[nextRowIdx].some(c => c.includes('अधिकार') || c.includes('कुल') || c.includes('योग') || c.includes('जोड़') || c.includes('Total') || c.includes('Sum'));
+          if (isNextTotal) break;
+          if (bodyRows[nextRowIdx][colIdx] !== "") break;
+          nextRowIdx++;
+        }
+        const spanCount = nextRowIdx - rowIdx;
+        spans[rowIdx][colIdx] = { rowSpan: spanCount, skip: false };
+        for (let r = rowIdx + 1; r < nextRowIdx; r++) {
+          spans[r][colIdx] = { rowSpan: 1, skip: true };
+        }
+        rowIdx = nextRowIdx;
+      } else {
+        spans[rowIdx][colIdx] = { rowSpan: 1, skip: false };
+        rowIdx++;
+      }
+    }
+  }
+
   return (
     <div key={id} data-block-id={id} className="w-full flex justify-center my-4">
-      <div className="inline-block max-w-full overflow-x-auto rounded-xl border-4 border-double border-gold/30 shadow-md bg-card/50 p-1">
-        <table className="border-collapse text-xs devanagari-safe font-heading">
-          <thead className="bg-gold/15 dark:bg-gold/10 font-bold text-foreground">
+      <div className="inline-block max-w-full overflow-x-auto rounded-xl shadow-md bg-card/25 p-0.5">
+        <table 
+          className="text-xs devanagari-safe font-heading"
+          style={{ borderCollapse: 'separate', borderSpacing: '3px' }}
+        >
+          <thead>
             <tr>
               {headerRow.map((cell, cellIdx) => (
-                <th key={cellIdx} className="px-3 py-2 text-center font-bold text-gold border border-gold/20">
+                <th 
+                  key={cellIdx} 
+                  className="px-3 py-2 text-center font-bold text-amber-950 dark:text-amber-200 border-2 border-amber-600/30 dark:border-gold/30 bg-[#FFE699] dark:bg-amber-950/50 rounded"
+                >
                   {highlightBracketedTerms(cell)}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="bg-card">
-            {bodyRows.map((row, rowIdx) => (
-              <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-emerald-500/10 dark:bg-emerald-500/15' : 'bg-sky-500/10 dark:bg-sky-500/15'}>
-                {row.map((cell, cellIdx) => (
-                  <td key={cellIdx} className="px-3 py-1.5 text-center text-foreground/90 border border-border/50">
-                    {highlightBracketedTerms(cell)}
-                  </td>
-                ))}
-              </tr>
-            ))}
+          <tbody>
+            {bodyRows.map((row, rowIdx) => {
+              const isTotalRow = rowIdx === bodyRows.length - 1 && 
+                                 row[0] === '' && 
+                                 row.some(c => c.includes('अधिकार') || c.includes('कुल') || c.includes('योग') || c.includes('जोड़') || c.includes('Total') || c.includes('Sum'));
+
+              let rowBgClass = "";
+              if (isTotalRow) {
+                rowBgClass = "bg-[#FFE699] dark:bg-amber-950/50 text-amber-950 dark:text-amber-100 font-bold";
+              } else if (rowIdx % 2 === 0) {
+                rowBgClass = "bg-[#DDEBF7] dark:bg-sky-950/40 text-sky-950 dark:text-sky-100";
+              } else {
+                rowBgClass = "bg-[#E2EFDA] dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-100";
+              }
+
+              return (
+                <tr key={rowIdx}>
+                  {row.map((cell, cellIdx) => {
+                    const cellSpan = spans[rowIdx]?.[cellIdx];
+                    if (cellSpan?.skip) return null;
+
+                    return (
+                      <td 
+                        key={cellIdx} 
+                        rowSpan={cellSpan?.rowSpan || 1}
+                        className={`px-3 py-1.5 text-center border-2 border-amber-600/30 dark:border-gold/30 rounded ${rowBgClass}`}
+                      >
+                        {highlightBracketedTerms(cell)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -226,13 +332,15 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
       });
 
       // Prakrit
-      list.push({
-        id: `gatha-${gathaNum}-prakrit`,
-        type: 'prakrit',
-        gathaNum,
-        chapterName,
-        data: content.gatha
-      });
+      if (content.gatha) {
+        list.push({
+          id: `gatha-${gathaNum}-prakrit`,
+          type: 'prakrit',
+          gathaNum,
+          chapterName,
+          data: content.gatha
+        });
+      }
 
       // Sanskrit
       if (content.gathaS) {
@@ -257,13 +365,15 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
       }
 
       // Anvayarth
-      list.push({
-        id: `gatha-${gathaNum}-anvayarth`,
-        type: 'anvayarth',
-        gathaNum,
-        chapterName,
-        data: content.anvayarth
-      });
+      if (content.anvayarth) {
+        list.push({
+          id: `gatha-${gathaNum}-anvayarth`,
+          type: 'anvayarth',
+          gathaNum,
+          chapterName,
+          data: content.anvayarth
+        });
+      }
 
       // English
       if (content.english) {
@@ -362,12 +472,33 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                 data: { isSanskrit: true, text: unwrappedTitle, isMeterHeader: false, inVerse: false, isStarLine: false, isBoldTitle: true }
               });
             } else {
+              const getIndentLevel = (line: string): number => {
+                const match = line.match(/^([ \t]+)/);
+                if (!match) return 0;
+                let spaces = 0;
+                for (const char of match[1]) {
+                  if (char === '\t') spaces += 2;
+                  else if (char === ' ') spaces += 1;
+                }
+                return Math.floor(spaces / 2);
+              };
+              const indentLevel = getIndentLevel(lineText);
+              const isBullet = clean.startsWith('•');
               list.push({
                 id: `gatha-${gathaNum}-teeka-${comm}-sanskrit-p-${pIdx++}`,
                 type: 'teeka_content_para',
                 gathaNum,
                 chapterName,
-                data: { isSanskrit: true, text: clean, isMeterHeader: false, inVerse: false, isStarLine, isBoldTitle: false }
+                data: { 
+                  isSanskrit: true, 
+                  text: clean, 
+                  isMeterHeader: false, 
+                  inVerse: false, 
+                  isStarLine, 
+                  isBoldTitle: false,
+                  isBullet,
+                  indentLevel
+                }
               });
             }
           });
@@ -448,12 +579,33 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                 data: { isSanskrit: false, text: unwrappedTitle, isMeterHeader: false, inVerse: false, isStarLine: false, isBoldTitle: true }
               });
             } else {
+              const getIndentLevel = (line: string): number => {
+                const match = line.match(/^([ \t]+)/);
+                if (!match) return 0;
+                let spaces = 0;
+                for (const char of match[1]) {
+                  if (char === '\t') spaces += 2;
+                  else if (char === ' ') spaces += 1;
+                }
+                return Math.floor(spaces / 2);
+              };
+              const indentLevel = getIndentLevel(lineText);
+              const isBullet = clean.startsWith('•');
               list.push({
                 id: `gatha-${gathaNum}-teeka-${comm}-hindi-p-${pIdx++}`,
                 type: 'teeka_content_para',
                 gathaNum,
                 chapterName,
-                data: { isSanskrit: false, text: clean, isMeterHeader: false, inVerse: false, isStarLine, isBoldTitle: false }
+                data: { 
+                  isSanskrit: false, 
+                  text: clean, 
+                  isMeterHeader: false, 
+                  inVerse: false, 
+                  isStarLine, 
+                  isBoldTitle: false,
+                  isBullet,
+                  indentLevel
+                }
               });
             }
           });
@@ -897,6 +1049,8 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                 const inVerse = block.data.inVerse;
                 const isStarLine = block.data.isStarLine;
                 const isBoldTitle = block.data.isBoldTitle;
+                const isBullet = block.data.isBullet;
+                const indentLevel = block.data.indentLevel || 0;
                 
                 let paraClass = "my-2 text-xs leading-loose ";
                 let paraStyle: React.CSSProperties | undefined = undefined;
@@ -916,8 +1070,23 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                   };
                 } else if (isBoldTitle) {
                   paraClass += "text-gold text-center font-bold my-4 text-base devanagari-safe";
+                } else if (isBullet) {
+                  paraClass += "text-foreground/90 text-left devanagari-safe";
+                  paraStyle = {
+                    marginLeft: `${1.5 + indentLevel * 1.5}rem`,
+                    paddingLeft: '1.2rem', 
+                    textIndent: '-1.2rem',
+                    marginTop: '2px',
+                    marginBottom: '2px',
+                    lineHeight: '1.4'
+                  };
                 } else {
                   paraClass += `text-foreground/90 text-left devanagari-safe ${block.data.isSanskrit ? 'bg-gold/5 p-2.5 rounded-lg border border-gold/10 italic text-foreground/80' : ''}`;
+                }
+
+                let displayText = block.data.text;
+                if (isBullet && indentLevel > 0) {
+                  displayText = displayText.replace(/^•/, '◦');
                 }
                 
                 return (
@@ -931,8 +1100,8 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                       <span className="font-bold text-[9px] uppercase text-gold block mb-1">संस्कृत</span>
                     )}
                     {isMeterHeader || inVerse 
-                      ? block.data.text 
-                      : highlightBracketedTerms(block.data.text)
+                      ? displayText 
+                      : highlightBracketedTerms(displayText)
                     }
                   </p>
                 );
