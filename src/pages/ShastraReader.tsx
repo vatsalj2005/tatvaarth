@@ -58,6 +58,51 @@ const ShastraReader = () => {
   const isManualScrollingRef = useRef(false);
   const isProgrammaticScrollRef = useRef(false);
   const programmaticScrollTimeoutRef = useRef<any>(null);
+  const visibleGathasRef = useRef<Set<string>>(new Set());
+  const activeGathaNumRef = useRef(activeGathaNum);
+
+  useEffect(() => {
+    activeGathaNumRef.current = activeGathaNum;
+  }, [activeGathaNum]);
+
+  const handleScrollOccupancy = () => {
+    if (isManualScrollingRef.current) return;
+    if (visibleGathasRef.current.size === 0) return;
+
+    let targetGathaNum = '';
+    let maxOccupancy = 0;
+    let gathaWith51Plus = '';
+
+    visibleGathasRef.current.forEach((num) => {
+      const el = document.getElementById(`gatha-${num}`);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        const visibleHeight = Math.max(0, Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0));
+        const occupancy = visibleHeight / window.innerHeight;
+
+        if (occupancy > maxOccupancy) {
+          maxOccupancy = occupancy;
+          targetGathaNum = num;
+        }
+        if (occupancy >= 0.51) {
+          gathaWith51Plus = num;
+        }
+      }
+    });
+
+    const nextActive = gathaWith51Plus || targetGathaNum;
+    if (nextActive && nextActive !== activeGathaNumRef.current) {
+      setActiveGathaNum(nextActive);
+    }
+  };
+
+  useEffect(() => {
+    const onScroll = () => {
+      handleScrollOccupancy();
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const formatGathaText = (text: string, isGadya: boolean = false) => {
     return text.split('\n').map((line, i, arr) => {
@@ -157,11 +202,9 @@ const ShastraReader = () => {
     }
   }, [gathas]);
 
-  // 3. Setup IntersectionObserver to highlight current active gatha in the sidebar
+  // 3. Setup IntersectionObserver to track visible gathas for active highlighting
   useEffect(() => {
     if (observerRef.current) observerRef.current.disconnect();
-
-    const intersectingGathas = new Set<string>();
 
     observerRef.current = new IntersectionObserver(
       (entries) => {
@@ -169,36 +212,19 @@ const ShastraReader = () => {
           const gathaNum = entry.target.getAttribute('data-gatha-num');
           if (gathaNum) {
             if (entry.isIntersecting) {
-              intersectingGathas.add(gathaNum);
+              visibleGathasRef.current.add(gathaNum);
             } else {
-              intersectingGathas.delete(gathaNum);
+              visibleGathasRef.current.delete(gathaNum);
             }
           }
         });
 
-        // Find the top-most intersecting gatha
-        if (intersectingGathas.size > 0 && !isManualScrollingRef.current) {
-          let topGathaNum = '';
-          let minTop = Infinity;
-
-          intersectingGathas.forEach((num) => {
-            const el = document.getElementById(`gatha-${num}`);
-            if (el) {
-              const rect = el.getBoundingClientRect();
-              if (rect.top < minTop) {
-                minTop = rect.top;
-                topGathaNum = num;
-              }
-            }
-          });
-
-          if (topGathaNum) {
-            setActiveGathaNum(topGathaNum);
-          }
-        }
+        handleScrollOccupancy();
       },
       {
-        rootMargin: '-10% 0px -45% 0px', // Trigger when item enters the upper half of reading viewport
+        root: null,
+        rootMargin: '0px',
+        threshold: 0,
       }
     );
 
@@ -208,7 +234,7 @@ const ShastraReader = () => {
     });
 
     return () => observerRef.current?.disconnect();
-  }, [gathas, theme, fontSize, lineSpacing, useSerif]);
+  }, [gathas]);
 
   // 4. Auto-follow sidebar scroll
   useEffect(() => {
@@ -345,7 +371,7 @@ const ShastraReader = () => {
       const isStarLine = 
         (trimmed.startsWith('*') && !trimmed.startsWith('**')) || 
         (trimmed.includes(' = ') && !trimmed.startsWith('|') && !trimmed.startsWith('**')) ||
-        (/^[०-९0-9]+(?:\s+)?[a-zA-Z\u0900-\u097F]/.test(trimmed) && !trimmed.startsWith('|') && !trimmed.startsWith('**'));
+        (/^[०-९0-9]+(?:\s+)?[a-zA-Z\u0900-\u0965\u0970-\u097F]/.test(trimmed) && !trimmed.startsWith('|') && !trimmed.startsWith('**'));
       
       const parts = line.split(/(\*\*\[[^\]]+\]\*\*|\([^\)]+\))/);
       
@@ -408,7 +434,7 @@ const ShastraReader = () => {
         "पण्डित-जुगल-किशोर कृत"
       ].includes(trimmed);
 
-      const isArthColor = trimmed.startsWith("(समस्त पापों का नाश करनेवाला");
+      const isArthColor = trimmed.startsWith("(समस्त पापों का नाश करनेवाला") || trimmed.startsWith("। (समस्त पापों का नाश करनेवाला");
 
       const colorClass = isSanskritColor 
         ? "text-pink-700 dark:text-pink-400 font-semibold" 
@@ -433,15 +459,11 @@ const ShastraReader = () => {
 
   // Helper to highlight bracketed terms in commentaries (like [स्वानुभूत्या चकासते] in dark red or gold)
   const highlightBracketedTerms = (text: string) => {
-    let prefix: string | null = null;
-    let restText = text;
-    
     // Check for list items like "१. जीवत्वशक्ति -" or "३३-३८. भाव-अभावादि छह शक्तियाँ -"
-    const prefixMatch = text.match(/^([०-९0-9]+(?:-[०-९0-9]+)?\.\s+.*?[\s]*[-–]+(?:[\s]+|$))(.*)$/);
-    if (prefixMatch && prefixMatch[1].length <= 60) {
-      prefix = prefixMatch[1];
-      restText = prefixMatch[2];
-    }
+    // Group 1: Number prefix (e.g., "१. ")
+    // Group 2: Term and hyphen (e.g., "जीवत्वशक्ति - ")
+    // Group 3: Rest of the text
+    const prefixMatch = text.match(/^([०-९0-9]+(?:-[०-९0-9]+)?\.\s+)(.*?[\s]*[-–]+(?:[\s]+|$))(.*)$/);
 
     const processText = (t: string) => {
       const parts = t.split(/(\*\*\[[^\]]+\]\*\*|\[[^\]]+\]|\([^\)]+\)|\{[^\}]+\}|(?:समाधान|उत्तर)\s*[–-])/);
@@ -506,11 +528,16 @@ const ShastraReader = () => {
       });
     };
 
-    if (prefix) {
+    if (prefixMatch && (prefixMatch[1].length + prefixMatch[2].length) <= 60) {
+      const numPart = prefixMatch[1];
+      const termPart = prefixMatch[2];
+      const restText = prefixMatch[3];
+      
       return (
-        <span className="inline-block">
-          <span className="inline-block px-1 py-0.5 mr-1 rounded text-gold font-semibold bg-gold/10 border border-gold/10">
-            {prefix.trim()}
+        <span>
+          {numPart}
+          <span className="px-1 py-0.5 mr-1 rounded text-gold font-semibold bg-gold/10 border border-gold/10">
+            {termPart.trim()}
           </span>
           {processText(restText)}
         </span>
@@ -806,10 +833,11 @@ const ShastraReader = () => {
       const isStarLine = 
         (unwrapped.startsWith('*') && !unwrapped.startsWith('**')) || 
         (unwrapped.includes(' = ') && !unwrapped.startsWith('|') && !unwrapped.startsWith('**')) ||
-        (/^[०-९0-9]+(?:\s+)?[a-zA-Z\u0900-\u097F]/.test(unwrapped) && !unwrapped.startsWith('|') && !unwrapped.startsWith('**'));
+        (/^[०-९0-9]+(?:\s+)?[a-zA-Z\u0900-\u0965\u0970-\u097F]/.test(unwrapped) && !unwrapped.startsWith('|') && !unwrapped.startsWith('**'));
       const isQuestion = unwrapped.startsWith('प्रश्न –') || unwrapped.startsWith('प्रश्न -') || unwrapped.startsWith('शंका –') || unwrapped.startsWith('शंका -');
       const isCenteredOrange = isWrapped && !isMeterHeader;
       const isBullet = clean.startsWith('•');
+      const isNumber = /^[०-९0-9]+(?:-[०-९0-9]+)?\./.test(clean);
       
       let displayClasses = '';
       if (isStarLine) {
@@ -830,11 +858,11 @@ const ShastraReader = () => {
             marginBottom: '0px', 
             lineHeight: '1.3' 
           }
-        : isBullet 
+        : (isBullet || isNumber)
           ? { 
               marginLeft: `${1.5 + indentLevel * 1.5}rem`,
-              paddingLeft: '1.2rem', 
-              textIndent: '-1.2rem',
+              paddingLeft: '1.5rem', 
+              textIndent: '-1.5rem',
               marginTop: '2px',
               marginBottom: '2px',
               lineHeight: '1.4'
@@ -849,7 +877,7 @@ const ShastraReader = () => {
       renderedElements.push(
         <div 
           key={index} 
-          className={`${displayClasses} ${isStarLine ? 'my-0.5' : isBullet ? 'my-0.5' : 'my-2'} leading-loose devanagari-safe`}
+          className={`${displayClasses} ${isStarLine ? 'my-0.5' : (isBullet || isNumber) ? 'my-0.5' : 'my-2'} leading-loose devanagari-safe`}
           style={displayStyle}
         >
           {highlightBracketedTerms(displayText)}

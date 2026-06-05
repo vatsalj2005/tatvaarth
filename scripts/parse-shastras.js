@@ -17,26 +17,48 @@ function stripHtml(html) {
   // Convert HTML tables to Markdown tables
   text = text.replace(/<table[^>]*>([\s\S]*?)<\/table>/gi, (tableMatch, tableBody) => {
     const rows = [];
-    const rowMatches = tableBody.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi);
-    for (const rowMatch of rowMatches) {
-      const rowContent = rowMatch[1];
+    // Split by <tr tags to handle unclosed rows
+    const rowSegments = tableBody.split(/<tr\b[^>]*>/gi);
+    
+    // Check if the very first segment (before the first <tr) has any th/td cells
+    const firstSegment = rowSegments[0];
+    const firstSegmentCells = [];
+    const cellRegex = /<(td|th)\b[^>]*>([\s\S]*?)(?:<\/\1>|(?=<(td|th)\b)|$)/gi;
+    let cellMatch;
+    while ((cellMatch = cellRegex.exec(firstSegment)) !== null) {
+      let cellText = cellMatch[2].replace(/<br\s*\/?>/gi, ' ');
+      cellText = cellText.replace(/<[^>]+>/g, '').trim().replace(/\s+/g, ' ');
+      firstSegmentCells.push(cellText);
+    }
+    if (firstSegmentCells.length === 0) {
+      let segmentText = firstSegment.replace(/<br\s*\/?>/gi, ' ');
+      segmentText = segmentText.replace(/<[^>]+>/g, '').trim().replace(/\s+/g, ' ');
+      if (segmentText) {
+        firstSegmentCells.push(segmentText);
+      }
+    }
+    if (firstSegmentCells.length > 0) {
+      rows.push(firstSegmentCells);
+    }
+
+    // Process all segments starting from index 1 (each is a row)
+    for (let i = 1; i < rowSegments.length; i++) {
+      const rowContent = rowSegments[i];
       const cells = [];
-      const cellMatches = [...rowContent.matchAll(/<(td|th)[^>]*>([\s\S]*?)<\/\1>/gi)];
-      
-      if (cellMatches.length > 0) {
-        for (const cellMatch of cellMatches) {
-          let cellText = cellMatch[2].replace(/<br\s*\/?>/gi, ' ');
-          cellText = cellText.replace(/<[^>]+>/g, '').trim().replace(/\s+/g, ' ');
-          cells.push(cellText);
-        }
-      } else {
+      const cellRegex = /<(td|th)\b[^>]*>([\s\S]*?)(?:<\/\1>|(?=<(td|th)\b)|$)/gi;
+      let cellMatch;
+      while ((cellMatch = cellRegex.exec(rowContent)) !== null) {
+        let cellText = cellMatch[2].replace(/<br\s*\/?>/gi, ' ');
+        cellText = cellText.replace(/<[^>]+>/g, '').trim().replace(/\s+/g, ' ');
+        cells.push(cellText);
+      }
+      if (cells.length === 0) {
         let rowText = rowContent.replace(/<br\s*\/?>/gi, ' ');
         rowText = rowText.replace(/<[^>]+>/g, '').trim().replace(/\s+/g, ' ');
         if (rowText) {
           cells.push(rowText);
         }
       }
-      
       if (cells.length > 0) {
         rows.push(cells);
       }
@@ -57,7 +79,11 @@ function stripHtml(html) {
       markdownTable += "| " + headerRow.map(() => "---").join(" | ") + " |\n";
       
       for (let i = startIndex + 1; i < rows.length; i++) {
-        markdownTable += "| " + rows[i].join(" | ") + " |\n";
+        const rowCells = [...rows[i]];
+        while (rowCells.length < headerRow.length) {
+          rowCells.push("");
+        }
+        markdownTable += "| " + rowCells.slice(0, headerRow.length).join(" | ") + " |\n";
       }
     }
     
@@ -76,13 +102,58 @@ function stripHtml(html) {
       .join('\n') + '\n';
   });
 
-  // Convert list items to markdown bullet points
-  text = text.replace(/<li>/gi, '\n• ');
-  text = text.replace(/<\/li>/gi, '');
-  text = text.replace(/<ul[^>]*>/gi, '');
-  text = text.replace(/<\/ul>/gi, '\n');
-  text = text.replace(/<ol[^>]*>/gi, '');
-  text = text.replace(/<\/ol>/gi, '\n');
+  // Helper to convert integer to Devanagari numerals
+  function toDevanagari(num) {
+    const digits = ['०', '१', '२', '३', '४', '५', '६', '७', '८', '९'];
+    return String(num).split('').map(char => digits[parseInt(char)] || char).join('');
+  }
+
+  // Stateful parser to handle ordered and unordered lists (and nested lists)
+  function parseLists(html) {
+    if (!html) return "";
+    
+    const tagRegex = /<\/?(ol|ul|li)\b[^>]*>/gi;
+    let result = "";
+    let lastIndex = 0;
+    const listStack = [];
+    
+    let match;
+    while ((match = tagRegex.exec(html)) !== null) {
+      result += html.substring(lastIndex, match.index);
+      lastIndex = tagRegex.lastIndex;
+      
+      const tag = match[0].toLowerCase();
+      
+      if (tag.startsWith('<ol')) {
+        listStack.push({ type: 'ol', count: 0 });
+      } else if (tag.startsWith('<ul')) {
+        listStack.push({ type: 'ul', count: 0 });
+      } else if (tag.startsWith('</ol') || tag.startsWith('</ul')) {
+        listStack.pop();
+        result += '\n';
+      } else if (tag.startsWith('<li')) {
+        const activeList = listStack[listStack.length - 1];
+        const indentSpaces = "  ".repeat(listStack.length);
+        if (activeList) {
+          if (activeList.type === 'ol') {
+            activeList.count++;
+            const numStr = toDevanagari(activeList.count);
+            result += `\n${indentSpaces}${numStr}. `;
+          } else {
+            result += `\n${indentSpaces}• `;
+          }
+        } else {
+          result += `\n${indentSpaces}• `;
+        }
+      }
+    }
+    
+    result += html.substring(lastIndex);
+    return result;
+  }
+
+  // Convert list items dynamically based on ol vs ul
+  text = parseLists(text);
 
   return text
     .replace(/<br\s*\/?>/gi, '\n')
@@ -147,7 +218,10 @@ function parseGathaHtml(filePath) {
     } else {
       const gathaMatch = html.match(/<div[^>]*class=["']?gatha["']?[^>]*>([\s\S]*?)<\/div>/i);
       if (gathaMatch) {
-        gatha = stripHtml(gathaMatch[1]);
+        let gathaHtml = gathaMatch[1];
+        // Strip out nested comment div (with or without closing tag) to prevent repeating the arth inside the gatha section
+        gathaHtml = gathaHtml.replace(/<div[^>]*class=["']?comment["']?[^>]*>([\s\S]*?)(?:<\/div>|$)/gi, '');
+        gatha = stripHtml(gathaHtml);
       }
     }
     
@@ -465,6 +539,30 @@ function convertShastra(config) {
     }
   }
 
+  // Prepend 000_मंगलाचरण if it exists but is not in chapters
+  const hasTeekaMangalacharan = fs.existsSync(path.join(htmlFolder, '000_मंगलाचरण.html'));
+  if (hasTeekaMangalacharan) {
+    let firstChapter = chapters[0];
+    if (!firstChapter) {
+      firstChapter = { name: "मंगलाचरण", items: [] };
+      chapters.unshift(firstChapter);
+    }
+    const alreadyExists = chapters.some(ch => ch.items.some(item => item.file.startsWith('000_मंगलाचरण')));
+    if (!alreadyExists) {
+      const index = firstChapter.items.findIndex(item => item.file.startsWith('0000_शास्त्र-मंगलाचरण'));
+      const newItem = {
+        file: '000_मंगलाचरण.txt',
+        gathaNum: '000_मंगलाचरण',
+        title: 'टीकाकार (अमृतचंद्रआचार्य और जयसेनाचार्य) द्वारा मंगलाचरण'
+      };
+      if (index !== -1) {
+        firstChapter.items.splice(index + 1, 0, newItem);
+      } else {
+        firstChapter.items.unshift(newItem);
+      }
+    }
+  }
+
   // Create output directory for this shastra
   const destShastraPath = path.join(outDir, categoryDirName, shastraDirName);
   fs.mkdirSync(destShastraPath, { recursive: true });
@@ -518,7 +616,7 @@ function convertShastra(config) {
     title,
     author,
     category,
-    cover: existingIndex.cover || {
+    cover: config.cover || existingIndex.cover || {
       invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
       authorPrefix: `श्रीमद्-भगवत्${author}-प्रणीत`,
       title: `श्री ${title}`,
@@ -557,6 +655,25 @@ const configs = [
     shastraSlug: "pravachansar",
     categoryDirName: "01_द्रव्यानुयोग",
     shastraDirName: "02_प्रवचनसार--कुन्दकुन्दाचार्य"
+  },
+  {
+    id: "panchastikay",
+    title: "पञ्चास्तिकाय",
+    author: "कुन्दकुन्दाचार्य",
+    category: "द्रव्यानुयोग",
+    categoryHi: "द्रव्यानुयोग",
+    categoryEn: "Dravyanuyog",
+    categorySlug: "dravyanuyog",
+    shastraSlug: "panchastikay",
+    categoryDirName: "01_द्रव्यानुयोग",
+    shastraDirName: "05_पञ्चास्तिकाय--कुन्दकुन्दाचार्य",
+    cover: {
+      invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
+      authorPrefix: "श्रीमद्-भगवत्कुन्दकुन्दाचार्य-प्रणीत",
+      title: "श्री पञ्चास्तिकाय",
+      subtitle: "मूल प्राकृत गाथा, श्री अमृतचंद्राचार्य विरचित 'समय-व्याख्या' नामक संस्कृत टीका का हिंदी अनुवाद, श्री जयसेनाचार्य विरचित 'तात्पर्य-वृत्ति' नामक संस्कृत टीका का हिंदी अनुवाद सहित",
+      credits: "आभार : पं जयचंदजी छाबडा, पं हुकमचंद भारिल्ल"
+    }
   }
 ];
 
