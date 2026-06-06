@@ -254,41 +254,47 @@ function parseGathaHtml(filePath) {
     };
   }
 
+  // Get main body HTML before teekakaar section to avoid matching gadya/paragraph/paragraphE from commentaries
+  const teekakaarIdx = html.search(/<div[^>]*class=["']?teekakaar["']?[^>]*>/i);
+  const mainHtml = teekakaarIdx !== -1 ? html.substring(0, teekakaarIdx) : html;
+
   // 1. Title
   let title = "";
-  const titleMatch = html.match(/<div[^>]*class=["']?title["']?[^>]*>([\s\S]*?)<\/div>/i);
+  const titleMatch = mainHtml.match(/<div[^>]*class=["']?title["']?[^>]*>([\s\S]*?)<\/div>/i);
   if (titleMatch) {
     title = titleMatch[1]
       .replace(/<span[^>]*class=["']?incFontSz["']?[^>]*>[\s\S]*?<\/span>/gi, '')
       .replace(/<span[^>]*class=["']?decFontSz["']?[^>]*>[\s\S]*?<\/span>/gi, '')
       .replace(/<a[^>]*>([\s\S]*?)<\/a>/gi, '$1');
     title = stripHtml(title);
+  } else if (fileName === '001.html') {
+    title = "टीकाकार (ब्रह्मदेव सूरि) द्वारा मंगलाचरण";
   }
 
   // 2. Gatha (Prakrit)
   let gatha = "";
-  const gathaMatch = html.match(/<div[^>]*class=["']?gatha["']?[^>]*>([\s\S]*?)<\/div>/i);
+  const gathaMatch = mainHtml.match(/<div[^>]*class=["']?gatha["']?[^>]*>([\s\S]*?)<\/div>/i);
   if (gathaMatch) {
     gatha = stripHtml(gathaMatch[1]);
   }
 
   // 3. Sanskrit Equivalent (GathaS)
   let gathaS = "";
-  const gathaSMatch = html.match(/<div[^>]*class=["']?gathaS["']?[^>]*>([\s\S]*?)<\/div>/i);
+  const gathaSMatch = mainHtml.match(/<div[^>]*class=["']?gathaS["']?[^>]*>([\s\S]*?)<\/div>/i);
   if (gathaSMatch) {
     gathaS = stripHtml(gathaSMatch[1]);
   }
 
   // 4. Hindi Verse (Gadya)
   let gadya = "";
-  const gadyaMatch = html.match(/<div[^>]*class=["']?gadya["']?[^>]*>([\s\S]*?)<\/div>/i);
+  const gadyaMatch = mainHtml.match(/<div[^>]*class=["']?gadya["']?[^>]*>([\s\S]*?)<\/div>/i);
   if (gadyaMatch) {
     gadya = stripHtml(gadyaMatch[1]);
   }
 
   // 5. Anvayarth (Paragraph)
   let anvayarth = "";
-  const anvayarthMatches = html.matchAll(/<div[^>]*class=["']?paragraph\b[^>]*>([\s\S]*?)<\/div>/gi);
+  const anvayarthMatches = mainHtml.matchAll(/<div[^>]*class=["']?paragraph\b[^>]*>([\s\S]*?)<\/div>/gi);
   const anvayarthContents = [];
   for (const match of anvayarthMatches) {
     let content = match[1];
@@ -312,7 +318,7 @@ function parseGathaHtml(filePath) {
 
   // 6. English Meaning (ParagraphE)
   let english = "";
-  const englishMatches = html.matchAll(/<div[^>]*class=["']?paragraphE\b[^>]*>([\s\S]*?)<\/div>/gi);
+  const englishMatches = mainHtml.matchAll(/<div[^>]*class=["']?paragraphE\b[^>]*>([\s\S]*?)<\/div>/gi);
   const englishContents = [];
   for (const match of englishMatches) {
     let content = match[1];
@@ -351,7 +357,13 @@ function parseGathaHtml(filePath) {
     if (steekaIndex !== -1) {
       const matchedDiv = findMatchingDiv(teekaHtml, steekaIndex);
       if (matchedDiv) {
-        sanskrit = stripHtml(matchedDiv.content);
+        let matchedContent = matchedDiv.content;
+        if (fileName === '001.html' && filePath.includes('द्रव्यसंग्रह')) {
+          // Remove the duplicate <div class=gadya>...</div> block (and any surrounding <b> tags)
+          matchedContent = matchedContent.replace(/<b>\s*<div[^>]*class=["']?gadya["']?[^>]*>([\s\S]*?)<\/div>\s*<\/b>/gi, '');
+          matchedContent = matchedContent.replace(/<div[^>]*class=["']?gadya["']?[^>]*>([\s\S]*?)<\/div>/gi, '');
+        }
+        sanskrit = stripHtml(matchedContent);
         teekaHtml = teekaHtml.substring(0, matchedDiv.start) + teekaHtml.substring(matchedDiv.end);
       }
     }
@@ -516,19 +528,37 @@ function convertShastra(config) {
   const htmlFolder = path.join(sourceShastraPath, 'html');
   const myItemPath = path.join(htmlFolder, 'myItem.js');
 
+  // Determine existingIndex and shastraChapters first to preserve custom list items
+  const destShastraPath = path.join(outDir, categoryDirName, shastraDirName);
+  fs.mkdirSync(destShastraPath, { recursive: true });
+
+  const destIndexJsonPath = path.join(destShastraPath, 'index.json');
+  let existingIndex = {};
   let chapters = [];
   if (fs.existsSync(myItemPath)) {
     chapters = parseMyItemJs(myItemPath);
     console.log(`Parsed chapters from myItem.js. Found ${chapters.length} chapters.`);
   }
 
+  let shastraChapters = chapters;
+  if (fs.existsSync(destIndexJsonPath)) {
+    try {
+      existingIndex = JSON.parse(fs.readFileSync(destIndexJsonPath, 'utf-8'));
+      if (existingIndex.chapters && existingIndex.chapters.length > 0) {
+        shastraChapters = existingIndex.chapters;
+      }
+    } catch (e) {
+      console.error("Failed to read existing index.json", e);
+    }
+  }
+
   // Prepend 0000_शास्त्र-मंगलाचरण if it exists but is not in chapters
   const hasMangalacharan = fs.existsSync(path.join(htmlFolder, '0000_शास्त्र-मंगलाचरण.html'));
   if (hasMangalacharan) {
-    let firstChapter = chapters[0];
+    let firstChapter = shastraChapters[0];
     if (!firstChapter) {
       firstChapter = { name: "मंगलाचरण", items: [] };
-      chapters.unshift(firstChapter);
+      shastraChapters.unshift(firstChapter);
     }
     if (!firstChapter.items.some(item => item.file.startsWith('0000_शास्त्र-मंगलाचरण'))) {
       firstChapter.items.unshift({
@@ -542,12 +572,12 @@ function convertShastra(config) {
   // Prepend 000_मंगलाचरण if it exists but is not in chapters
   const hasTeekaMangalacharan = fs.existsSync(path.join(htmlFolder, '000_मंगलाचरण.html'));
   if (hasTeekaMangalacharan) {
-    let firstChapter = chapters[0];
+    let firstChapter = shastraChapters[0];
     if (!firstChapter) {
       firstChapter = { name: "मंगलाचरण", items: [] };
-      chapters.unshift(firstChapter);
+      shastraChapters.unshift(firstChapter);
     }
-    const alreadyExists = chapters.some(ch => ch.items.some(item => item.file.startsWith('000_मंगलाचरण')));
+    const alreadyExists = shastraChapters.some(ch => ch.items.some(item => item.file.startsWith('000_मंगलाचरण')));
     if (!alreadyExists) {
       const index = firstChapter.items.findIndex(item => item.file.startsWith('0000_शास्त्र-मंगलाचरण'));
       const newItem = {
@@ -563,9 +593,42 @@ function convertShastra(config) {
     }
   }
 
-  // Create output directory for this shastra
-  const destShastraPath = path.join(outDir, categoryDirName, shastraDirName);
-  fs.mkdirSync(destShastraPath, { recursive: true });
+  // Prepend 001.html if it exists but is not in chapters
+  const has001Html = fs.existsSync(path.join(htmlFolder, '001.html'));
+  if (has001Html) {
+    let firstChapter = shastraChapters[0];
+    if (!firstChapter) {
+      firstChapter = { name: "मंगलाचरण", items: [] };
+      shastraChapters.unshift(firstChapter);
+    }
+    
+    let existingItem = null;
+    for (const ch of shastraChapters) {
+      existingItem = ch.items.find(item => item.file === '001.txt');
+      if (existingItem) break;
+    }
+
+    if (existingItem) {
+      if (shastraDirName.includes('द्रव्यसंग्रह')) {
+        existingItem.gathaNum = '000_मंगलाचरण';
+      }
+    } else {
+      let insertIndex = firstChapter.items.findIndex(item => item.file.startsWith('000_मंगलाचरण'));
+      if (insertIndex === -1) {
+        insertIndex = firstChapter.items.findIndex(item => item.file.startsWith('0000_शास्त्र-मंगलाचरण'));
+      }
+      const newItem = {
+        file: '001.txt',
+        gathaNum: '000_मंगलाचरण',
+        title: 'टीकाकार (ब्रह्मदेव सूरि) द्वारा मंगलाचरण'
+      };
+      if (insertIndex !== -1) {
+        firstChapter.items.splice(insertIndex + 1, 0, newItem);
+      } else {
+        firstChapter.items.unshift(newItem);
+      }
+    }
+  }
 
   // Read all HTML files in the directory, excluding indexes
   const files = fs.readdirSync(htmlFolder).filter(f => f.endsWith('.html') && !f.includes('index'));
@@ -588,7 +651,7 @@ function convertShastra(config) {
   }
 
   // If chapters items were empty (e.g. no myItem.js or failed parsing), build from processed files
-  const defaultChapter = chapters[0];
+  const defaultChapter = shastraChapters[0];
   if (defaultChapter && defaultChapter.items.length === 0) {
     const sortedTxtFiles = fs.readdirSync(destShastraPath).filter(f => f.endsWith('.txt')).sort();
     for (const txtFile of sortedTxtFiles) {
@@ -598,17 +661,6 @@ function convertShastra(config) {
         gathaNum: baseName,
         title: `गाथा ${baseName}`
       });
-    }
-  }
-
-  // Write index.json manifest inside the shastra folder
-  const destIndexJsonPath = path.join(destShastraPath, 'index.json');
-  let existingIndex = {};
-  if (fs.existsSync(destIndexJsonPath)) {
-    try {
-      existingIndex = JSON.parse(fs.readFileSync(destIndexJsonPath, 'utf-8'));
-    } catch (e) {
-      console.error("Failed to read existing index.json", e);
     }
   }
 
@@ -623,7 +675,7 @@ function convertShastra(config) {
       subtitle: `मूल प्राकृत गाथा, श्री अमृतचंद्राचार्य विरचित 'समय-व्याख्या' नामक संस्कृत टीका का हिंदी अनुवाद, श्री जयसेनाचार्य विरचित 'तात्पर्य-वृत्ति' नामक संस्कृत टीका का हिंदी अनुवाद सहित`,
       credits: "आभार : विजय कुमार जैन"
     },
-    chapters: existingIndex.chapters || chapters
+    chapters: shastraChapters
   };
   fs.writeFileSync(destIndexJsonPath, JSON.stringify(shastraIndexJson, null, 2), 'utf-8');
 
@@ -674,14 +726,92 @@ const configs = [
       subtitle: "मूल प्राकृत गाथा, श्री अमृतचंद्राचार्य विरचित 'समय-व्याख्या' नामक संस्कृत टीका का हिंदी अनुवाद, श्री जयसेनाचार्य विरचित 'तात्पर्य-वृत्ति' नामक संस्कृत टीका का हिंदी अनुवाद सहित",
       credits: "आभार : पं जयचंदजी छाबडा, पं हुकमचंद भारिल्ल"
     }
+  },
+  {
+    id: "dravyasangraha",
+    title: "द्रव्यसंग्रह",
+    author: "नेमिचंद्र-सिद्धांतचक्रवर्ती",
+    category: "द्रव्यानुयोग",
+    categoryHi: "द्रव्यानुयोग",
+    categoryEn: "Dravyanuyog",
+    categorySlug: "dravyanuyog",
+    shastraSlug: "dravyasangraha",
+    categoryDirName: "01_द्रव्यानुयोग",
+    shastraDirName: "06_द्रव्यसंग्रह--नेमिचंद्र-सिद्धांतचक्रवर्ती",
+    cover: {
+      invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
+      authorPrefix: "श्रीमद्-भगवन्नेमिचन्द्र-प्रणीत",
+      title: "श्री द्रव्यसंग्रह",
+      subtitle: "मूल शौरसेणी प्राकृत गाथा और ब्रह्मदेव-सूरि (वि० सं० की १२वीं शताब्दी) कृत टीका सहित",
+      credits: "आभार : पद्यानुवाद : आ. डॉ. हुकमचंद भारिल्ल"
+    }
   }
 ];
+
+function getActualGathaCount(chapters) {
+  let maxGatha = 0;
+  for (const chapter of chapters) {
+    for (const item of chapter.items) {
+      const numStr = item.gathaNum.trim();
+      // Skip Mangalacharans and non-numbered items
+      if (numStr.startsWith("000") || numStr.includes("मंगलाचरण") || item.title.includes("मंगलाचरण")) {
+        continue;
+      }
+      
+      // Skip Parishisht and non-gatha text items by checking gathaNum, title and file
+      const hasParishisht = 
+        numStr.toLowerCase().includes("parishisht") || numStr.includes("परिशिष्ट") ||
+        item.title.toLowerCase().includes("parishisht") || item.title.includes("परिशिष्ट") ||
+        item.file.toLowerCase().includes("parishisht") || item.file.includes("परिशिष्ट");
+        
+      if (hasParishisht || numStr.includes("प्रस्तावना") || numStr.includes("चूलिका")) {
+        continue;
+      }
+      
+      // Look for range like 222-227
+      const rangeMatch = numStr.match(/^(\d+)[-–](\d+)$/);
+      if (rangeMatch) {
+        const end = parseInt(rangeMatch[2], 10);
+        if (!isNaN(end) && end > maxGatha) {
+          maxGatha = end;
+        }
+        continue;
+      }
+      
+      // Single number like 012 or 439
+      const singleMatch = numStr.match(/^(\d+)/);
+      if (singleMatch) {
+        const val = parseInt(singleMatch[1], 10);
+        if (!isNaN(val) && val > maxGatha) {
+          maxGatha = val;
+        }
+        continue;
+      }
+    }
+  }
+  return maxGatha;
+}
 
 function main() {
   const globalManifest = [];
   for (const config of configs) {
     const processedCount = convertShastra(config);
     if (processedCount > 0) {
+      // Load chapters from newly generated index.json to calculate the actual gatha count
+      const destShastraPath = path.join(outDir, config.categoryDirName, config.shastraDirName);
+      const destIndexJsonPath = path.join(destShastraPath, 'index.json');
+      let gathaCount = processedCount;
+      if (fs.existsSync(destIndexJsonPath)) {
+        try {
+          const indexJson = JSON.parse(fs.readFileSync(destIndexJsonPath, 'utf-8'));
+          if (indexJson && indexJson.chapters) {
+            gathaCount = getActualGathaCount(indexJson.chapters);
+          }
+        } catch (e) {
+          console.error(`Failed to read index.json for ${config.title}:`, e);
+        }
+      }
+
       globalManifest.push({
         id: config.id,
         title: config.title,
@@ -691,7 +821,7 @@ function main() {
         categorySlug: config.categorySlug,
         shastraSlug: config.shastraSlug,
         path: `${config.categoryDirName}/${config.shastraDirName}`,
-        gathaCount: processedCount
+        gathaCount: gathaCount
       });
     }
   }

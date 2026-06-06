@@ -24,6 +24,7 @@ export default function App() {
           <Route path="/bhajan/:subdivisionId/:bhajanId" element={<BhajanPage />} />
 
           <Route path="/shastra" element={<ShastraLanding />} />
+          <Route path="/shastra/:categorySlug" element={<ShastraLanding />} />
           <Route path="/shastra/:categorySlug/:shastraSlug" element={<ShastraReader />} />
 
           <Route path="/pooja" element={<ComingSoon title="पूजा | Pooja" />} />

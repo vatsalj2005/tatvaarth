@@ -8,7 +8,7 @@
     "categorySlug": "dravyanuyog",
     "shastraSlug": "samaysar",
     "path": "01_द्रव्यानुयोग/01_समयसार--कुन्दकुन्दाचार्य",
-    "gathaCount": 222
+    "gathaCount": 439
   },
   {
     "id": "pravachansar",
@@ -19,7 +19,7 @@
     "categorySlug": "dravyanuyog",
     "shastraSlug": "pravachansar",
     "path": "01_द्रव्यानुयोग/02_प्रवचनसार--कुन्दकुन्दाचार्य",
-    "gathaCount": 304
+    "gathaCount": 311
   },
   {
     "id": "panchastikay",
@@ -30,6 +30,17 @@
     "categorySlug": "dravyanuyog",
     "shastraSlug": "panchastikay",
     "path": "01_द्रव्यानुयोग/05_पञ्चास्तिकाय--कुन्दकुन्दाचार्य",
-    "gathaCount": 176
+    "gathaCount": 181
+  },
+  {
+    "id": "dravyasangraha",
+    "title": "द्रव्यसंग्रह",
+    "author": "नेमिचंद्र-सिद्धांतचक्रवर्ती",
+    "categoryHi": "द्रव्यानुयोग",
+    "categoryEn": "Dravyanuyog",
+    "categorySlug": "dravyanuyog",
+    "shastraSlug": "dravyasangraha",
+    "path": "01_द्रव्यानुयोग/06_द्रव्यसंग्रह--नेमिचंद्र-सिद्धांतचक्रवर्ती",
+    "gathaCount": 58
   }
 ]

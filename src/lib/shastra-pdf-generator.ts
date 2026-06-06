@@ -212,7 +212,8 @@ export async function generateFullShastraPdf({ title, author, gathas, theme }: F
     // Render columns
     setTextColor();
     doc.setFontSize(9.5);
-    doc.text(sanitizeText(gathaNum), colGathaX, y + 4.5);
+    const displayNum = gathaNum === '000_मंगलाचरण' ? '000' : gathaNum;
+    doc.text(sanitizeText(displayNum), colGathaX, y + 4.5);
 
     // Truncate chapter name if it exceeds the space
     let shortChap = sanitizeText(chapName);
@@ -298,7 +299,8 @@ export async function generateFullShastraPdf({ title, author, gathas, theme }: F
     // Gatha Title
     setAccentColor();
     doc.setFontSize(14);
-    drawCenteredLine(sanitizeText(`गाथा #${gathaNum} — ${content.title}`), contentY);
+    const displayNum = gathaNum === '000_मंगलाचरण' ? '000' : gathaNum;
+    drawCenteredLine(sanitizeText(`गाथा #${displayNum} — ${content.title}`), contentY);
     contentY += 6;
 
     // Heading divider line

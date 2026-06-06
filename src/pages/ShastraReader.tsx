@@ -53,6 +53,18 @@ const ShastraReader = () => {
   const [gathas, setGathas] = useState<Array<{ item: GathaItem; content: GathaContent; chapterName: string }>>([]);
   const [isLoadingGathas, setIsLoadingGathas] = useState(true);
 
+  const uniqueCommentators = useMemo(() => {
+    const set = new Set<string>();
+    gathas.forEach(g => {
+      g.content.teekas.forEach(t => {
+        if (t.commentator) {
+          set.add(t.commentator);
+        }
+      });
+    });
+    return Array.from(set);
+  }, [gathas]);
+
   const observerRef = useRef<IntersectionObserver | null>(null);
   const gathaRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const isManualScrollingRef = useRef(false);
@@ -974,16 +986,26 @@ const ShastraReader = () => {
                 </div>
                 
                 {/* Teeka Legend */}
-                <div className="flex flex-col gap-1.5 text-[11px] text-muted-foreground devanagari-safe font-medium mt-1">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-teal-600 dark:bg-teal-500 shadow-[0_0_8px_rgba(20,184,166,0.4)]"></span> 
-                    <span>अमृतचंद्राचार्य</span>
+                {uniqueCommentators.length > 0 && (
+                  <div className="flex flex-col gap-1.5 text-[11px] text-muted-foreground devanagari-safe font-medium mt-1">
+                    {uniqueCommentators.map((comm, idx) => {
+                      const colors = [
+                        { dot: "bg-teal-600 dark:bg-teal-500 shadow-[0_0_8px_rgba(20,184,166,0.4)]" },
+                        { dot: "bg-orange-500 dark:bg-orange-400 shadow-[0_0_8px_rgba(249,115,22,0.4)]" },
+                        { dot: "bg-purple-600 dark:bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.4)]" },
+                        { dot: "bg-rose-600 dark:bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]" },
+                        { dot: "bg-sky-600 dark:bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.4)]" }
+                      ];
+                      const color = colors[idx % colors.length];
+                      return (
+                        <div key={comm} className="flex items-center gap-2">
+                          <span className={`w-2.5 h-2.5 rounded-sm ${color.dot}`}></span> 
+                          <span>{comm}</span>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-orange-500 dark:bg-orange-400 shadow-[0_0_8px_rgba(249,115,22,0.4)]"></span> 
-                    <span>जयसेनाचार्य</span>
-                  </div>
-                </div>
+                )}
               </div>
 
               <div 
@@ -1039,7 +1061,7 @@ const ShastraReader = () => {
                             }`}
                           >
                             <span className="truncate pr-2">
-                              {item.gathaNum.replace('-parishisht', '')} — {item.title}
+                              {item.gathaNum === '000_मंगलाचरण' ? '000' : item.gathaNum.replace('-parishisht', '')} — {item.title}
                             </span>
                             <ChevronRight className="w-3.5 h-3.5 opacity-50 flex-shrink-0" />
                           </button>
@@ -1153,7 +1175,7 @@ const ShastraReader = () => {
                         📂 {chapterName}
                       </span>
                       <span className="text-lg font-heading text-gold font-bold">
-                        #{gathaNum.replace('-parishisht', '-परिशिष्ट')}
+                        #{gathaNum === '000_मंगलाचरण' ? '000' : gathaNum.replace('-parishisht', '-परिशिष्ट')}
                       </span>
                     </div>
 
