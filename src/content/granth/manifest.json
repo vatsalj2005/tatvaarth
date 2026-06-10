@@ -42,5 +42,27 @@
     "shastraSlug": "dravyasangraha",
     "path": "01_द्रव्यानुयोग/06_द्रव्यसंग्रह--नेमिचंद्र-सिद्धांतचक्रवर्ती",
     "gathaCount": 58
+  },
+  {
+    "id": "samadhitantra",
+    "title": "समाधितन्त्र",
+    "author": "पूज्यपाद",
+    "categoryHi": "द्रव्यानुयोग",
+    "categoryEn": "Dravyanuyog",
+    "categorySlug": "dravyanuyog",
+    "shastraSlug": "samadhitantra",
+    "path": "01_द्रव्यानुयोग/07_समाधितन्त्र--आचार्य‌-पूज्यपाद",
+    "gathaCount": 105
+  },
+  {
+    "id": "swaroopsambodhan",
+    "title": "स्वरूप-संबोधन",
+    "author": "अकलंक-देव",
+    "categoryHi": "द्रव्यानुयोग",
+    "categoryEn": "Dravyanuyog",
+    "categorySlug": "dravyanuyog",
+    "shastraSlug": "swaroopsambodhan",
+    "path": "01_द्रव्यानुयोग/08_स्वरूप-संबोधन--अकलंक-देव",
+    "gathaCount": 25
   }
 ]

@@ -240,6 +240,12 @@ function parseGathaHtml(filePath) {
       const endBlockIndex = restHtml.indexOf('<br><div class=teekakaar>');
       const rawBhavarth = endBlockIndex !== -1 ? restHtml.substring(0, endBlockIndex) : restHtml;
       bhavarth = stripHtml(rawBhavarth);
+    } else {
+      const splitIdx = gatha.indexOf("॥ श्रीपरमगुरुवे");
+      if (splitIdx !== -1) {
+        bhavarth = gatha.substring(splitIdx).trim();
+        gatha = gatha.substring(0, splitIdx).trim();
+      }
     }
     
     return {
@@ -467,51 +473,88 @@ function parseBlock(blockContent) {
 function parseMyItemJs(filePath) {
   const content = fs.readFileSync(filePath, 'utf-8');
   
-  // Try to find select-native-1 (which has the complete standard numbering)
-  const select1Start = content.indexOf("select-native-1");
-  if (select1Start === -1) {
+  // Find all starts of select-native-X
+  const selectRegex = /select-native-(\d+)/g;
+  const blocks = [];
+  let match;
+  while ((match = selectRegex.exec(content)) !== null) {
+    blocks.push({
+      num: parseInt(match[1], 10),
+      start: match.index
+    });
+  }
+  
+  if (blocks.length === 0) {
     return parseBlock(content);
   }
   
-  let select1End = content.indexOf("select-native-2", select1Start);
-  if (select1End === -1) {
-    select1End = content.indexOf("select-native-3", select1Start);
-  }
-  if (select1End === -1) {
-    select1End = content.length;
-  }
+  // Sort blocks by start index ascending
+  blocks.sort((a, b) => a.start - b.start);
   
-  const select1Content = content.substring(select1Start, select1End);
-  const chapters = parseBlock(select1Content);
-  
-  // Also grab the "परिशिष्ट" or "मंगलाचरण" from select-native-0 if it exists
-  const select0Start = content.indexOf("select-native-0");
-  if (select0Start !== -1) {
-    const select0End = select1Start;
-    const select0Content = content.substring(select0Start, select0End);
-    const select0Chapters = parseBlock(select0Content);
+  // Slice content for each block
+  const parsedBlocks = [];
+  for (let i = 0; i < blocks.length; i++) {
+    const startIdx = blocks[i].start;
+    const endIdx = (i + 1 < blocks.length) ? blocks[i + 1].start : content.length;
+    const blockContent = content.substring(startIdx, endIdx);
+    const chapters = parseBlock(blockContent);
     
-    for (const c of select0Chapters) {
+    // Count total items in this block
+    let itemCount = 0;
+    for (const ch of chapters) {
+      itemCount += ch.items.length;
+    }
+    
+    parsedBlocks.push({
+      num: blocks[i].num,
+      chapters,
+      itemCount
+    });
+  }
+  
+  // Find the block with the maximum items
+  let mainBlock = parsedBlocks[0];
+  for (const pb of parsedBlocks) {
+    if (pb.itemCount > mainBlock.itemCount) {
+      mainBlock = pb;
+    }
+  }
+  
+  const mainChapters = [...mainBlock.chapters];
+  
+  // If the main chapters default to a single chapter named "मंगलाचरण" but has a lot of items,
+  // let's rename it to "मूल ग्रंथ" for clarity if it contains many items and no optgroup.
+  if (mainChapters.length === 1 && mainChapters[0].name === "मंगलाचरण" && mainBlock.itemCount > 10) {
+    mainChapters[0].name = "मूल ग्रंथ";
+  }
+  
+  // Merge other blocks if they have "परिशिष्ट" or "मंगलाचरण" chapters
+  for (const pb of parsedBlocks) {
+    if (pb.num === mainBlock.num) continue;
+    
+    for (const c of pb.chapters) {
       if (c.name.includes("परिशिष्ट") || c.name.includes("मंगलाचरण")) {
-        if (!chapters.some(ch => ch.name.includes(c.name))) {
+        // Only merge if not already containing the same items or similar name
+        const alreadyHasName = mainChapters.some(ch => ch.name.includes(c.name));
+        if (!alreadyHasName) {
           if (c.name.includes("मंगलाचरण")) {
-            chapters.unshift(c);
+            mainChapters.unshift(c);
           } else {
-            chapters.push(c);
+            mainChapters.push(c);
           }
         }
       }
     }
   }
   
-  if (chapters.length === 0) {
-    chapters.push({
+  if (mainChapters.length === 0) {
+    mainChapters.push({
       name: "मूल ग्रंथ",
       items: []
     });
   }
-
-  return chapters;
+  
+  return mainChapters;
 }
 
 // Convert a single shastra
@@ -612,15 +655,25 @@ function convertShastra(config) {
       if (shastraDirName.includes('द्रव्यसंग्रह')) {
         existingItem.gathaNum = '000_मंगलाचरण';
       }
+      if (shastraDirName.includes('स्वरूप-संबोधन')) {
+        existingItem.gathaNum = '001';
+        existingItem.title = 'मंगलाचरण';
+      }
     } else {
       let insertIndex = firstChapter.items.findIndex(item => item.file.startsWith('000_मंगलाचरण'));
       if (insertIndex === -1) {
         insertIndex = firstChapter.items.findIndex(item => item.file.startsWith('0000_शास्त्र-मंगलाचरण'));
       }
+      let gathaNum = '000_मंगलाचरण';
+      let title = 'टीकाकार (ब्रह्मदेव सूरि) द्वारा मंगलाचरण';
+      if (shastraDirName.includes('स्वरूप-संबोधन')) {
+        gathaNum = '001';
+        title = 'मंगलाचरण';
+      }
       const newItem = {
         file: '001.txt',
-        gathaNum: '000_मंगलाचरण',
-        title: 'टीकाकार (ब्रह्मदेव सूरि) द्वारा मंगलाचरण'
+        gathaNum,
+        title
       };
       if (insertIndex !== -1) {
         firstChapter.items.splice(insertIndex + 1, 0, newItem);
@@ -651,17 +704,72 @@ function convertShastra(config) {
   }
 
   // If chapters items were empty (e.g. no myItem.js or failed parsing), build from processed files
-  const defaultChapter = shastraChapters[0];
-  if (defaultChapter && defaultChapter.items.length === 0) {
+  if (!fs.existsSync(myItemPath) || chapters.length === 0) {
+    // No chapters parsed from myItem.js. We need to build a "मूल ग्रंथ" chapter with all files not already in other chapters
+    let mainChapter = shastraChapters.find(ch => ch.name === "मूल ग्रंथ");
+    if (!mainChapter) {
+      mainChapter = { name: "मूल ग्रंथ", items: [] };
+      shastraChapters.push(mainChapter);
+    }
+    
     const sortedTxtFiles = fs.readdirSync(destShastraPath).filter(f => f.endsWith('.txt')).sort();
     for (const txtFile of sortedTxtFiles) {
       const baseName = path.basename(txtFile, '.txt');
-      defaultChapter.items.push({
-        file: txtFile,
-        gathaNum: baseName,
-        title: `गाथा ${baseName}`
-      });
+      
+      // Check if already in some chapter
+      const alreadyExists = shastraChapters.some(ch => ch !== mainChapter && ch.items.some(item => item.file === txtFile));
+      const alreadyInMain = mainChapter.items.some(item => item.file === txtFile);
+      if (!alreadyExists && !alreadyInMain) {
+        mainChapter.items.push({
+          file: txtFile,
+          gathaNum: baseName,
+          title: `गाथा ${baseName}`
+        });
+      }
     }
+  }
+  // Post-processing for specific scriptures
+  if (shastraDirName.includes('समाधितन्त्र')) {
+    // 1. Remove '000_मंगलाचरण.txt' from all chapters
+    for (const chapter of shastraChapters) {
+      chapter.items = chapter.items.filter(item => item.file !== '000_मंगलाचरण.txt');
+    }
+    
+    // 2. Find '001.txt' and move it to the "मंगलाचरण" chapter
+    let item001 = null;
+    for (const chapter of shastraChapters) {
+      const idx = chapter.items.findIndex(item => item.file === '001.txt');
+      if (idx !== -1) {
+        item001 = chapter.items.splice(idx, 1)[0];
+        break;
+      }
+    }
+    
+    if (item001) {
+      let mangalaChapter = shastraChapters.find(ch => ch.name === 'मंगलाचरण');
+      if (!mangalaChapter) {
+        mangalaChapter = { name: 'मंगलाचरण', items: [] };
+        shastraChapters.unshift(mangalaChapter);
+      }
+      const insertIdx = mangalaChapter.items.findIndex(item => item.file.startsWith('0000_शास्त्र-मंगलाचरण'));
+      if (insertIdx !== -1) {
+        mangalaChapter.items.splice(insertIdx + 1, 0, item001);
+      } else {
+        mangalaChapter.items.unshift(item001);
+      }
+    }
+  }
+
+  // Deduplicate files across all chapters, keeping only the first occurrence of each file
+  const seenFiles = new Set();
+  for (const chapter of shastraChapters) {
+    chapter.items = chapter.items.filter(item => {
+      if (seenFiles.has(item.file)) {
+        return false;
+      }
+      seenFiles.add(item.file);
+      return true;
+    });
   }
 
   const shastraIndexJson = {
@@ -744,6 +852,44 @@ const configs = [
       title: "श्री द्रव्यसंग्रह",
       subtitle: "मूल शौरसेणी प्राकृत गाथा और ब्रह्मदेव-सूरि (वि० सं० की १२वीं शताब्दी) कृत टीका सहित",
       credits: "आभार : पद्यानुवाद : आ. डॉ. हुकमचंद भारिल्ल"
+    }
+  },
+  {
+    id: "samadhitantra",
+    title: "समाधितन्त्र",
+    author: "पूज्यपाद",
+    category: "द्रव्यानुयोग",
+    categoryHi: "द्रव्यानुयोग",
+    categoryEn: "Dravyanuyog",
+    categorySlug: "dravyanuyog",
+    shastraSlug: "samadhitantra",
+    categoryDirName: "01_द्रव्यानुयोग",
+    shastraDirName: "07_समाधितन्त्र--आचार्य‌-पूज्यपाद",
+    cover: {
+      invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
+      authorPrefix: "आचार्य-पूज्यपाद-प्रणीत",
+      title: "श्री समाधितन्त्र",
+      subtitle: "मूल संस्कृत गाथा, श्री प्रभाचंद्र आचार्य द्वारा कृत संस्कृत टीका का हिंदी अनुवाद पं देवेन्द्रकुमार बिजौलियां वाले, श्री क्षु. मनोहर वर्णी द्वारा कृत हिंदी टीका सहित",
+      credits: ""
+    }
+  },
+  {
+    id: "swaroopsambodhan",
+    title: "स्वरूप-संबोधन",
+    author: "अकलंक-देव",
+    category: "द्रव्यानुयोग",
+    categoryHi: "द्रव्यानुयोग",
+    categoryEn: "Dravyanuyog",
+    categorySlug: "dravyanuyog",
+    shastraSlug: "swaroopsambodhan",
+    categoryDirName: "01_द्रव्यानुयोग",
+    shastraDirName: "08_स्वरूप-संबोधन--अकलंक-देव",
+    cover: {
+      invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
+      authorPrefix: "श्रीमद्-भगवत्-अकलंक-आचार्यदेव-प्रणीत",
+      title: "श्री स्वरूप-संबोधन",
+      subtitle: "मूल संस्कृत गाथा,",
+      credits: ""
     }
   }
 ];

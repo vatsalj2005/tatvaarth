@@ -1,0 +1,149 @@
+{
+  "title": "स्वरूप-संबोधन",
+  "author": "अकलंक-देव",
+  "category": "द्रव्यानुयोग",
+  "cover": {
+    "invocation": "!! श्रीसर्वज्ञवीतरागाय नमः !!",
+    "authorPrefix": "श्रीमद्-भगवत्-अकलंक-आचार्यदेव-प्रणीत",
+    "title": "श्री स्वरूप-संबोधन",
+    "subtitle": "मूल संस्कृत गाथा,",
+    "credits": ""
+  },
+  "chapters": [
+    {
+      "name": "मंगलाचरण",
+      "items": [
+        {
+          "file": "0000_शास्त्र-मंगलाचरण.txt",
+          "gathaNum": "000",
+          "title": "शास्त्र-मंगलाचरण"
+        },
+        {
+          "file": "001.txt",
+          "gathaNum": "001",
+          "title": "मंगलाचरण"
+        }
+      ]
+    },
+    {
+      "name": "मूल ग्रंथ",
+      "items": [
+        {
+          "file": "002.txt",
+          "gathaNum": "002",
+          "title": "गाथा 002"
+        },
+        {
+          "file": "003.txt",
+          "gathaNum": "003",
+          "title": "गाथा 003"
+        },
+        {
+          "file": "004.txt",
+          "gathaNum": "004",
+          "title": "गाथा 004"
+        },
+        {
+          "file": "005.txt",
+          "gathaNum": "005",
+          "title": "गाथा 005"
+        },
+        {
+          "file": "006.txt",
+          "gathaNum": "006",
+          "title": "गाथा 006"
+        },
+        {
+          "file": "007.txt",
+          "gathaNum": "007",
+          "title": "गाथा 007"
+        },
+        {
+          "file": "008.txt",
+          "gathaNum": "008",
+          "title": "गाथा 008"
+        },
+        {
+          "file": "009.txt",
+          "gathaNum": "009",
+          "title": "गाथा 009"
+        },
+        {
+          "file": "010.txt",
+          "gathaNum": "010",
+          "title": "गाथा 010"
+        },
+        {
+          "file": "011.txt",
+          "gathaNum": "011",
+          "title": "गाथा 011"
+        },
+        {
+          "file": "012.txt",
+          "gathaNum": "012",
+          "title": "गाथा 012"
+        },
+        {
+          "file": "013-014.txt",
+          "gathaNum": "013-014",
+          "title": "गाथा 013-014"
+        },
+        {
+          "file": "015.txt",
+          "gathaNum": "015",
+          "title": "गाथा 015"
+        },
+        {
+          "file": "016.txt",
+          "gathaNum": "016",
+          "title": "गाथा 016"
+        },
+        {
+          "file": "017.txt",
+          "gathaNum": "017",
+          "title": "गाथा 017"
+        },
+        {
+          "file": "018.txt",
+          "gathaNum": "018",
+          "title": "गाथा 018"
+        },
+        {
+          "file": "019.txt",
+          "gathaNum": "019",
+          "title": "गाथा 019"
+        },
+        {
+          "file": "020.txt",
+          "gathaNum": "020",
+          "title": "गाथा 020"
+        },
+        {
+          "file": "021.txt",
+          "gathaNum": "021",
+          "title": "गाथा 021"
+        },
+        {
+          "file": "022.txt",
+          "gathaNum": "022",
+          "title": "गाथा 022"
+        },
+        {
+          "file": "023.txt",
+          "gathaNum": "023",
+          "title": "गाथा 023"
+        },
+        {
+          "file": "024.txt",
+          "gathaNum": "024",
+          "title": "गाथा 024"
+        },
+        {
+          "file": "025.txt",
+          "gathaNum": "025",
+          "title": "गाथा 025"
+        }
+      ]
+    }
+  ]
+}
