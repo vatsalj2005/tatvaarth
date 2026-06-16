@@ -557,6 +557,23 @@ function parseMyItemJs(filePath) {
   return mainChapters;
 }
 
+// Helper to read title from generated .txt file
+function readTitleFromTxt(filePath) {
+  try {
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const lines = content.split('\n');
+      const titleIdx = lines.indexOf('=== Title ===');
+      if (titleIdx !== -1 && lines[titleIdx + 1]) {
+        return lines[titleIdx + 1].trim();
+      }
+    }
+  } catch (e) {
+    console.error(`Failed to read title from ${filePath}:`, e);
+  }
+  return "";
+}
+
 // Convert a single shastra
 function convertShastra(config) {
   const { categoryDirName, shastraDirName, title, author, category } = config;
@@ -760,6 +777,94 @@ function convertShastra(config) {
     }
   }
 
+  // Auto-append any converted .txt files that are not referenced in the manifest chapters
+  const allTxtFiles = fs.readdirSync(destShastraPath).filter(f => f.endsWith('.txt')).sort();
+  for (const txtFile of allTxtFiles) {
+    const alreadyExists = shastraChapters.some(ch => ch.items.some(item => item.file === txtFile));
+    if (!alreadyExists) {
+      const baseName = path.basename(txtFile, '.txt');
+      const txtFilePath = path.join(destShastraPath, txtFile);
+      const fileTitle = readTitleFromTxt(txtFilePath);
+      
+      const item = {
+        file: txtFile,
+        gathaNum: baseName,
+        title: fileTitle || `गाथा ${baseName}`
+      };
+
+      const getNumeric = (itm) => {
+        const base = path.basename(itm.file, '.txt');
+        const numStr = itm.gathaNum || base;
+        if (shastraDirName.includes('paramatmaprakash') || shastraDirName.includes('परमात्मप्रकाश')) {
+          const secMatch = numStr.match(/^(\d+)[-–](\d+)/);
+          if (secMatch) {
+            const major = parseInt(secMatch[1], 10);
+            const minor = parseInt(secMatch[2], 10);
+            return major * 10000 + minor;
+          }
+        }
+        const numMatch = numStr.match(/^(\d+)/);
+        if (numMatch) {
+          return parseInt(numMatch[1], 10);
+        }
+        return null;
+      };
+
+      const val = getNumeric(item);
+      
+      // Find the best chapter for this item
+      let targetChapter = null;
+      if (val !== null) {
+        // 1. Look for a chapter where the item fits within its min/max range
+        for (const chapter of shastraChapters) {
+          if (chapter.name === "मंगलाचरण") continue; // Keep Mangalacharan isolated
+          const numericItems = chapter.items
+            .map(itm => getNumeric(itm))
+            .filter(n => n !== null);
+          
+          if (numericItems.length > 0) {
+            const min = Math.min(...numericItems);
+            const max = Math.max(...numericItems);
+            if (val >= min && val <= max) {
+              targetChapter = chapter;
+              break;
+            }
+          }
+        }
+
+        // 2. If not inside any chapter's range, find the chapter whose end is closest but before val
+        if (!targetChapter) {
+          let minDiff = Infinity;
+          for (const chapter of shastraChapters) {
+            if (chapter.name === "मंगलाचरण") continue;
+            const numericItems = chapter.items
+              .map(itm => getNumeric(itm))
+              .filter(n => n !== null);
+            if (numericItems.length > 0) {
+              const max = Math.max(...numericItems);
+              if (val > max && (val - max) < minDiff) {
+                minDiff = val - max;
+                targetChapter = chapter;
+              }
+            }
+          }
+        }
+      }
+
+      if (!targetChapter) {
+        // Fallback to the last chapter or "मूल ग्रंथ"
+        targetChapter = shastraChapters.find(ch => ch.name === "मूल ग्रंथ") || shastraChapters[shastraChapters.length - 1];
+      }
+
+      if (!targetChapter) {
+        targetChapter = { name: "मूल ग्रंथ", items: [] };
+        shastraChapters.push(targetChapter);
+      }
+
+      targetChapter.items.push(item);
+    }
+  }
+
   // Deduplicate files across all chapters, keeping only the first occurrence of each file
   const seenFiles = new Set();
   for (const chapter of shastraChapters) {
@@ -769,6 +874,102 @@ function convertShastra(config) {
       }
       seenFiles.add(item.file);
       return true;
+    });
+
+    // Sort items in the chapter numerically
+    chapter.items.sort((a, b) => {
+      const getNumeric = (item) => {
+        const base = path.basename(item.file, '.txt');
+        const numStr = item.gathaNum || base;
+        
+        // Match major-minor pattern (like 1-002 or 2-025)
+        if (shastraDirName.includes('paramatmaprakash') || shastraDirName.includes('परमात्मप्रकाश')) {
+          const secMatch = numStr.match(/^(\d+)[-–](\d+)/);
+          if (secMatch) {
+            const major = parseInt(secMatch[1], 10);
+            const minor = parseInt(secMatch[2], 10);
+            return major * 10000 + minor;
+          }
+        }
+
+        // Match standard leading number pattern (like 019 or 13-14 or 13)
+        const numMatch = numStr.match(/^(\d+)/);
+        if (numMatch) {
+          return parseInt(numMatch[1], 10);
+        }
+        
+        return 999999;
+      };
+
+      const valA = getNumeric(a);
+      const valB = getNumeric(b);
+      
+      if (valA !== valB) {
+        return valA - valB;
+      }
+      return a.file.localeCompare(b.file);
+    });
+  }
+
+  // Move Mangalacharan items into their own "मंगलाचरण" chapter
+  const mangalaItems = [];
+  for (const chapter of shastraChapters) {
+    if (chapter.name === "मंगलाचरण") {
+      mangalaItems.push(...chapter.items);
+      chapter.items = [];
+      continue;
+    }
+    
+    const toMove = chapter.items.filter(item => {
+      const base = path.basename(item.file, '.txt');
+      const isMangalaFile = 
+        base.startsWith('0000_शास्त्र-मंगलाचरण') || 
+        base.startsWith('000_मंगलाचरण') || 
+        base === '001' || 
+        base === '01' ||
+        base === '1-001';
+      
+      const isMangalaTitle = 
+        item.title.includes('मंगलाचरण') || 
+        item.gathaNum === '000' || 
+        item.gathaNum === '001' || 
+        item.gathaNum === '01' ||
+        item.gathaNum === '1-001' ||
+        item.gathaNum === '000_मंगलाचरण';
+
+      return isMangalaFile || isMangalaTitle;
+    });
+
+    chapter.items = chapter.items.filter(item => !toMove.includes(item));
+    mangalaItems.push(...toMove);
+  }
+
+  // Remove empty chapters except "मंगलाचरण"
+  shastraChapters = shastraChapters.filter(ch => ch.items.length > 0 || ch.name === "मंगलाचरण");
+
+  if (mangalaItems.length > 0) {
+    let mangalaChapter = shastraChapters.find(ch => ch.name === 'मंगलाचरण');
+    if (!mangalaChapter) {
+      mangalaChapter = { name: 'मंगलाचरण', items: [] };
+      shastraChapters.unshift(mangalaChapter);
+    }
+    const seen = new Set();
+    mangalaChapter.items = mangalaItems.filter(item => {
+      if (seen.has(item.file)) return false;
+      seen.add(item.file);
+      return true;
+    });
+
+    // Sort Mangalacharan items numerically (000 before 001/01/1-001)
+    mangalaChapter.items.sort((a, b) => {
+      const getNum = (itm) => {
+        const base = path.basename(itm.file, '.txt');
+        if (base.startsWith('0000_शास्त्र-मंगलाचरण')) return 0;
+        if (base.startsWith('000_मंगलाचरण')) return 1;
+        if (base === '001' || base === '01' || base === '1-001') return 2;
+        return 9;
+      };
+      return getNum(a) - getNum(b);
     });
   }
 
@@ -814,7 +1015,14 @@ const configs = [
     categorySlug: "dravyanuyog",
     shastraSlug: "pravachansar",
     categoryDirName: "01_द्रव्यानुयोग",
-    shastraDirName: "02_प्रवचनसार--कुन्दकुन्दाचार्य"
+    shastraDirName: "02_प्रवचनसार--कुन्दकुन्दाचार्य",
+    cover: {
+      invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
+      authorPrefix: "श्रीमद्-भगवत्कुन्दकुन्दाचार्यदेव-प्रणीत",
+      title: "श्री प्रवचनसार",
+      subtitle: "मूल प्राकृत गाथा, श्री अमृतचंद्राचार्य विरचित 'तत्त्वदीपिका' नामक संस्कृत टीका का हिंदी अनुवाद, श्री जयसेनाचार्य विरचित 'तात्पर्य-वृत्ति' नामक संस्कृत टीका का हिंदी अनुवाद सहित",
+      credits: "आभार : पं जयचंदजी छाबडा, पं हुकमचंद भारिल्ल"
+    }
   },
   {
     id: "panchastikay",
@@ -888,7 +1096,45 @@ const configs = [
       invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
       authorPrefix: "श्रीमद्-भगवत्-अकलंक-आचार्यदेव-प्रणीत",
       title: "श्री स्वरूप-संबोधन",
-      subtitle: "मूल संस्कृत गाथा,",
+      subtitle: "",
+      credits: ""
+    }
+  },
+  {
+    id: "ishtopadesh",
+    title: "इष्टोपदेश",
+    author: "पूज्यपाद",
+    category: "द्रव्यानुयोग",
+    categoryHi: "द्रव्यानुयोग",
+    categoryEn: "Dravyanuyog",
+    categorySlug: "dravyanuyog",
+    shastraSlug: "ishtopadesh",
+    categoryDirName: "01_द्रव्यानुयोग",
+    shastraDirName: "09_इष्टोपदेश--आचार्य‌-पूज्यपाद",
+    cover: {
+      invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
+      authorPrefix: "श्रीमद्-भगवत्पूज्यपाद-आचार्य-प्रणीत",
+      title: "श्री इष्टोपदेश",
+      subtitle: "मूल संस्कृत गाथा",
+      credits: "आभार : पंडित आशाधरजी"
+    }
+  },
+  {
+    id: "paramatmaprakash",
+    title: "परमात्मप्रकाश",
+    author: "योगींदुदेव",
+    category: "द्रव्यानुयोग",
+    categoryHi: "द्रव्यानुयोग",
+    categoryEn: "Dravyanuyog",
+    categorySlug: "dravyanuyog",
+    shastraSlug: "paramatmaprakash",
+    categoryDirName: "01_द्रव्यानुयोग",
+    shastraDirName: "10_परमात्मप्रकाश--योगींदुदेव",
+    cover: {
+      invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
+      authorPrefix: "श्रीमद्-भगवत्योगीन्दु-देव-प्रणीत",
+      title: "श्री परमात्मप्रकाश",
+      subtitle: "मूल प्राकृत गाथा,",
       credits: ""
     }
   }

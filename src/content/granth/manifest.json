@@ -64,5 +64,27 @@
     "shastraSlug": "swaroopsambodhan",
     "path": "01_द्रव्यानुयोग/08_स्वरूप-संबोधन--अकलंक-देव",
     "gathaCount": 25
+  },
+  {
+    "id": "ishtopadesh",
+    "title": "इष्टोपदेश",
+    "author": "पूज्यपाद",
+    "categoryHi": "द्रव्यानुयोग",
+    "categoryEn": "Dravyanuyog",
+    "categorySlug": "dravyanuyog",
+    "shastraSlug": "ishtopadesh",
+    "path": "01_द्रव्यानुयोग/09_इष्टोपदेश--आचार्य‌-पूज्यपाद",
+    "gathaCount": 51
+  },
+  {
+    "id": "paramatmaprakash",
+    "title": "परमात्मप्रकाश",
+    "author": "योगींदुदेव",
+    "categoryHi": "द्रव्यानुयोग",
+    "categoryEn": "Dravyanuyog",
+    "categorySlug": "dravyanuyog",
+    "shastraSlug": "paramatmaprakash",
+    "path": "01_द्रव्यानुयोग/10_परमात्मप्रकाश--योगींदुदेव",
+    "gathaCount": 214
   }
 ]
