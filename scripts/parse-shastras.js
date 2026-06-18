@@ -202,12 +202,59 @@ function findMatchingDiv(html, startIdx) {
   return null;
 }
 
+// Parse OrgChart HTML lists to tree node structures
+function parseOrgChart(orgchartHtml) {
+  const nodes = [];
+  const tagRegex = /(<ul\b|<li\b|<\/ul\b|<\/li\b|<div\b class=["']?nodecontent["']?>|<\/div\b)/gi;
+  
+  let match;
+  let currentParentId = undefined;
+  const parentStack = [];
+  let nextNodeId = 1;
+  
+  const matches = [];
+  while ((match = tagRegex.exec(orgchartHtml)) !== null) {
+    matches.push({
+      tag: match[0].toLowerCase(),
+      index: match.index,
+      length: match[0].length
+    });
+  }
+  
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i];
+    if (m.tag.startsWith('<ul')) {
+      parentStack.push(currentParentId);
+    } else if (m.tag.startsWith('</ul')) {
+      currentParentId = parentStack.pop();
+    } else if (m.tag.startsWith('<div')) {
+      const contentStart = m.index + m.length;
+      const nextM = matches[i + 1];
+      if (nextM && nextM.tag.startsWith('</div')) {
+        const text = orgchartHtml.substring(contentStart, nextM.index).trim();
+        const id = nextNodeId === 1 ? 'root' : `sub${nextNodeId}`;
+        nextNodeId++;
+        
+        nodes.push({
+          id,
+          parentid: parentStack[parentStack.length - 1],
+          isroot: id === 'root' ? true : undefined,
+          topic: text
+        });
+        
+        currentParentId = id;
+      }
+    }
+  }
+  return nodes;
+}
+
 // Parse a single HTML file of a gatha
 function parseGathaHtml(filePath) {
   const html = fs.readFileSync(filePath, 'utf-8');
   const fileName = path.basename(filePath);
 
-  if (fileName.startsWith('0000_शास्त्र-मंगलाचरण')) {
+  if (fileName.startsWith('0000_शास्त्र-मंगलाचरण') || fileName.startsWith('000_शास्त्र-मंगलाचरण')) {
     const title = "शास्त्र-मंगलाचरण";
     
     // Gatha
@@ -300,39 +347,101 @@ function parseGathaHtml(filePath) {
 
   // 5. Anvayarth (Paragraph)
   let anvayarth = "";
-  const anvayarthMatches = mainHtml.matchAll(/<div[^>]*class=["']?paragraph\b[^>]*>([\s\S]*?)<\/div>/gi);
   const anvayarthContents = [];
-  for (const match of anvayarthMatches) {
-    let content = match[1];
-    // Strip "अन्वयार्थ :" prefix if it exists
-    content = content.replace(/<b><font color=[^>]*>अन्वयार्थ\s*:\s*<\/font><\/b>/i, '');
-    content = content.replace(/<b>अन्वयार्थ\s*:\s*<\/b>/i, '');
-    
-    // Convert <font color=...>[word]</font> to **[word]**
-    content = content.replace(/<font color=[^>]*>\s*(\[[^\]]+\])\s*<\/font>/gi, '**$1**');
-    content = content.replace(/<font color=[^>]*>([\s\S]*?)<\/font>/gi, '$1');
-    
-    content = stripHtml(content);
-    // Replace raw [word] with **[word]** if not already bolded
-    content = content.replace(/(?<!\*\*)(\[[^\]]+\])(?!\*\*)/g, '**$1**');
-    
-    if (content.trim()) {
-      anvayarthContents.push(content.trim());
+  const paragraphRegex = /<div[^>]*class=["']?paragraph\b[^>]*>/gi;
+  let match;
+  while ((match = paragraphRegex.exec(mainHtml)) !== null) {
+    const startIdx = match.index;
+    const matchedDiv = findMatchingDiv(mainHtml, startIdx);
+    if (matchedDiv) {
+      let content = matchedDiv.content;
+
+      // Look for OrgChart inside the content
+      const orgchartRegex = /<ul\b[^>]*class=["']?orgchart["']?[^>]*>([\s\S]*?)<\/ul>/gi;
+      let ocMatch;
+      let diagramsInPara = [];
+      while ((ocMatch = orgchartRegex.exec(content)) !== null) {
+        const fullOcHtml = ocMatch[0];
+        const nodes = parseOrgChart(fullOcHtml);
+        if (nodes && nodes.length > 0) {
+          diagramsInPara.push(`[DIAGRAM]\n${JSON.stringify({ type: 'vertical', nodes })}\n[/DIAGRAM]`);
+        }
+      }
+
+      // Remove the OrgChart elements from the HTML before stripping tags
+      content = content.replace(/<div[^>]*class=["']?oc["']?[^>]*>[\s\S]*?<\/div>\s*<\/div>/gi, '');
+      content = content.replace(/<div[^>]*class=["']?oc["']?[^>]*>[\s\S]*?<\/div>/gi, '');
+      content = content.replace(/<ul\b[^>]*class=["']?orgchart["']?[^>]*>[\s\S]*?<\/ul>/gi, '');
+
+      // Strip "अन्वयार्थ :" prefix if it exists
+      content = content.replace(/<b><font color=[^>]*>अन्वयार्थ\s*:\s*<\/font><\/b>/i, '');
+      content = content.replace(/<b>अन्वयार्थ\s*:\s*<\/b>/i, '');
+      
+      // Convert <font color=...>[word]</font> to **[word]**
+      content = content.replace(/<font color=[^>]*>\s*(\[[^\]]+\])\s*<\/font>/gi, '**$1**');
+      content = content.replace(/<font color=[^>]*>([\s\S]*?)<\/font>/gi, '$1');
+      
+      content = stripHtml(content);
+      // Replace raw [word] with **[word]** if not already bolded
+      content = content.replace(/(?<!\*\*)(\[[^\]]+\])(?!\*\*)/g, '**$1**');
+      
+      const paraText = content.trim();
+      if (paraText) {
+        anvayarthContents.push(paraText);
+      }
+      for (const diag of diagramsInPara) {
+        anvayarthContents.push(diag);
+      }
+
+      paragraphRegex.lastIndex = matchedDiv.end;
     }
   }
+
+  // Look for jsMind script in mainHtml
+  const jsmindRegex = /var\s+mind\d+\s*=\s*(\{[\s\S]*?\});/gi;
+  let jsmindMatch;
+  const jsMindDiagrams = [];
+  while ((jsmindMatch = jsmindRegex.exec(mainHtml)) !== null) {
+    try {
+      let dataStr = jsmindMatch[1];
+      const evalObj = new Function(`return ${dataStr}`)();
+      if (evalObj && evalObj.data) {
+        const nodes = evalObj.data.map(n => ({
+          id: n.id,
+          parentid: n.parentid || undefined,
+          isroot: n.isroot || undefined,
+          topic: n.topic
+        }));
+        jsMindDiagrams.push(`[DIAGRAM]\n${JSON.stringify({ type: 'horizontal', nodes })}\n[/DIAGRAM]`);
+      }
+    } catch (e) {
+      console.error("Error parsing jsMind data:", e);
+    }
+  }
+
+  for (const diag of jsMindDiagrams) {
+    anvayarthContents.push(diag);
+  }
+
   anvayarth = anvayarthContents.join('\n\n');
 
   // 6. English Meaning (ParagraphE)
   let english = "";
-  const englishMatches = mainHtml.matchAll(/<div[^>]*class=["']?paragraphE\b[^>]*>([\s\S]*?)<\/div>/gi);
   const englishContents = [];
-  for (const match of englishMatches) {
-    let content = match[1];
-    content = content.replace(/<b><font color=[^>]*>Meaning\s*:\s*<\/font><\/b>/i, '');
-    content = content.replace(/<b>Meaning\s*:\s*<\/b>/i, '');
-    content = stripHtml(content);
-    if (content.trim()) {
-      englishContents.push(content.trim());
+  const paragraphERegex = /<div[^>]*class=["']?paragraphE\b[^>]*>/gi;
+  let matchE;
+  while ((matchE = paragraphERegex.exec(mainHtml)) !== null) {
+    const startIdx = matchE.index;
+    const matchedDiv = findMatchingDiv(mainHtml, startIdx);
+    if (matchedDiv) {
+      let content = matchedDiv.content;
+      content = content.replace(/<b><font color=[^>]*>Meaning\s*:\s*<\/font><\/b>/i, '');
+      content = content.replace(/<b>Meaning\s*:\s*<\/b>/i, '');
+      content = stripHtml(content);
+      if (content.trim()) {
+        englishContents.push(content.trim());
+      }
+      paragraphERegex.lastIndex = matchedDiv.end;
     }
   }
   english = englishContents.join('\n\n');
@@ -612,17 +721,18 @@ function convertShastra(config) {
     }
   }
 
-  // Prepend 0000_शास्त्र-मंगलाचरण if it exists but is not in chapters
-  const hasMangalacharan = fs.existsSync(path.join(htmlFolder, '0000_शास्त्र-मंगलाचरण.html'));
+  // Prepend 0000_शास्त्र-मंगलाचरण or 000_शास्त्र-मंगलाचरण if it exists but is not in chapters
+  const hasMangalacharan = fs.existsSync(path.join(htmlFolder, '0000_शास्त्र-मंगलाचरण.html')) || fs.existsSync(path.join(htmlFolder, '000_शास्त्र-मंगलाचरण.html'));
   if (hasMangalacharan) {
+    const fileName = fs.existsSync(path.join(htmlFolder, '0000_शास्त्र-मंगलाचरण.html')) ? '0000_शास्त्र-मंगलाचरण' : '000_शास्त्र-मंगलाचरण';
     let firstChapter = shastraChapters[0];
     if (!firstChapter) {
       firstChapter = { name: "मंगलाचरण", items: [] };
       shastraChapters.unshift(firstChapter);
     }
-    if (!firstChapter.items.some(item => item.file.startsWith('0000_शास्त्र-मंगलाचरण'))) {
+    if (!firstChapter.items.some(item => item.file.startsWith(fileName))) {
       firstChapter.items.unshift({
-        file: '0000_शास्त्र-मंगलाचरण.txt',
+        file: `${fileName}.txt`,
         gathaNum: '000',
         title: 'शास्त्र-मंगलाचरण'
       });
@@ -795,7 +905,8 @@ function convertShastra(config) {
       const getNumeric = (itm) => {
         const base = path.basename(itm.file, '.txt');
         const numStr = itm.gathaNum || base;
-        if (shastraDirName.includes('paramatmaprakash') || shastraDirName.includes('परमात्मप्रकाश')) {
+        if (shastraDirName.includes('paramatmaprakash') || shastraDirName.includes('परमात्मप्रकाश') ||
+            shastraDirName.includes('tatvaarthsutra') || shastraDirName.includes('तत्त्वार्थसूत्र')) {
           const secMatch = numStr.match(/^(\d+)[-–](\d+)/);
           if (secMatch) {
             const major = parseInt(secMatch[1], 10);
@@ -883,7 +994,8 @@ function convertShastra(config) {
         const numStr = item.gathaNum || base;
         
         // Match major-minor pattern (like 1-002 or 2-025)
-        if (shastraDirName.includes('paramatmaprakash') || shastraDirName.includes('परमात्मप्रकाश')) {
+        if (shastraDirName.includes('paramatmaprakash') || shastraDirName.includes('परमात्मप्रकाश') ||
+            shastraDirName.includes('tatvaarthsutra') || shastraDirName.includes('तत्त्वार्थसूत्र')) {
           const secMatch = numStr.match(/^(\d+)[-–](\d+)/);
           if (secMatch) {
             const major = parseInt(secMatch[1], 10);
@@ -924,6 +1036,7 @@ function convertShastra(config) {
       const base = path.basename(item.file, '.txt');
       const isMangalaFile = 
         base.startsWith('0000_शास्त्र-मंगलाचरण') || 
+        base.startsWith('000_शास्त्र-मंगलाचरण') || 
         base.startsWith('000_मंगलाचरण') || 
         base === '001' || 
         base === '01' ||
@@ -964,7 +1077,7 @@ function convertShastra(config) {
     mangalaChapter.items.sort((a, b) => {
       const getNum = (itm) => {
         const base = path.basename(itm.file, '.txt');
-        if (base.startsWith('0000_शास्त्र-मंगलाचरण')) return 0;
+        if (base.startsWith('0000_शास्त्र-मंगलाचरण') || base.startsWith('000_शास्त्र-मंगलाचरण')) return 0;
         if (base.startsWith('000_मंगलाचरण')) return 1;
         if (base === '001' || base === '01' || base === '1-001') return 2;
         return 9;
@@ -1034,7 +1147,7 @@ const configs = [
     categorySlug: "dravyanuyog",
     shastraSlug: "panchastikay",
     categoryDirName: "01_द्रव्यानुयोग",
-    shastraDirName: "05_पञ्चास्तिकाय--कुन्दकुन्दाचार्य",
+    shastraDirName: "03_पञ्चास्तिकाय--कुन्दकुन्दाचार्य",
     cover: {
       invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
       authorPrefix: "श्रीमद्-भगवत्कुन्दकुन्दाचार्य-प्रणीत",
@@ -1053,7 +1166,7 @@ const configs = [
     categorySlug: "dravyanuyog",
     shastraSlug: "dravyasangraha",
     categoryDirName: "01_द्रव्यानुयोग",
-    shastraDirName: "06_द्रव्यसंग्रह--नेमिचंद्र-सिद्धांतचक्रवर्ती",
+    shastraDirName: "04_द्रव्यसंग्रह--नेमिचंद्र-सिद्धांतचक्रवर्ती",
     cover: {
       invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
       authorPrefix: "श्रीमद्-भगवन्नेमिचन्द्र-प्रणीत",
@@ -1072,7 +1185,7 @@ const configs = [
     categorySlug: "dravyanuyog",
     shastraSlug: "samadhitantra",
     categoryDirName: "01_द्रव्यानुयोग",
-    shastraDirName: "07_समाधितन्त्र--आचार्य‌-पूज्यपाद",
+    shastraDirName: "05_समाधितन्त्र--आचार्य‌-पूज्यपाद",
     cover: {
       invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
       authorPrefix: "आचार्य-पूज्यपाद-प्रणीत",
@@ -1091,7 +1204,7 @@ const configs = [
     categorySlug: "dravyanuyog",
     shastraSlug: "swaroopsambodhan",
     categoryDirName: "01_द्रव्यानुयोग",
-    shastraDirName: "08_स्वरूप-संबोधन--अकलंक-देव",
+    shastraDirName: "06_स्वरूप-संबोधन--अकलंक-देव",
     cover: {
       invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
       authorPrefix: "श्रीमद्-भगवत्-अकलंक-आचार्यदेव-प्रणीत",
@@ -1110,7 +1223,7 @@ const configs = [
     categorySlug: "dravyanuyog",
     shastraSlug: "ishtopadesh",
     categoryDirName: "01_द्रव्यानुयोग",
-    shastraDirName: "09_इष्टोपदेश--आचार्य‌-पूज्यपाद",
+    shastraDirName: "07_इष्टोपदेश--आचार्य‌-पूज्यपाद",
     cover: {
       invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
       authorPrefix: "श्रीमद्-भगवत्पूज्यपाद-आचार्य-प्रणीत",
@@ -1129,7 +1242,7 @@ const configs = [
     categorySlug: "dravyanuyog",
     shastraSlug: "paramatmaprakash",
     categoryDirName: "01_द्रव्यानुयोग",
-    shastraDirName: "10_परमात्मप्रकाश--योगींदुदेव",
+    shastraDirName: "08_परमात्मप्रकाश--योगींदुदेव",
     cover: {
       invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
       authorPrefix: "श्रीमद्-भगवत्योगीन्दु-देव-प्रणीत",
@@ -1137,11 +1250,32 @@ const configs = [
       subtitle: "मूल प्राकृत गाथा,",
       credits: ""
     }
+  },
+
+  {
+    id: "tatvaarthsutra",
+    title: "तत्त्वार्थसूत्र",
+    author: "उमास्वामी",
+    category: "द्रव्यानुयोग",
+    categoryHi: "द्रव्यानुयोग",
+    categoryEn: "Dravyanuyog",
+    categorySlug: "dravyanuyog",
+    shastraSlug: "tatvaarthsutra",
+    categoryDirName: "01_द्रव्यानुयोग",
+    shastraDirName: "10_तत्त्वार्थसूत्र--आचार्य-उमास्वामी",
+    cover: {
+      invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
+      authorPrefix: "श्रीमद्‌-भगवत्उमास्वामीदेव-प्रणीत",
+      title: "श्री तत्त्वार्थ-सूत्र",
+      subtitle: "मूल संस्कृत सूत्र, श्री पूज्यपाद-आचार्य विरचित 'सर्वार्थ-सिद्धि' नामक संस्कृत टीका का हिंदी अनुवाद, श्री अकलान्काचार्य विरचित 'तत्त्वार्थ-राजवार्तिक' नामक संस्कृत टीका का हिंदी अनुवाद सहित",
+      credits: "आभार : महेंद्र-कुमार जैन 'न्यायाचार्य', सुपार्श्वमती-माताजी"
+    }
   }
 ];
 
-function getActualGathaCount(chapters) {
+function getActualGathaCount(chapters, configId) {
   let maxGatha = 0;
+  let totalValidItems = 0;
   for (const chapter of chapters) {
     for (const item of chapter.items) {
       const numStr = item.gathaNum.trim();
@@ -1160,28 +1294,37 @@ function getActualGathaCount(chapters) {
         continue;
       }
       
-      // Look for range like 222-227
-      const rangeMatch = numStr.match(/^(\d+)[-–](\d+)$/);
-      if (rangeMatch) {
-        const end = parseInt(rangeMatch[2], 10);
-        if (!isNaN(end) && end > maxGatha) {
-          maxGatha = end;
+      totalValidItems++;
+
+      // Skip major-minor chapter-sutra patterns (like 01-01 or 1-002) when parsing range matches
+      const isChapterSutra = configId === 'tatvaarthsutra' || configId === 'paramatmaprakash';
+      if (!isChapterSutra) {
+        // Look for range like 222-227
+        const rangeMatch = numStr.match(/^(\d+)[-–](\d+)$/);
+        if (rangeMatch) {
+          const end = parseInt(rangeMatch[2], 10);
+          if (!isNaN(end) && end > maxGatha) {
+            maxGatha = end;
+          }
+          continue;
         }
-        continue;
-      }
-      
-      // Single number like 012 or 439
-      const singleMatch = numStr.match(/^(\d+)/);
-      if (singleMatch) {
-        const val = parseInt(singleMatch[1], 10);
-        if (!isNaN(val) && val > maxGatha) {
-          maxGatha = val;
+        
+        // Single number like 012 or 439
+        const singleMatch = numStr.match(/^(\d+)/);
+        if (singleMatch) {
+          const val = parseInt(singleMatch[1], 10);
+          if (!isNaN(val) && val > maxGatha) {
+            maxGatha = val;
+          }
+          continue;
         }
-        continue;
       }
     }
   }
-  return maxGatha;
+  if (configId === 'tatvaarthsutra' || configId === 'paramatmaprakash') {
+    return totalValidItems;
+  }
+  return maxGatha || totalValidItems;
 }
 
 function main() {
@@ -1197,7 +1340,7 @@ function main() {
         try {
           const indexJson = JSON.parse(fs.readFileSync(destIndexJsonPath, 'utf-8'));
           if (indexJson && indexJson.chapters) {
-            gathaCount = getActualGathaCount(indexJson.chapters);
+            gathaCount = getActualGathaCount(indexJson.chapters, config.id);
           }
         } catch (e) {
           console.error(`Failed to read index.json for ${config.title}:`, e);

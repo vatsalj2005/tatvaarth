@@ -1,0 +1,33 @@
+=== Title ===
+पर्वतों पर तालाब
+
+=== Gatha ===
+पद्ममहापद्मतिगिञ्छकेशरि महापुण्डरीकपुण्डरीका-हृदास्तेषामुपरि॥14॥
+
+=== Sanskrit ===
+
+
+=== Gadya ===
+
+
+=== Anvayarth ===
+इन पर्वतों के ऊपर क्रम से पद्म, महापद्म, तिगिंछ, केस‍री, महापुण्‍डरीक और पुण्‍डरीक ये तालाब हैं ॥१४॥
+
+[DIAGRAM]
+{"type":"horizontal","nodes":[{"id":"root","isroot":true,"topic":"जम्बू-द्वीप के पर्वत के ऊपर तलाब"},{"id":"sub6","parentid":"root","topic":"शिखरी"},{"id":"sub5","parentid":"root","topic":"रुक्‍मी"},{"id":"sub4","parentid":"root","topic":"नील"},{"id":"sub3","parentid":"root","topic":"निषध"},{"id":"sub2","parentid":"root","topic":"महाहिमवन्"},{"id":"sub1","parentid":"root","topic":"हिमवन्"},{"id":"sub11","parentid":"sub1","topic":"पद्म"},{"id":"sub12","parentid":"sub2","topic":"महापद्म"},{"id":"sub13","parentid":"sub3","topic":"तिगिंछ"},{"id":"sub14","parentid":"sub4","topic":"केस‍री"},{"id":"sub15","parentid":"sub5","topic":"महापुण्‍डरीक"},{"id":"sub16","parentid":"sub6","topic":"पुण्‍डरीक"}]}
+[/DIAGRAM]
+
+=== English ===
+Padma, Mahâpadma, Tigiñcha, Kesari, Mahâpundarîka, and Pundarîka are the lakes on the tops of these (mountains).
+
+=== Teeka: सर्वार्थसिद्धि ===
+=== Teeka: सर्वार्थसिद्धि: Hindi ===
+पद्म, महापद्म, तिगिंच्‍छ, केसरी, महापुण्‍डरीक और पुण्‍डरीक ये छह तालाब हैं जो उन हिमवान् आदि पर्वतोंपर क्रमसे जानना चाहिए। 
+
+
+इनमें-से पहले तालाबके आकार-विशेषका ज्ञान करानेके लिए आगेका सूत्र कहते हैं-
+
+=== Teeka: राजवार्तिक ===
+=== Teeka: राजवार्तिक: Hindi ===
+पद्म आदि कमलों के नाम हैं। इनके साहचर्य से सरोवरों की भी पद्म आदि संज्ञाएँ हैं।
+

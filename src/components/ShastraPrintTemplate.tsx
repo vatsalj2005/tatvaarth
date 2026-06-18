@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { GathaContent, GathaItem } from '@/data/shastra-loader';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import DiagramRenderer from './DiagramRenderer';
 
 interface ShastraPrintTemplateProps {
   title: string;
@@ -19,7 +20,7 @@ interface ShastraPrintTemplateProps {
 
 interface Block {
   id: string;
-  type: 'toc_header' | 'toc_row' | 'gatha_title' | 'prakrit' | 'sanskrit' | 'gadya' | 'anvayarth' | 'english' | 'teeka_header' | 'teeka_content_para' | 'table';
+  type: 'toc_header' | 'toc_row' | 'gatha_title' | 'prakrit' | 'sanskrit' | 'gadya' | 'anvayarth' | 'english' | 'teeka_header' | 'teeka_content_para' | 'table' | 'diagram';
   gathaNum?: string;
   chapterName?: string;
   data: any;
@@ -35,13 +36,33 @@ interface PageData {
 
 const highlightBracketedTerms = (text: string) => {
   let prefix: string | null = null;
+  let bullet: string | null = null;
   let restText = text;
   
-  // Check for list items like "१. जीवत्वशक्ति -" or "३३-३८. भाव-अभावादि छह शक्तियाँ -"
-  const prefixMatch = text.match(/^([०-९0-9]+(?:-[०-९0-9]+)?\.\s+.*?[\s]*[-–]+(?:[\s]+|$))(.*)$/);
-  if (prefixMatch && prefixMatch[1].length <= 60) {
-    prefix = prefixMatch[1];
-    restText = prefixMatch[2];
+  // Check for special philosophical schools at the beginning of paragraph
+  const specialPrefixMatch = text.match(/^(\s*[•◦▪▫\-*]\s+)?(सांख्य(?:\s*\([^)]+\))?(?:\s*[-–])?|नैयायिक(?:ादि)?\s*[-–]?|वैशेषिक\s*[-–]?|बौद्ध\s*[-–]?)\s*(.*)$/);
+  if (specialPrefixMatch) {
+    bullet = specialPrefixMatch[1] || null;
+    prefix = specialPrefixMatch[2];
+    restText = specialPrefixMatch[3];
+  } else {
+    // Check for list items like "१. जीवत्वशक्ति -" or "३३-३८. भाव-अभावादि छह शक्तियाँ -"
+    const prefixMatch = text.match(/^([०-९0-9]+(?:-[०-९0-9]+)?\.\s+)(.*?[\s]*[-–]+(?:[\s]+|$))(.*)$/);
+    if (prefixMatch && (prefixMatch[1].length + prefixMatch[2].length) <= 60) {
+      const numPart = prefixMatch[1];
+      const termPart = prefixMatch[2];
+      const restTextVal = prefixMatch[3];
+      
+      const trimmedTerm = termPart.trim().replace(/[-–\s]+$/, '');
+      const wordCount = trimmedTerm.split(/\s+/).filter(w => w.length > 0).length;
+      const isQuestionOrSolution = trimmedTerm === 'प्रश्न' || trimmedTerm === 'शंका' || trimmedTerm === 'उत्तर' || trimmedTerm === 'समाधान';
+      const isInvalidTerm = wordCount > 4 || /[,，।?？]/.test(trimmedTerm);
+
+      if (!isQuestionOrSolution && !isInvalidTerm) {
+        prefix = numPart + termPart;
+        restText = restTextVal;
+      }
+    }
   }
 
   const processText = (t: string) => {
@@ -110,6 +131,7 @@ const highlightBracketedTerms = (text: string) => {
   if (prefix) {
     return (
       <span className="inline-block">
+        {bullet}
         <span className="inline-block px-1 py-0.5 mr-1 rounded text-gold font-semibold bg-gold/10 border border-gold/10">
           {prefix.trim()}
         </span>
@@ -149,6 +171,49 @@ const getRowRange = (text: string) => {
   }
   
   return null;
+};
+
+const cleanAnvayarthText = (text: string): string => {
+  if (!text) return '';
+  return text
+    .split('\n')
+    .filter(line => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('var mind') || 
+          trimmed.startsWith('var options') || 
+          trimmed.includes('new jsMind') || 
+          trimmed.includes('jm.show') ||
+          trimmed.startsWith('var oc') ||
+          trimmed.includes('new OrgChart')) {
+        return false;
+      }
+      return true;
+    })
+    .join('\n');
+};
+
+const parseTextWithDiagrams = (text: string): { type: 'text' | 'diagram'; content: string }[] => {
+  if (!text) return [];
+  const parts: { type: 'text' | 'diagram'; content: string }[] = [];
+  const regex = /\[DIAGRAM\]([\s\S]*?)\[\/DIAGRAM\]/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    const textBefore = text.slice(lastIndex, match.index);
+    if (textBefore.trim()) {
+      parts.push({ type: 'text', content: textBefore });
+    }
+    parts.push({ type: 'diagram', content: match[1].trim() });
+    lastIndex = regex.lastIndex;
+  }
+
+  const textAfter = text.slice(lastIndex);
+  if (textAfter.trim()) {
+    parts.push({ type: 'text', content: textAfter });
+  }
+
+  return parts;
 };
 
 const renderTableBlockHelper = (id: string, rows: string[]) => {
@@ -259,7 +324,7 @@ const renderTableBlockHelper = (id: string, rows: string[]) => {
                         rowSpan={cellSpan?.rowSpan || 1}
                         className={`px-3 py-1.5 text-center border-2 border-amber-600/30 dark:border-gold/30 rounded ${rowBgClass}`}
                       >
-                        {highlightBracketedTerms(cell)}
+                        {cell === '-' ? '' : highlightBracketedTerms(cell)}
                       </td>
                     );
                   })}
@@ -366,12 +431,25 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
 
       // Anvayarth
       if (content.anvayarth) {
-        list.push({
-          id: `gatha-${gathaNum}-anvayarth`,
-          type: 'anvayarth',
-          gathaNum,
-          chapterName,
-          data: content.anvayarth
+        const parts = parseTextWithDiagrams(cleanAnvayarthText(content.anvayarth));
+        parts.forEach((part, partIdx) => {
+          if (part.type === 'diagram') {
+            list.push({
+              id: `gatha-${gathaNum}-anvayarth-diagram-${partIdx}`,
+              type: 'diagram',
+              gathaNum,
+              chapterName,
+              data: part.content
+            });
+          } else {
+            list.push({
+              id: `gatha-${gathaNum}-anvayarth-text-${partIdx}`,
+              type: 'anvayarth',
+              gathaNum,
+              chapterName,
+              data: part.content
+            });
+          }
         });
       }
 
@@ -399,217 +477,243 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
         });
 
         if (teeka.sanskrit) {
-          const lines = teeka.sanskrit.split('\n');
-          let inVerse = false;
-          let pIdx = 0;
-          let currentTableRows: string[] = [];
-
-          const flushTableBlock = () => {
-            if (currentTableRows.length > 0) {
+          const parts = parseTextWithDiagrams(cleanAnvayarthText(teeka.sanskrit));
+          parts.forEach((part, partIdx) => {
+            if (part.type === 'diagram') {
               list.push({
-                id: `gatha-${gathaNum}-teeka-${comm}-sanskrit-table-${pIdx++}`,
-                type: 'table',
+                id: `gatha-${gathaNum}-teeka-${comm}-sanskrit-diagram-${partIdx}`,
+                type: 'diagram',
                 gathaNum,
                 chapterName,
-                data: [...currentTableRows]
+                data: part.content
               });
-              currentTableRows = [];
-            }
-          };
-
-          lines.forEach((lineText) => {
-            const clean = lineText.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
-
-            if (clean.startsWith('|')) {
-              currentTableRows.push(clean);
-              return;
             } else {
+              const lines = part.content.split('\n');
+              let inVerse = false;
+              let pIdx = 0;
+              let currentTableRows: string[] = [];
+
+              const flushTableBlock = () => {
+                if (currentTableRows.length > 0) {
+                  list.push({
+                    id: `gatha-${gathaNum}-teeka-${comm}-sanskrit-table-${partIdx}-${pIdx++}`,
+                    type: 'table',
+                    gathaNum,
+                    chapterName,
+                    data: [...currentTableRows]
+                  });
+                  currentTableRows = [];
+                }
+              };
+
+              lines.forEach((lineText) => {
+                const clean = lineText.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+
+                if (clean.startsWith('|')) {
+                  currentTableRows.push(clean);
+                  return;
+                } else {
+                  flushTableBlock();
+                }
+
+                if (!clean) return;
+
+                const isMeterHeader = clean.startsWith('(') && clean.endsWith(')') && clean.length <= 50;
+                const isStarLine = 
+                  (clean.startsWith('*') && !clean.startsWith('**')) || 
+                  (clean.includes(' = ') && !clean.startsWith('|') && !clean.startsWith('**')) ||
+                  (/^[०-९0-9]+(?:\s+)?[a-zA-Z\u0900-\u097F]/.test(clean) && !clean.startsWith('|') && !clean.startsWith('**'));
+                const isBoldTitle = clean.startsWith('**') && clean.endsWith('**') && !clean.startsWith('**[');
+
+                if (isMeterHeader) {
+                  inVerse = true;
+                  list.push({
+                    id: `gatha-${gathaNum}-teeka-${comm}-sanskrit-p-${partIdx}-${pIdx++}`,
+                    type: 'teeka_content_para',
+                    gathaNum,
+                    chapterName,
+                    data: { isSanskrit: true, text: clean, isMeterHeader: true, inVerse: false, isStarLine: false, isBoldTitle: false }
+                  });
+                } else if (inVerse && (clean.startsWith('[') || clean.startsWith('**['))) {
+                  inVerse = false;
+                  list.push({
+                    id: `gatha-${gathaNum}-teeka-${comm}-sanskrit-p-${partIdx}-${pIdx++}`,
+                    type: 'teeka_content_para',
+                    gathaNum,
+                    chapterName,
+                    data: { isSanskrit: true, text: clean, isMeterHeader: false, inVerse: false, isStarLine: false, isBoldTitle: false }
+                  });
+                } else if (inVerse) {
+                  list.push({
+                    id: `gatha-${gathaNum}-teeka-${comm}-sanskrit-p-${partIdx}-${pIdx++}`,
+                    type: 'teeka_content_para',
+                    gathaNum,
+                    chapterName,
+                    data: { isSanskrit: true, text: clean, isMeterHeader: false, inVerse: true, isStarLine: false, isBoldTitle: false }
+                  });
+                } else if (isBoldTitle) {
+                  const unwrappedTitle = clean.slice(2, -2).trim();
+                  list.push({
+                    id: `gatha-${gathaNum}-teeka-${comm}-sanskrit-p-${partIdx}-${pIdx++}`,
+                    type: 'teeka_content_para',
+                    gathaNum,
+                    chapterName,
+                    data: { isSanskrit: true, text: unwrappedTitle, isMeterHeader: false, inVerse: false, isStarLine: false, isBoldTitle: true }
+                  });
+                } else {
+                  const getIndentLevel = (line: string): number => {
+                    const match = line.match(/^([ \t]+)/);
+                    if (!match) return 0;
+                    let spaces = 0;
+                    for (const char of match[1]) {
+                      if (char === '\t') spaces += 2;
+                      else if (char === ' ') spaces += 1;
+                    }
+                    return Math.floor(spaces / 2);
+                  };
+                  const indentLevel = getIndentLevel(lineText);
+                  const isBullet = clean.startsWith('•');
+                  list.push({
+                    id: `gatha-${gathaNum}-teeka-${comm}-sanskrit-p-${partIdx}-${pIdx++}`,
+                    type: 'teeka_content_para',
+                    gathaNum,
+                    chapterName,
+                    data: { 
+                      isSanskrit: true, 
+                      text: clean, 
+                      isMeterHeader: false, 
+                      inVerse: false, 
+                      isStarLine, 
+                      isBoldTitle: false,
+                      isBullet,
+                      indentLevel
+                    }
+                  });
+                }
+              });
               flushTableBlock();
             }
-
-            if (!clean) return;
-
-            const isMeterHeader = clean.startsWith('(') && clean.endsWith(')') && clean.length <= 50;
-            const isStarLine = 
-              (clean.startsWith('*') && !clean.startsWith('**')) || 
-              (clean.includes(' = ') && !clean.startsWith('|') && !clean.startsWith('**')) ||
-              (/^[०-९0-9]+(?:\s+)?[a-zA-Z\u0900-\u097F]/.test(clean) && !clean.startsWith('|') && !clean.startsWith('**'));
-            const isBoldTitle = clean.startsWith('**') && clean.endsWith('**') && !clean.startsWith('**[');
-
-            if (isMeterHeader) {
-              inVerse = true;
-              list.push({
-                id: `gatha-${gathaNum}-teeka-${comm}-sanskrit-p-${pIdx++}`,
-                type: 'teeka_content_para',
-                gathaNum,
-                chapterName,
-                data: { isSanskrit: true, text: clean, isMeterHeader: true, inVerse: false, isStarLine: false, isBoldTitle: false }
-              });
-            } else if (inVerse && (clean.startsWith('[') || clean.startsWith('**['))) {
-              inVerse = false;
-              list.push({
-                id: `gatha-${gathaNum}-teeka-${comm}-sanskrit-p-${pIdx++}`,
-                type: 'teeka_content_para',
-                gathaNum,
-                chapterName,
-                data: { isSanskrit: true, text: clean, isMeterHeader: false, inVerse: false, isStarLine: false, isBoldTitle: false }
-              });
-            } else if (inVerse) {
-              list.push({
-                id: `gatha-${gathaNum}-teeka-${comm}-sanskrit-p-${pIdx++}`,
-                type: 'teeka_content_para',
-                gathaNum,
-                chapterName,
-                data: { isSanskrit: true, text: clean, isMeterHeader: false, inVerse: true, isStarLine: false, isBoldTitle: false }
-              });
-            } else if (isBoldTitle) {
-              const unwrappedTitle = clean.slice(2, -2).trim();
-              list.push({
-                id: `gatha-${gathaNum}-teeka-${comm}-sanskrit-p-${pIdx++}`,
-                type: 'teeka_content_para',
-                gathaNum,
-                chapterName,
-                data: { isSanskrit: true, text: unwrappedTitle, isMeterHeader: false, inVerse: false, isStarLine: false, isBoldTitle: true }
-              });
-            } else {
-              const getIndentLevel = (line: string): number => {
-                const match = line.match(/^([ \t]+)/);
-                if (!match) return 0;
-                let spaces = 0;
-                for (const char of match[1]) {
-                  if (char === '\t') spaces += 2;
-                  else if (char === ' ') spaces += 1;
-                }
-                return Math.floor(spaces / 2);
-              };
-              const indentLevel = getIndentLevel(lineText);
-              const isBullet = clean.startsWith('•');
-              list.push({
-                id: `gatha-${gathaNum}-teeka-${comm}-sanskrit-p-${pIdx++}`,
-                type: 'teeka_content_para',
-                gathaNum,
-                chapterName,
-                data: { 
-                  isSanskrit: true, 
-                  text: clean, 
-                  isMeterHeader: false, 
-                  inVerse: false, 
-                  isStarLine, 
-                  isBoldTitle: false,
-                  isBullet,
-                  indentLevel
-                }
-              });
-            }
           });
-          flushTableBlock();
         }
 
         if (teeka.hindi) {
-          const lines = teeka.hindi.split('\n');
-          let inVerse = false;
-          let pIdx = 0;
-          let currentTableRows: string[] = [];
-
-          const flushTableBlock = () => {
-            if (currentTableRows.length > 0) {
+          const parts = parseTextWithDiagrams(cleanAnvayarthText(teeka.hindi));
+          parts.forEach((part, partIdx) => {
+            if (part.type === 'diagram') {
               list.push({
-                id: `gatha-${gathaNum}-teeka-${comm}-hindi-table-${pIdx++}`,
-                type: 'table',
+                id: `gatha-${gathaNum}-teeka-${comm}-hindi-diagram-${partIdx}`,
+                type: 'diagram',
                 gathaNum,
                 chapterName,
-                data: [...currentTableRows]
+                data: part.content
               });
-              currentTableRows = [];
-            }
-          };
-
-          lines.forEach((lineText) => {
-            const clean = lineText.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
-
-            if (clean.startsWith('|')) {
-              currentTableRows.push(clean);
-              return;
             } else {
+              const lines = part.content.split('\n');
+              let inVerse = false;
+              let pIdx = 0;
+              let currentTableRows: string[] = [];
+
+              const flushTableBlock = () => {
+                if (currentTableRows.length > 0) {
+                  list.push({
+                    id: `gatha-${gathaNum}-teeka-${comm}-hindi-table-${partIdx}-${pIdx++}`,
+                    type: 'table',
+                    gathaNum,
+                    chapterName,
+                    data: [...currentTableRows]
+                  });
+                  currentTableRows = [];
+                }
+              };
+
+              lines.forEach((lineText) => {
+                const clean = lineText.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+
+                if (clean.startsWith('|')) {
+                  currentTableRows.push(clean);
+                  return;
+                } else {
+                  flushTableBlock();
+                }
+
+                if (!clean) return;
+
+                const isMeterHeader = clean.startsWith('(') && clean.endsWith(')') && clean.length <= 50;
+                const isStarLine = 
+                  (clean.startsWith('*') && !clean.startsWith('**')) || 
+                  (clean.includes(' = ') && !clean.startsWith('|') && !clean.startsWith('**')) ||
+                  (/^[०-९0-9]+(?:\s+)?[a-zA-Z\u0900-\u097F]/.test(clean) && !clean.startsWith('|') && !clean.startsWith('**'));
+                const isBoldTitle = clean.startsWith('**') && clean.endsWith('**') && !clean.startsWith('**[');
+
+                if (isMeterHeader) {
+                  inVerse = true;
+                  list.push({
+                    id: `gatha-${gathaNum}-teeka-${comm}-hindi-p-${partIdx}-${pIdx++}`,
+                    type: 'teeka_content_para',
+                    gathaNum,
+                    chapterName,
+                    data: { isSanskrit: false, text: clean, isMeterHeader: true, inVerse: false, isStarLine: false, isBoldTitle: false }
+                  });
+                } else if (inVerse && (clean.startsWith('[') || clean.startsWith('**['))) {
+                  inVerse = false;
+                  list.push({
+                    id: `gatha-${gathaNum}-teeka-${comm}-hindi-p-${partIdx}-${pIdx++}`,
+                    type: 'teeka_content_para',
+                    gathaNum,
+                    chapterName,
+                    data: { isSanskrit: false, text: clean, isMeterHeader: false, inVerse: false, isStarLine: false, isBoldTitle: false }
+                  });
+                } else if (inVerse) {
+                  list.push({
+                    id: `gatha-${gathaNum}-teeka-${comm}-hindi-p-${partIdx}-${pIdx++}`,
+                    type: 'teeka_content_para',
+                    gathaNum,
+                    chapterName,
+                    data: { isSanskrit: false, text: clean, isMeterHeader: false, inVerse: true, isStarLine: false, isBoldTitle: false }
+                  });
+                } else if (isBoldTitle) {
+                  const unwrappedTitle = clean.slice(2, -2).trim();
+                  list.push({
+                    id: `gatha-${gathaNum}-teeka-${comm}-hindi-p-${partIdx}-${pIdx++}`,
+                    type: 'teeka_content_para',
+                    gathaNum,
+                    chapterName,
+                    data: { isSanskrit: false, text: unwrappedTitle, isMeterHeader: false, inVerse: false, isStarLine: false, isBoldTitle: true }
+                  });
+                } else {
+                  const getIndentLevel = (line: string): number => {
+                    const match = line.match(/^([ \t]+)/);
+                    if (!match) return 0;
+                    let spaces = 0;
+                    for (const char of match[1]) {
+                      if (char === '\t') spaces += 2;
+                      else if (char === ' ') spaces += 1;
+                    }
+                    return Math.floor(spaces / 2);
+                  };
+                  const indentLevel = getIndentLevel(lineText);
+                  const isBullet = clean.startsWith('•');
+                  list.push({
+                    id: `gatha-${gathaNum}-teeka-${comm}-hindi-p-${partIdx}-${pIdx++}`,
+                    type: 'teeka_content_para',
+                    gathaNum,
+                    chapterName,
+                    data: { 
+                      isSanskrit: false, 
+                      text: clean, 
+                      isMeterHeader: false, 
+                      inVerse: false, 
+                      isStarLine, 
+                      isBoldTitle: false,
+                      isBullet,
+                      indentLevel
+                    }
+                  });
+                }
+              });
               flushTableBlock();
             }
-
-            if (!clean) return;
-
-            const isMeterHeader = clean.startsWith('(') && clean.endsWith(')') && clean.length <= 50;
-            const isStarLine = 
-              (clean.startsWith('*') && !clean.startsWith('**')) || 
-              (clean.includes(' = ') && !clean.startsWith('|') && !clean.startsWith('**')) ||
-              (/^[०-९0-9]+(?:\s+)?[a-zA-Z\u0900-\u097F]/.test(clean) && !clean.startsWith('|') && !clean.startsWith('**'));
-            const isBoldTitle = clean.startsWith('**') && clean.endsWith('**') && !clean.startsWith('**[');
-
-            if (isMeterHeader) {
-              inVerse = true;
-              list.push({
-                id: `gatha-${gathaNum}-teeka-${comm}-hindi-p-${pIdx++}`,
-                type: 'teeka_content_para',
-                gathaNum,
-                chapterName,
-                data: { isSanskrit: false, text: clean, isMeterHeader: true, inVerse: false, isStarLine: false, isBoldTitle: false }
-              });
-            } else if (inVerse && (clean.startsWith('[') || clean.startsWith('**['))) {
-              inVerse = false;
-              list.push({
-                id: `gatha-${gathaNum}-teeka-${comm}-hindi-p-${pIdx++}`,
-                type: 'teeka_content_para',
-                gathaNum,
-                chapterName,
-                data: { isSanskrit: false, text: clean, isMeterHeader: false, inVerse: false, isStarLine: false, isBoldTitle: false }
-              });
-            } else if (inVerse) {
-              list.push({
-                id: `gatha-${gathaNum}-teeka-${comm}-hindi-p-${pIdx++}`,
-                type: 'teeka_content_para',
-                gathaNum,
-                chapterName,
-                data: { isSanskrit: false, text: clean, isMeterHeader: false, inVerse: true, isStarLine: false, isBoldTitle: false }
-              });
-            } else if (isBoldTitle) {
-              const unwrappedTitle = clean.slice(2, -2).trim();
-              list.push({
-                id: `gatha-${gathaNum}-teeka-${comm}-hindi-p-${pIdx++}`,
-                type: 'teeka_content_para',
-                gathaNum,
-                chapterName,
-                data: { isSanskrit: false, text: unwrappedTitle, isMeterHeader: false, inVerse: false, isStarLine: false, isBoldTitle: true }
-              });
-            } else {
-              const getIndentLevel = (line: string): number => {
-                const match = line.match(/^([ \t]+)/);
-                if (!match) return 0;
-                let spaces = 0;
-                for (const char of match[1]) {
-                  if (char === '\t') spaces += 2;
-                  else if (char === ' ') spaces += 1;
-                }
-                return Math.floor(spaces / 2);
-              };
-              const indentLevel = getIndentLevel(lineText);
-              const isBullet = clean.startsWith('•');
-              list.push({
-                id: `gatha-${gathaNum}-teeka-${comm}-hindi-p-${pIdx++}`,
-                type: 'teeka_content_para',
-                gathaNum,
-                chapterName,
-                data: { 
-                  isSanskrit: false, 
-                  text: clean, 
-                  isMeterHeader: false, 
-                  inVerse: false, 
-                  isStarLine, 
-                  isBoldTitle: false,
-                  isBullet,
-                  indentLevel
-                }
-              });
-            }
           });
-          flushTableBlock();
         }
       });
     });
@@ -1029,6 +1133,20 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                   </div>
                 );
 
+              case 'diagram': {
+                try {
+                  const data = JSON.parse(block.data);
+                  return (
+                    <div key={block.id} data-block-id={block.id} className="w-full">
+                      <DiagramRenderer type={data.type} nodes={data.nodes} />
+                    </div>
+                  );
+                } catch (e) {
+                  console.error('Failed to parse diagram JSON in print measuring', e);
+                  return null;
+                }
+              }
+
               case 'english':
                 return (
                   <div key={block.id} data-block-id={block.id} className="my-4 p-4 rounded-xl bg-card border border-border/30 text-xs text-foreground/80 font-sans leading-relaxed">
@@ -1255,6 +1373,20 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                                 {renderHighlightedAnvayarth(block.data)}
                               </div>
                             );
+
+                          case 'diagram': {
+                            try {
+                              const data = JSON.parse(block.data);
+                              return (
+                                <div key={block.id} className="w-full">
+                                  <DiagramRenderer type={data.type} nodes={data.nodes} />
+                                </div>
+                              );
+                            } catch (e) {
+                              console.error('Failed to parse diagram JSON in print rendering', e);
+                              return null;
+                            }
+                          }
 
                           case 'english':
                             return (

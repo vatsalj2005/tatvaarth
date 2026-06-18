@@ -7,6 +7,8 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { ChevronRight, ListCollapse, Download, Type, ChevronLeft, Eye, EyeOff, LocateFixed, X } from 'lucide-react';
 import ShastraPrintTemplate from '@/components/ShastraPrintTemplate';
+import DiagramRenderer from '@/components/DiagramRenderer';
+import ShrutskandhImg from '../content/granth/Shrutskandh.jpg';
 
 const devanagariToEnglish = (str: string): string => {
   const map: Record<string, string> = {
@@ -36,6 +38,49 @@ const getRowRange = (text: string) => {
   }
   
   return null;
+};
+
+const cleanAnvayarthText = (text: string): string => {
+  if (!text) return '';
+  return text
+    .split('\n')
+    .filter(line => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('var mind') || 
+          trimmed.startsWith('var options') || 
+          trimmed.includes('new jsMind') || 
+          trimmed.includes('jm.show') ||
+          trimmed.startsWith('var oc') ||
+          trimmed.includes('new OrgChart')) {
+        return false;
+      }
+      return true;
+    })
+    .join('\n');
+};
+
+const parseTextWithDiagrams = (text: string): { type: 'text' | 'diagram'; content: string }[] => {
+  if (!text) return [];
+  const parts: { type: 'text' | 'diagram'; content: string }[] = [];
+  const regex = /\[DIAGRAM\]([\s\S]*?)\[\/DIAGRAM\]/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    const textBefore = text.slice(lastIndex, match.index);
+    if (textBefore.trim()) {
+      parts.push({ type: 'text', content: textBefore });
+    }
+    parts.push({ type: 'diagram', content: match[1].trim() });
+    lastIndex = regex.lastIndex;
+  }
+
+  const textAfter = text.slice(lastIndex);
+  if (textAfter.trim()) {
+    parts.push({ type: 'text', content: textAfter });
+  }
+
+  return parts;
 };
 
 const ShastraReader = () => {
@@ -432,6 +477,11 @@ const ShastraReader = () => {
 
   // Helper to color specific lines in Bhavarth
   const renderBhavarthText = (text: string) => {
+    // Regex: Devanagari word(s) with possible internal hyphens, immediately followed by "- " (no space before dash)
+    // e.g. "काल- ", "गति- ", "प्रत्येकबुद्ध-बोधितबुद्ध- "
+    // Excludes "अर्थ - " / "अन्वयार्थ : " (those have a space before the dash/colon)
+    const goldenHeadingRegex = /^([\u0900-\u097F\u200C\u200D]+(?:-[\u0900-\u097F\u200C\u200D]+)*)-(\s+.*)$/;
+
     return text.split('\n').map((line, i, arr) => {
       const trimmed = line.trim();
       const isSanskritColor = [
@@ -448,24 +498,63 @@ const ShastraReader = () => {
         "पण्डित-जुगल-किशोर कृत"
       ].includes(trimmed);
 
-      const isArthColor = trimmed.startsWith("(समस्त पापों का नाश करनेवाला") || trimmed.startsWith("। (समस्त पापों का नाश करनेवाला");
+      const isArthColor = 
+        trimmed.startsWith("(समस्त पापों का नाश करनेवाला") || 
+        trimmed.startsWith("। (समस्त पापों का नाश करनेवाला") ||
+        trimmed.startsWith("आ. उमास्वामी") ||
+        trimmed.startsWith("आ. उमास्‍वामी") ||
+        /^(अन्वयार्थ|अर्थ)\s*[-:]/.test(trimmed);
+
+      const isOrangeColor = 
+        trimmed.startsWith("त्रैकाल्यं") || 
+        trimmed.startsWith("पंचान्ये") || 
+        trimmed.startsWith("इत्येतन्मोक्षमूलं") || 
+        trimmed.startsWith("प्रत्येति") ||
+        trimmed.startsWith("मोक्षमार्गस्य") || 
+        trimmed.startsWith("ज्ञातारं") ||
+        trimmed.startsWith("सिद्धे जयप्पसिद्धे") ||
+        trimmed.startsWith("वंदित्ता अरहंते") ||
+        trimmed.startsWith("उज्जोवणमुज्जवणं") ||
+        trimmed.startsWith("दंसण-णाण-चरित्तं");
 
       const colorClass = isSanskritColor 
         ? "text-pink-700 dark:text-pink-400 font-semibold" 
-        : isArthColor 
-          ? "text-foreground/95" 
-          : "text-green-800 dark:text-green-600";
+        : isOrangeColor
+          ? "text-orange-700 dark:text-orange-400 font-semibold"
+          : isArthColor 
+            ? "text-foreground/95" 
+            : "text-green-800 dark:text-green-600";
 
       const style = trimmed === "आर्हत भक्ति"
         ? { fontSize: "2.1em", lineHeight: "1.1", display: "block", margin: "0.25rem 0" }
         : trimmed === "पण्डित-जुगल-किशोर कृत"
           ? { fontSize: "0.55em", lineHeight: "1.1", display: "block", margin: "0.15rem 0 1.25rem 0" }
-          : undefined;
+          : /^(अन्वयार्थ|अर्थ)\s*[-:]/.test(trimmed)
+            ? { display: "block", marginTop: "1.25rem" }
+            : undefined;
+
+      // Check for golden heading pattern (e.g. "काल- ...", "गति- ...")
+      // Only applies to lines that are not already specially colored
+      const goldenMatch = !isSanskritColor && !isOrangeColor && !isArthColor
+        ? trimmed.match(goldenHeadingRegex)
+        : null;
+
+      const br = i < arr.length - 1 ? <br /> : null;
+
+      if (goldenMatch) {
+        return (
+          <span key={i} className={colorClass} style={style}>
+            <span className="text-gold font-bold">{goldenMatch[1]}-</span>
+            {goldenMatch[2]}
+            {br}
+          </span>
+        );
+      }
 
       return (
         <span key={i} className={colorClass} style={style}>
           {line}
-          {i < arr.length - 1 && <br />}
+          {br}
         </span>
       );
     });
@@ -473,12 +562,6 @@ const ShastraReader = () => {
 
   // Helper to highlight bracketed terms in commentaries (like [स्वानुभूत्या चकासते] in dark red or gold)
   const highlightBracketedTerms = (text: string) => {
-    // Check for list items like "१. जीवत्वशक्ति -" or "३३-३८. भाव-अभावादि छह शक्तियाँ -"
-    // Group 1: Number prefix (e.g., "१. ")
-    // Group 2: Term and hyphen (e.g., "जीवत्वशक्ति - ")
-    // Group 3: Rest of the text
-    const prefixMatch = text.match(/^([०-९0-9]+(?:-[०-९0-9]+)?\.\s+)(.*?[\s]*[-–]+(?:[\s]+|$))(.*)$/);
-
     const processText = (t: string) => {
       const parts = t.split(/(\*\*\[[^\]]+\]\*\*|\[[^\]]+\]|\([^\)]+\)|\{[^\}]+\}|(?:समाधान|उत्तर)\s*[–-])/);
       return parts.map((part, index) => {
@@ -542,14 +625,15 @@ const ShastraReader = () => {
       });
     };
 
-    if (prefixMatch && (prefixMatch[1].length + prefixMatch[2].length) <= 60) {
-      const numPart = prefixMatch[1];
-      const termPart = prefixMatch[2];
-      const restText = prefixMatch[3];
-      
+    // Check for special philosophical schools at the beginning of paragraph
+    const specialPrefixMatch = text.match(/^(\s*[•◦▪▫\-*]\s+)?(सांख्य(?:\s*\([^)]+\))?(?:\s*[-–])?|नैयायिक(?:ादि)?\s*[-–]?|वैशेषिक\s*[-–]?|बौद्ध\s*[-–]?)\s*(.*)$/);
+    if (specialPrefixMatch) {
+      const bulletPart = specialPrefixMatch[1] || "";
+      const termPart = specialPrefixMatch[2];
+      const restText = specialPrefixMatch[3];
       return (
         <span>
-          {numPart}
+          {bulletPart}
           <span className="px-1 py-0.5 mr-1 rounded text-gold font-semibold bg-gold/10 border border-gold/10">
             {termPart.trim()}
           </span>
@@ -558,11 +642,40 @@ const ShastraReader = () => {
       );
     }
 
+    // Check for list items like "१. जीवत्वशक्ति -" or "३३-३८. भाव-अभावादि छह शक्तियाँ -"
+    // Group 1: Number prefix (e.g., "१. ")
+    // Group 2: Term and hyphen (e.g., "जीवत्वशक्ति - ")
+    // Group 3: Rest of the text
+    const prefixMatch = text.match(/^([०-९0-9]+(?:-[०-९0-9]+)?\.\s+)(.*?[\s]*[-–]+(?:[\s]+|$))(.*)$/);
+
+    if (prefixMatch && (prefixMatch[1].length + prefixMatch[2].length) <= 60) {
+      const numPart = prefixMatch[1];
+      const termPart = prefixMatch[2];
+      const restText = prefixMatch[3];
+      
+      const trimmedTerm = termPart.trim().replace(/[-–\s]+$/, '');
+      const wordCount = trimmedTerm.split(/\s+/).filter(w => w.length > 0).length;
+      const isQuestionOrSolution = trimmedTerm === 'प्रश्न' || trimmedTerm === 'शंका' || trimmedTerm === 'उत्तर' || trimmedTerm === 'समाधान';
+      const isInvalidTerm = wordCount > 4 || /[,，।?？]/.test(trimmedTerm);
+
+      if (!isQuestionOrSolution && !isInvalidTerm) {
+        return (
+          <span>
+            {numPart}
+            <span className="px-1 py-0.5 mr-1 rounded text-gold font-semibold bg-gold/10 border border-gold/10">
+              {termPart.trim()}
+            </span>
+            {processText(restText)}
+          </span>
+        );
+      }
+    }
+
     return processText(text);
   };
 
   // Helper to render commentary lines dynamically (centering कलश-दोहा and verses, highlighting brackets, rendering tables)
-  const renderFormattedCommentary = (text: string, colorClass: string = "text-foreground/90") => {
+  const renderFormattedCommentary = (text: string, colorClass: string = "text-foreground/90", centerAlign: boolean = false) => {
     if (!text) return null;
 
     const paragraphs = text.split('\n');
@@ -741,7 +854,7 @@ const ShastraReader = () => {
                             rowSpan={cellSpan?.rowSpan || 1}
                             className={`px-4 py-2.5 text-center border-2 rounded ${cellBorderClass} ${cellBgClass}`}
                           >
-                            {highlightBracketedTerms(cell)}
+                            {cell === '-' ? '' : highlightBracketedTerms(cell)}
                           </td>
                         );
                       })}
@@ -847,11 +960,14 @@ const ShastraReader = () => {
       const isStarLine = 
         (unwrapped.startsWith('*') && !unwrapped.startsWith('**')) || 
         (unwrapped.includes(' = ') && !unwrapped.startsWith('|') && !unwrapped.startsWith('**')) ||
-        (/^[०-९0-9]+(?:\s+)?[a-zA-Z\u0900-\u0965\u0970-\u097F]/.test(unwrapped) && !unwrapped.startsWith('|') && !unwrapped.startsWith('**'));
-      const isQuestion = unwrapped.startsWith('प्रश्न –') || unwrapped.startsWith('प्रश्न -') || unwrapped.startsWith('शंका –') || unwrapped.startsWith('शंका -');
+        // Only match numbers directly adjacent to text (no space), e.g. "1जीव" not "9 जीव" (latter is a numbered paragraph)
+        (/^[०-९0-9]+[a-zA-Z\u0900-\u0965\u0970-\u097F]/.test(unwrapped) && !unwrapped.startsWith('|') && !unwrapped.startsWith('**'));
+      const cleanPrefix = unwrapped.replace(/^[०-९0-9]+(?:-[०-९0-9]+)?\.\s*/, '');
+      const isQuestion = cleanPrefix.startsWith('प्रश्न –') || cleanPrefix.startsWith('प्रश्न -') || cleanPrefix.startsWith('शंका –') || cleanPrefix.startsWith('शंका -');
       const isCenteredOrange = isWrapped && !isMeterHeader;
       const isBullet = clean.startsWith('•');
-      const isNumber = /^[०-९0-9]+(?:-[०-९0-9]+)?\./.test(clean);
+      // Match both "9. text" (with period) and "9 text" (number + space, no period)
+      const isNumber = /^[०-९0-9]+(?:-[०-९0-9]+)?[.\s]/.test(clean);
       
       let displayClasses = '';
       if (isStarLine) {
@@ -859,9 +975,9 @@ const ShastraReader = () => {
       } else if (isQuestion) {
         displayClasses = 'text-red-600 dark:text-red-400 font-semibold text-left';
       } else if (isCenteredOrange) {
-        displayClasses = 'text-orange-800 dark:text-orange-400 font-semibold text-center';
+        displayClasses = 'text-orange-800 dark:text-orange-400 font-semibold text-center !m-0 !leading-tight';
       } else {
-        displayClasses = `${colorClass} text-left`;
+        displayClasses = `${colorClass} ${centerAlign ? 'text-center' : 'text-left'}`;
       }
 
       const displayStyle = isStarLine 
@@ -883,24 +999,75 @@ const ShastraReader = () => {
             } 
           : undefined;
 
+      // Golden heading regex: Devanagari Word(s) immediately followed by "- " (no space before dash)
+      // e.g. "विशेष- ...", "असंगत्‍वात्- ..."  (but NOT "अर्थ - " which has space before dash)
       let displayText = unwrapped;
       if (isBullet && indentLevel > 0) {
         displayText = unwrapped.replace(/^•/, '◦');
       }
 
+      const goldenHeadingMatch = !isStarLine && !isQuestion && !isCenteredOrange && !isBullet && !isNumber
+        ? unwrapped.match(/^([\u0900-\u097F\u200C\u200D]+(?:-[\u0900-\u097F\u200C\u200D]+)*)-(\ .*)$/)
+        : null;
+
+      let renderedContent;
+      if (goldenHeadingMatch) {
+        renderedContent = (
+          <>
+            <span className="text-gold font-bold">{goldenHeadingMatch[1]}-</span>
+            {highlightBracketedTerms(goldenHeadingMatch[2])}
+          </>
+        );
+      } else if (isQuestion) {
+        const match = displayText.match(/^([०-९0-9]+(?:-[०-९0-9]+)?\.\s*)(.*)$/);
+        if (match) {
+          renderedContent = (
+            <>
+              <span className={`${colorClass} font-normal`}>{match[1]}</span>
+              {highlightBracketedTerms(match[2])}
+            </>
+          );
+        } else {
+          renderedContent = highlightBracketedTerms(displayText);
+        }
+      } else {
+        renderedContent = highlightBracketedTerms(displayText);
+      }
+
       renderedElements.push(
         <div 
           key={index} 
-          className={`${displayClasses} ${isStarLine ? 'my-0.5' : (isBullet || isNumber) ? 'my-0.5' : 'my-2'} leading-loose devanagari-safe`}
+          className={`${displayClasses} ${isStarLine ? 'my-0.5' : isCenteredOrange ? '' : (isBullet || isNumber) ? 'my-0.5' : 'my-2'} ${isCenteredOrange ? '' : 'leading-loose'} devanagari-safe`}
           style={displayStyle}
         >
-          {highlightBracketedTerms(displayText)}
+          {renderedContent}
         </div>
       );
     });
 
     flushTable(paragraphs.length);
     return renderedElements;
+  };
+
+  const renderCommentaryWithDiagrams = (text: string, colorClass?: string) => {
+    return parseTextWithDiagrams(cleanAnvayarthText(text)).map((part, idx) => {
+      if (part.type === 'diagram') {
+        try {
+          const data = JSON.parse(part.content);
+          return (
+            <DiagramRenderer
+              key={`diag-${idx}`}
+              type={data.type}
+              nodes={data.nodes}
+            />
+          );
+        } catch (e) {
+          console.error('Failed to parse diagram JSON', e);
+          return null;
+        }
+      }
+      return <Fragment key={`text-${idx}`}>{renderFormattedCommentary(part.content, colorClass)}</Fragment>;
+    });
   };
 
   const readingClass = useSerif ? 'font-reading' : '';
@@ -1072,6 +1239,35 @@ const ShastraReader = () => {
                     </ul>
                   </div>
                 ))}
+
+                {/* Shrutskandh Sidebar Link */}
+                <div className="mb-6 mt-4 relative border-t border-gold/15 pt-4">
+                  <div className="sticky top-0 bg-card z-10 py-1 mb-2 border-b-2 border-gold/20">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-gold/90 px-2 py-1 truncate devanagari-safe">
+                      श्रुतस्कन्ध
+                    </h3>
+                  </div>
+                  <ul className="space-y-1 relative before:absolute before:inset-y-0 before:left-3 before:w-[1px] before:bg-gold/20 ml-1">
+                    <li id="sidebar-link-shrutskandh" className="relative">
+                      <div className={`absolute left-[11px] top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full z-10 ${
+                        activeGathaNum === 'shrutskandh' ? 'bg-gold shadow-[0_0_8px_rgba(234,179,8,0.8)]' : 'bg-gold/40'
+                      }`}></div>
+                      <button
+                        onClick={() => scrollToGatha('shrutskandh')}
+                        className={`w-full text-left pl-7 pr-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between devanagari-safe ${
+                          activeGathaNum === 'shrutskandh'
+                            ? 'bg-gold/15 text-gold font-semibold shadow-sm'
+                            : 'text-foreground/80 hover:bg-secondary hover:text-foreground'
+                        }`}
+                      >
+                        <span className="truncate pr-2">
+                          श्रुतस्कन्ध
+                        </span>
+                        <ChevronRight className="w-3.5 h-3.5 opacity-50 flex-shrink-0" />
+                      </button>
+                    </li>
+                  </ul>
+                </div>
               </div>
             </motion.aside>
             </>
@@ -1238,7 +1434,24 @@ const ShastraReader = () => {
                         className="text-foreground/95 devanagari-safe leading-loose"
                         style={{ fontSize: `${contentFontSize}px`, lineHeight: lineSpacing }}
                       >
-                        {renderHighlightedAnvayarth(content.anvayarth)}
+                        {parseTextWithDiagrams(cleanAnvayarthText(content.anvayarth)).map((part, pIdx) => {
+                          if (part.type === 'diagram') {
+                            try {
+                              const data = JSON.parse(part.content);
+                              return (
+                                <DiagramRenderer 
+                                  key={pIdx} 
+                                  type={data.type} 
+                                  nodes={data.nodes} 
+                                />
+                              );
+                            } catch (e) {
+                              console.error('Failed to parse diagram JSON', e);
+                              return null;
+                            }
+                          }
+                          return renderHighlightedAnvayarth(part.content);
+                        })}
                       </div>
                     </div>
                   )}
@@ -1246,12 +1459,12 @@ const ShastraReader = () => {
                   {/* Bhavarth (Special Meaning / Context) */}
                   {content.bhavarth && (
                     <div className="my-8 p-6 rounded-2xl bg-amber-900/5 dark:bg-amber-900/10 border border-gold/10 shadow-inner">
-                      <p 
-                        className="devanagari-safe leading-loose text-center"
+                      <div 
+                        className="devanagari-safe leading-loose"
                         style={{ fontSize: `${contentFontSize * 1.1}px`, lineHeight: lineSpacing }}
                       >
-                        {renderBhavarthText(content.bhavarth)}
-                      </p>
+                        {renderFormattedCommentary(content.bhavarth, 'text-foreground/90', true)}
+                      </div>
                     </div>
                   )}
 
@@ -1319,7 +1532,7 @@ const ShastraReader = () => {
                                 style={{ fontSize: `${contentFontSize}px`, lineHeight: lineSpacing }}
                               >
                                 <h5 className="text-xs uppercase text-gold font-semibold mb-2">{t('sanskrit')}</h5>
-                                {renderFormattedCommentary(activeTeeka.sanskrit, "text-teal-700 dark:text-teal-400")}
+                                {renderCommentaryWithDiagrams(activeTeeka.sanskrit, "text-teal-700 dark:text-teal-400")}
                               </motion.div>
                             )}
 
@@ -1328,7 +1541,7 @@ const ShastraReader = () => {
                               className="text-foreground/90 devanagari-safe leading-loose space-y-2"
                               style={{ fontSize: `${contentFontSize}px`, lineHeight: lineSpacing }}
                             >
-                              {renderFormattedCommentary(activeTeeka.hindi)}
+                              {renderCommentaryWithDiagrams(activeTeeka.hindi)}
                             </div>
                           </div>
                         )}
@@ -1339,6 +1552,33 @@ const ShastraReader = () => {
                 </Fragment>
               );
             })}
+            </div>
+          )}
+
+          {/* Shrutskandh Page */}
+          {!isLoadingGathas && (
+            <div
+              id="gatha-shrutskandh"
+              data-gatha-num="shrutskandh"
+              ref={(el) => { gathaRefs.current['shrutskandh'] = el; }}
+              className="flex flex-col items-center justify-center py-16 mt-8 border-t border-gold/20 devanagari-safe scroll-mt-20"
+            >
+              <div className="flex flex-col items-center justify-center mb-8 space-y-4">
+                <div className="w-full max-w-2xl h-px bg-gradient-to-r from-transparent via-gold/60 to-transparent"></div>
+                <h2 className="text-2xl md:text-4xl font-heading font-bold text-gold tracking-widest devanagari-safe text-center px-4">
+                  ------ श्रुतस्कन्ध ------
+                </h2>
+                <div className="w-full max-w-2xl h-px bg-gradient-to-r from-transparent via-gold/60 to-transparent"></div>
+              </div>
+
+              <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-gold/20 shadow-2xl bg-card p-3 relative group transition-all duration-500 hover:border-gold/40">
+                <div className="absolute inset-0 bg-gold/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"></div>
+                <img 
+                  src={ShrutskandhImg} 
+                  alt="Shrutskandh" 
+                  className="w-full h-auto rounded-xl shadow-inner object-contain max-h-[80vh] mx-auto"
+                />
+              </div>
             </div>
           )}
         </main>

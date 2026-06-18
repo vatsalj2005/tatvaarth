@@ -1,0 +1,33 @@
+=== Title ===
+अहिंसाव्रत की भावनाएँ
+
+=== Gatha ===
+वाङ्मनोगुप्तीर्यादाननिक्षेपण-समित्यालोकित-पान-भोजनानि पञ्च ॥4॥
+
+=== Sanskrit ===
+
+
+=== Gadya ===
+
+
+=== Anvayarth ===
+वचनगुप्ति, मनोगुप्ति, ईर्यासमिति, आदाननिक्षेपणसमिति और आलोकितपान-भोजन ये अहिंसाव्रत की पाँच भावनाएँ हैं ॥४॥
+
+[DIAGRAM]
+{"type":"horizontal","nodes":[{"id":"root","isroot":true,"topic":"अहिंसाव्रत की पाँच भावनाएँ"},{"id":"sub1","parentid":"root","topic":"वचनगुप्ति"},{"id":"sub1a","parentid":"sub1","topic":"वचन को वश में करना"},{"id":"sub2","parentid":"root","topic":"मनोगुप्ति"},{"id":"sub2a","parentid":"sub2","topic":"मन को वश में करना"},{"id":"sub3","parentid":"root","topic":"ईर्यासमिति"},{"id":"sub3a","parentid":"sub3","topic":"चार हाथ आगे की भूमि को देखकर चलना"},{"id":"sub4","parentid":"root","topic":"आदाननिक्षेपणसमिति"},{"id":"sub4a","parentid":"sub4","topic":"यत्न पूर्वक वस्तुओं (पुस्तक आदि) को उठाना / धरना"},{"id":"sub5","parentid":"root","topic":"आलोकितपान-भोजन"},{"id":"sub5a","parentid":"sub5","topic":"देख शोधकर सूर्य के प्रकाश में भोजन ग्रहण"}]}
+[/DIAGRAM]
+
+=== English ===
+Control of speech, control of thought, regulation of movement, care in taking and placing things or objects, and examining food or drink, are five.
+
+=== Teeka: सर्वार्थसिद्धि ===
+=== Teeka: सर्वार्थसिद्धि: Hindi ===
+वचनगुप्ति, मनोगुप्ति, ईर्यासमिति, आदाननिक्षेपणसमिति और आलोकितपानभोजन ये अहिंसा व्रत की पाँच भावनाएँ हैं ।
+
+
+अब दूसरे व्रत की भावनाएँ कौनसी हैं यह बतलाने के लिए आगे का सूत्र कहते हैं -
+
+=== Teeka: राजवार्तिक ===
+=== Teeka: राजवार्तिक: Hindi ===
+वचनगुप्ति, मनोगुप्ति, ईर्यासमिति, आदाननिक्षेपणसमिति और आलोकितपानभोजन ये अहिंसाव्रत की पाँच भावनाएँ हैं।
+

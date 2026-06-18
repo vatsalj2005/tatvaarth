@@ -1,0 +1,30 @@
+=== Title ===
+मूल कर्मों में जघन्य स्थिति
+
+=== Gatha ===
+अपरा द्वादश मुहूर्ता वेदनीयस्य ॥18॥
+
+=== Sanskrit ===
+
+
+=== Gadya ===
+
+
+=== Anvayarth ===
+वेदनीय की जघन्य स्थिति बारह मुहूर्त है ॥१८॥
+
+[DIAGRAM]
+{"type":"horizontal","nodes":[{"id":"root","isroot":true,"topic":"मूल  प्रकृतियों की जघन्य  स्थिति  "},{"id":"sub1","parentid":"root","topic":"ज्ञानावरण"},{"id":"sub1a","parentid":"sub1","topic":"अन्‍तर्मुहूर्त "},{"id":"sub11","parentid":"root","topic":"दर्शनावरण"},{"id":"sub11a","parentid":"sub11","topic":"अन्‍तर्मुहूर्त "},{"id":"sub12","parentid":"root","topic":"वेदनीय"},{"id":"sub12a","parentid":"sub12","topic":"बारह मुहूर्त "},{"id":"sub13","parentid":"root","topic":"मोहनीय "},{"id":"sub13a","parentid":"sub13","topic":"अन्‍तर्मुहूर्त "},{"id":"sub14","parentid":"root","topic":"आयु "},{"id":"sub14a","parentid":"sub14","topic":"अन्‍तर्मुहूर्त "},{"id":"sub15","parentid":"root","topic":"नाम  "},{"id":"sub15a","parentid":"sub15","topic":"आठ  मुहूर्त "},{"id":"sub16","parentid":"root","topic":"गोत्र  "},{"id":"sub16a","parentid":"sub16","topic":"आठ  मुहूर्त "},{"id":"sub17","parentid":"root","topic":"अन्तराय  "},{"id":"sub17a","parentid":"sub17","topic":"अन्‍तर्मुहूर्त "}]}
+[/DIAGRAM]
+
+=== English ===
+The minimum duration of the feeling-producing karma is twelve muhûrtas.
+
+=== Teeka: सर्वार्थसिद्धि ===
+=== Teeka: सर्वार्थसिद्धि: Hindi ===
+अपरा अर्थात् जघन्‍य । यह वेदनीय की बारह मुहूर्त है।
+
+=== Teeka: राजवार्तिक ===
+=== Teeka: राजवार्तिक: Hindi ===
+सूक्ष्मसाम्पराय गुणस्थान में वेदनीय की जघन्यस्थिति 12 मुहूर्त प्रमाण है।
+

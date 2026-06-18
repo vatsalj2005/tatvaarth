@@ -92,10 +92,15 @@ const BhajanLanding = () => {
                           navigate(`/bhajan/${s.bhajan.subdivision}/${s.bhajan.slug}`);
                           setSearchQuery('');
                         }}
-                        className="w-full text-left px-4 py-2.5 hover:bg-secondary transition-colors text-sm flex items-center gap-3"
+                        className="w-full text-left px-4 py-2.5 hover:bg-secondary/80 transition-colors text-sm flex items-center justify-between gap-3"
                       >
-                        <Search className="w-3.5 h-3.5 text-muted-foreground/40 flex-shrink-0" />
-                        <span className="text-foreground/90 truncate devanagari-safe">{s.title}</span>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Search className="w-3.5 h-3.5 text-muted-foreground/40 flex-shrink-0" />
+                          <span className="text-foreground/90 truncate devanagari-safe">{s.title}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground/60 flex-shrink-0 devanagari-safe">
+                          {s.bhajan.singer ? `🎤 ${s.bhajan.singer}` : '🎵 Bhajan'}
+                        </span>
                       </button>
                     ))
                   ) : (
