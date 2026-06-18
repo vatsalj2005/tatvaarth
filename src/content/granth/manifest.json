@@ -88,6 +88,17 @@
     "gathaCount": 337
   },
   {
+    "id": "yogsaarprabhrat",
+    "title": "योगसार-प्राभृत",
+    "author": "अमितगति-आचार्य",
+    "categoryHi": "द्रव्यानुयोग",
+    "categoryEn": "Dravyanuyog",
+    "categorySlug": "dravyanuyog",
+    "shastraSlug": "yogsaarprabhrat",
+    "path": "01_द्रव्यानुयोग/09_योगसार-प्राभृत--अमितगति-आचार्य",
+    "gathaCount": 540
+  },
+  {
     "id": "tatvaarthsutra",
     "title": "तत्त्वार्थसूत्र",
     "author": "उमास्वामी",

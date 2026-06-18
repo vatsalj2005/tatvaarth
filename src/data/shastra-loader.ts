@@ -56,7 +56,7 @@ export interface GathaContent {
   teekas: TeekaData[];
 }
 
-// 1. Eagerly load all index.json metadata files for the shastras
+// 1. Eagerly load all index.json metadata files for the shastras (touched to force glob reload after 001 fix)
 const shastraIndices = import.meta.glob('../content/granth/**/index.json', { eager: true }) as Record<string, any>;
 
 // 2. Eagerly load all .txt gatha files for the shastras

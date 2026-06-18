@@ -484,13 +484,16 @@ const ShastraReader = () => {
 
     return text.split('\n').map((line, i, arr) => {
       const trimmed = line.trim();
-      const isSanskritColor = [
+      const isMangalacharanOrange = [
         "॥ श्रीपरमगुरुवे नमः, परम्पराचार्यगुरुवे नमः ॥",
         "॥ श्रीपरमगुरुवे नम:, परम्पराचार्यगुरुवे नम: ॥",
         "॥ श्रोतारः सावधानतया शृणवन्तु ॥",
         "॥ श्रोतार: सावधानतया शृणवन्तु ॥",
         "॥ श्रोतारः सावधान-तया शृणवन्तु ॥",
-        "॥ श्रोतार: सावधान-तया शृणवन्तु ॥",
+        "॥ श्रोतार: सावधान-तया शृणवन्तु ॥"
+      ].includes(trimmed);
+
+      const isSanskritColor = [
         "(देव वंदना)",
         "(शास्त्र वंदना)",
         "(गुरु वंदना)",
@@ -517,13 +520,15 @@ const ShastraReader = () => {
         trimmed.startsWith("उज्जोवणमुज्जवणं") ||
         trimmed.startsWith("दंसण-णाण-चरित्तं");
 
-      const colorClass = isSanskritColor 
-        ? "text-pink-700 dark:text-pink-400 font-semibold" 
-        : isOrangeColor
-          ? "text-orange-700 dark:text-orange-400 font-semibold"
-          : isArthColor 
-            ? "text-foreground/95" 
-            : "text-green-800 dark:text-green-600";
+      const colorClass = isMangalacharanOrange
+        ? "text-orange-800 dark:text-orange-400 font-semibold"
+        : isSanskritColor 
+          ? "text-pink-700 dark:text-pink-400 font-semibold" 
+          : isOrangeColor
+            ? "text-orange-800 dark:text-orange-400 font-semibold"
+            : isArthColor 
+              ? "text-foreground/95" 
+              : "text-green-800 dark:text-green-600";
 
       const style = trimmed === "आर्हत भक्ति"
         ? { fontSize: "2.1em", lineHeight: "1.1", display: "block", margin: "0.25rem 0" }
@@ -535,7 +540,7 @@ const ShastraReader = () => {
 
       // Check for golden heading pattern (e.g. "काल- ...", "गति- ...")
       // Only applies to lines that are not already specially colored
-      const goldenMatch = !isSanskritColor && !isOrangeColor && !isArthColor
+      const goldenMatch = !isSanskritColor && !isOrangeColor && !isArthColor && !isMangalacharanOrange
         ? trimmed.match(goldenHeadingRegex)
         : null;
 
@@ -957,6 +962,35 @@ const ShastraReader = () => {
 
       const indentLevel = getIndentLevel(paragraph);
 
+      const isMangalacharanOrange = [
+        "॥ श्रीपरमगुरुवे नमः, परम्पराचार्यगुरुवे नमः ॥",
+        "॥ श्रीपरमगुरुवे नम:, परम्पराचार्यगुरुवे नम: ॥",
+        "॥ श्रोतारः सावधानतया शृणवन्तु ॥",
+        "॥ श्रोतार: सावधानतया शृणवन्तु ॥",
+        "॥ श्रोतारः सावधान-तया शृणवन्तु ॥",
+        "॥ श्रोतार: सावधान-तया शृणवन्तु ॥"
+      ].includes(unwrapped);
+
+      const isSanskritColor = [
+        "(देव वंदना)",
+        "(शास्त्र वंदना)",
+        "(गुरु वंदना)",
+        "आर्हत भक्ति",
+        "पण्डित-जुगल-किशोर कृत"
+      ].includes(unwrapped);
+
+      const isOrangeColor = 
+        unwrapped.startsWith("त्रैकाल्यं") || 
+        unwrapped.startsWith("पंचान्ये") || 
+        unwrapped.startsWith("इत्येतन्मोक्षमूलं") || 
+        unwrapped.startsWith("प्रत्येति") ||
+        unwrapped.startsWith("मोक्षमार्गस्य") || 
+        unwrapped.startsWith("ज्ञातारं") ||
+        unwrapped.startsWith("सिद्धे जयप्पसिद्धे") ||
+        unwrapped.startsWith("वंदित्ता अरहंते") ||
+        unwrapped.startsWith("उज्जोवणमुज्जवणं") ||
+        unwrapped.startsWith("दंसण-णाण-चरित्तं");
+
       const isStarLine = 
         (unwrapped.startsWith('*') && !unwrapped.startsWith('**')) || 
         (unwrapped.includes(' = ') && !unwrapped.startsWith('|') && !unwrapped.startsWith('**')) ||
@@ -976,11 +1010,17 @@ const ShastraReader = () => {
         displayClasses = 'text-red-600 dark:text-red-400 font-semibold text-left';
       } else if (isCenteredOrange) {
         displayClasses = 'text-orange-800 dark:text-orange-400 font-semibold text-center !m-0 !leading-tight';
+      } else if (isMangalacharanOrange) {
+        displayClasses = `text-orange-800 dark:text-orange-400 font-semibold ${centerAlign ? 'text-center' : 'text-left'}`;
+      } else if (isSanskritColor) {
+        displayClasses = `text-pink-700 dark:text-pink-400 font-semibold ${centerAlign ? 'text-center' : 'text-left'}`;
+      } else if (isOrangeColor) {
+        displayClasses = `text-orange-800 dark:text-orange-400 font-semibold ${centerAlign ? 'text-center' : 'text-left'}`;
       } else {
         displayClasses = `${colorClass} ${centerAlign ? 'text-center' : 'text-left'}`;
       }
 
-      const displayStyle = isStarLine 
+      let displayStyle = isStarLine 
         ? { 
             fontSize: '0.85em', 
             marginLeft: '2rem', 
@@ -999,6 +1039,26 @@ const ShastraReader = () => {
             } 
           : undefined;
 
+      if (unwrapped === "आर्हत भक्ति") {
+        displayStyle = {
+          ...displayStyle,
+          fontSize: '2.15em',
+          lineHeight: '1.1',
+          textAlign: 'center',
+          marginTop: '0.5rem',
+          marginBottom: '0.5rem'
+        } as any;
+      } else if (unwrapped === "पण्डित-जुगल-किशोर कृत") {
+        displayStyle = {
+          ...displayStyle,
+          fontSize: '0.8em',
+          lineHeight: '1.1',
+          textAlign: 'center',
+          marginTop: '0.25rem',
+          marginBottom: '1.5rem'
+        } as any;
+      }
+
       // Golden heading regex: Devanagari Word(s) immediately followed by "- " (no space before dash)
       // e.g. "विशेष- ...", "असंगत्‍वात्- ..."  (but NOT "अर्थ - " which has space before dash)
       let displayText = unwrapped;
@@ -1006,7 +1066,7 @@ const ShastraReader = () => {
         displayText = unwrapped.replace(/^•/, '◦');
       }
 
-      const goldenHeadingMatch = !isStarLine && !isQuestion && !isCenteredOrange && !isBullet && !isNumber
+      const goldenHeadingMatch = !isStarLine && !isQuestion && !isCenteredOrange && !isBullet && !isNumber && !isMangalacharanOrange && !isSanskritColor && !isOrangeColor
         ? unwrapped.match(/^([\u0900-\u097F\u200C\u200D]+(?:-[\u0900-\u097F\u200C\u200D]+)*)-(\ .*)$/)
         : null;
 

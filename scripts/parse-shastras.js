@@ -686,7 +686,7 @@ function readTitleFromTxt(filePath) {
 // Convert a single shastra
 function convertShastra(config) {
   const { categoryDirName, shastraDirName, title, author, category } = config;
-  const sourceShastraPath = path.join(dbDir, categoryDirName, shastraDirName);
+  const sourceShastraPath = path.join(dbDir, categoryDirName, config.sourceShastraDirName || shastraDirName);
   if (!fs.existsSync(sourceShastraPath)) {
     console.error(`Source directory not found: ${sourceShastraPath}`);
     return 0;
@@ -786,6 +786,10 @@ function convertShastra(config) {
         existingItem.gathaNum = '001';
         existingItem.title = 'मंगलाचरण';
       }
+      if (shastraDirName.includes('योगसार-प्राभृत') || shastraDirName.includes('yogsaarprabhrat')) {
+        existingItem.gathaNum = '001';
+        existingItem.title = 'जीव अधिकार - ग्रंथकार का मंगलाचरण एवं उद्देश्य';
+      }
     } else {
       let insertIndex = firstChapter.items.findIndex(item => item.file.startsWith('000_मंगलाचरण'));
       if (insertIndex === -1) {
@@ -796,6 +800,10 @@ function convertShastra(config) {
       if (shastraDirName.includes('स्वरूप-संबोधन')) {
         gathaNum = '001';
         title = 'मंगलाचरण';
+      }
+      if (shastraDirName.includes('योगसार-प्राभृत') || shastraDirName.includes('yogsaarprabhrat')) {
+        gathaNum = '001';
+        title = 'जीव अधिकार - ग्रंथकार का मंगलाचरण एवं उद्देश्य';
       }
       const newItem = {
         file: '001.txt',
@@ -823,7 +831,10 @@ function convertShastra(config) {
       const txtFileName = file.replace('.html', '.txt');
       const txtFilePath = path.join(destShastraPath, txtFileName);
       
-      fs.writeFileSync(txtFilePath, formattedText, 'utf-8');
+      // Do not overwrite existing txt files to prevent losing manual formatting/edits (e.g. Mangalacharans)
+      if (!fs.existsSync(txtFilePath)) {
+        fs.writeFileSync(txtFilePath, formattedText, 'utf-8');
+      }
       processedCount++;
     } catch (err) {
       console.error(`Error parsing file ${file}:`, err);
@@ -1038,14 +1049,14 @@ function convertShastra(config) {
         base.startsWith('0000_शास्त्र-मंगलाचरण') || 
         base.startsWith('000_शास्त्र-मंगलाचरण') || 
         base.startsWith('000_मंगलाचरण') || 
-        base === '001' || 
+        (base === '001' && !shastraDirName.includes('योगसार-प्राभृत') && !shastraDirName.includes('yogsaarprabhrat')) || 
         base === '01' ||
         base === '1-001';
       
       const isMangalaTitle = 
-        item.title.includes('मंगलाचरण') || 
+        (item.title.includes('मंगलाचरण') && !shastraDirName.includes('योगसार-प्राभृत') && !shastraDirName.includes('yogsaarprabhrat')) || 
         item.gathaNum === '000' || 
-        item.gathaNum === '001' || 
+        (item.gathaNum === '001' && !shastraDirName.includes('योगसार-प्राभृत') && !shastraDirName.includes('yogsaarprabhrat')) || 
         item.gathaNum === '01' ||
         item.gathaNum === '1-001' ||
         item.gathaNum === '000_मंगलाचरण';
@@ -1084,6 +1095,71 @@ function convertShastra(config) {
       };
       return getNum(a) - getNum(b);
     });
+  }
+
+  if (config.id === 'yogsaarprabhrat') {
+    // Group Yogsaar-Prabhrat files into 9 rights (Adhikars) plus Mangalacharan
+    const yogsaarChapters = [
+      { name: "मंगलाचरण", items: [] },
+      { name: "जीव अधिकार", items: [] },
+      { name: "अजीव अधिकार", items: [] },
+      { name: "आस्रव अधिकार", items: [] },
+      { name: "बन्ध अधिकार", items: [] },
+      { name: "संवर अधिकार", items: [] },
+      { name: "निर्जरा अधिकार", items: [] },
+      { name: "मोक्ष अधिकार", items: [] },
+      { name: "चारित्र अधिकार", items: [] },
+      { name: "चूलिका अधिकार", items: [] }
+    ];
+
+    // Collect all items from the existing shastraChapters
+    const allItems = [];
+    const seenFiles = new Set();
+    for (const chapter of shastraChapters) {
+      for (const item of chapter.items) {
+        if (!seenFiles.has(item.file)) {
+          seenFiles.add(item.file);
+          allItems.push(item);
+        }
+      }
+    }
+
+    for (const item of allItems) {
+      const baseName = path.basename(item.file, '.txt');
+      if (baseName.startsWith('0000_शास्त्र-मंगलाचरण') || baseName.startsWith('000_शास्त्र-मंगलाचरण')) {
+        yogsaarChapters[0].items.push(item);
+      } else {
+        const firstNumMatch = baseName.match(/^([०-९0-9]+)/);
+        if (firstNumMatch) {
+          const num = parseInt(firstNumMatch[1], 10);
+          if (num >= 1 && num <= 59) {
+            yogsaarChapters[1].items.push(item);
+          } else if (num >= 60 && num <= 109) {
+            yogsaarChapters[2].items.push(item);
+          } else if (num >= 110 && num <= 149) {
+            yogsaarChapters[3].items.push(item);
+          } else if (num >= 150 && num <= 190) {
+            yogsaarChapters[4].items.push(item);
+          } else if (num >= 191 && num <= 252) {
+            yogsaarChapters[5].items.push(item);
+          } else if (num >= 253 && num <= 302) {
+            yogsaarChapters[6].items.push(item);
+          } else if (num >= 303 && num <= 356) {
+            yogsaarChapters[7].items.push(item);
+          } else if (num >= 357 && num <= 456) {
+            yogsaarChapters[8].items.push(item);
+          } else if (num >= 457 && num <= 540) {
+            yogsaarChapters[9].items.push(item);
+          } else {
+            yogsaarChapters[9].items.push(item);
+          }
+        } else {
+          yogsaarChapters[0].items.push(item);
+        }
+      }
+    }
+
+    shastraChapters = yogsaarChapters.filter(ch => ch.items.length > 0);
   }
 
   const shastraIndexJson = {
@@ -1147,6 +1223,7 @@ const configs = [
     categorySlug: "dravyanuyog",
     shastraSlug: "panchastikay",
     categoryDirName: "01_द्रव्यानुयोग",
+    sourceShastraDirName: "05_पञ्चास्तिकाय--कुन्दकुन्दाचार्य",
     shastraDirName: "03_पञ्चास्तिकाय--कुन्दकुन्दाचार्य",
     cover: {
       invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
@@ -1166,6 +1243,7 @@ const configs = [
     categorySlug: "dravyanuyog",
     shastraSlug: "dravyasangraha",
     categoryDirName: "01_द्रव्यानुयोग",
+    sourceShastraDirName: "06_द्रव्यसंग्रह--नेमिचंद्र-सिद्धांतचक्रवर्ती",
     shastraDirName: "04_द्रव्यसंग्रह--नेमिचंद्र-सिद्धांतचक्रवर्ती",
     cover: {
       invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
@@ -1185,6 +1263,7 @@ const configs = [
     categorySlug: "dravyanuyog",
     shastraSlug: "samadhitantra",
     categoryDirName: "01_द्रव्यानुयोग",
+    sourceShastraDirName: "07_समाधितन्त्र--आचार्य‌-पूज्यपाद",
     shastraDirName: "05_समाधितन्त्र--आचार्य‌-पूज्यपाद",
     cover: {
       invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
@@ -1204,6 +1283,7 @@ const configs = [
     categorySlug: "dravyanuyog",
     shastraSlug: "swaroopsambodhan",
     categoryDirName: "01_द्रव्यानुयोग",
+    sourceShastraDirName: "08_स्वरूप-संबोधन--अकलंक-देव",
     shastraDirName: "06_स्वरूप-संबोधन--अकलंक-देव",
     cover: {
       invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
@@ -1223,6 +1303,7 @@ const configs = [
     categorySlug: "dravyanuyog",
     shastraSlug: "ishtopadesh",
     categoryDirName: "01_द्रव्यानुयोग",
+    sourceShastraDirName: "09_इष्टोपदेश--आचार्य‌-पूज्यपाद",
     shastraDirName: "07_इष्टोपदेश--आचार्य‌-पूज्यपाद",
     cover: {
       invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
@@ -1242,12 +1323,34 @@ const configs = [
     categorySlug: "dravyanuyog",
     shastraSlug: "paramatmaprakash",
     categoryDirName: "01_द्रव्यानुयोग",
+    sourceShastraDirName: "10_परमात्मप्रकाश--योगींदुदेव",
     shastraDirName: "08_परमात्मप्रकाश--योगींदुदेव",
     cover: {
       invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
       authorPrefix: "श्रीमद्-भगवत्योगीन्दु-देव-प्रणीत",
       title: "श्री परमात्मप्रकाश",
       subtitle: "मूल प्राकृत गाथा,",
+      credits: ""
+    }
+  },
+
+  {
+    id: "yogsaarprabhrat",
+    title: "योगसार-प्राभृत",
+    author: "अमितगति-आचार्य",
+    category: "द्रव्यानुयोग",
+    categoryHi: "द्रव्यानुयोग",
+    categoryEn: "Dravyanuyog",
+    categorySlug: "dravyanuyog",
+    shastraSlug: "yogsaarprabhrat",
+    categoryDirName: "01_द्रव्यानुयोग",
+    sourceShastraDirName: "12_योगसार-प्राभृत--अमितगति-आचार्य",
+    shastraDirName: "09_योगसार-प्राभृत--अमितगति-आचार्य",
+    cover: {
+      invocation: "!! श्रीसर्वज्ञवीतरागाय नम: !!",
+      authorPrefix: "श्रीमद्-भगवत्अमितगतिदेव-प्रणीत",
+      title: "श्री योगसार-प्राभृत",
+      subtitle: "मूल अपभ्रंश गाथा",
       credits: ""
     }
   },
@@ -1262,6 +1365,7 @@ const configs = [
     categorySlug: "dravyanuyog",
     shastraSlug: "tatvaarthsutra",
     categoryDirName: "01_द्रव्यानुयोग",
+    sourceShastraDirName: "13_तत्त्वार्थसूत्र--आचार्य-उमास्वामी",
     shastraDirName: "10_तत्त्वार्थसूत्र--आचार्य-उमास्वामी",
     cover: {
       invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
