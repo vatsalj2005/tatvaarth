@@ -709,6 +709,8 @@ function convertShastra(config) {
     console.log(`Parsed chapters from myItem.js. Found ${chapters.length} chapters.`);
   }
 
+  const hasNoChapters = chapters.length === 0;
+
   let shastraChapters = chapters;
   if (fs.existsSync(destIndexJsonPath)) {
     try {
@@ -790,6 +792,10 @@ function convertShastra(config) {
         existingItem.gathaNum = '001';
         existingItem.title = 'जीव अधिकार - ग्रंथकार का मंगलाचरण एवं उद्देश्य';
       }
+      if (shastraDirName.includes('योगसार--योगींदुदेव') || shastraDirName.includes('yogsaar')) {
+        existingItem.gathaNum = '001';
+        existingItem.title = 'सिद्धों को नमस्कार';
+      }
     } else {
       let insertIndex = firstChapter.items.findIndex(item => item.file.startsWith('000_मंगलाचरण'));
       if (insertIndex === -1) {
@@ -804,6 +810,10 @@ function convertShastra(config) {
       if (shastraDirName.includes('योगसार-प्राभृत') || shastraDirName.includes('yogsaarprabhrat')) {
         gathaNum = '001';
         title = 'जीव अधिकार - ग्रंथकार का मंगलाचरण एवं उद्देश्य';
+      }
+      if (shastraDirName.includes('योगसार--योगींदुदेव') || shastraDirName.includes('yogsaar')) {
+        gathaNum = '001';
+        title = 'सिद्धों को नमस्कार';
       }
       const newItem = {
         file: '001.txt',
@@ -842,7 +852,7 @@ function convertShastra(config) {
   }
 
   // If chapters items were empty (e.g. no myItem.js or failed parsing), build from processed files
-  if (!fs.existsSync(myItemPath) || chapters.length === 0) {
+  if (!fs.existsSync(myItemPath) || hasNoChapters) {
     // No chapters parsed from myItem.js. We need to build a "मूल ग्रंथ" chapter with all files not already in other chapters
     let mainChapter = shastraChapters.find(ch => ch.name === "मूल ग्रंथ");
     if (!mainChapter) {
@@ -858,10 +868,12 @@ function convertShastra(config) {
       const alreadyExists = shastraChapters.some(ch => ch !== mainChapter && ch.items.some(item => item.file === txtFile));
       const alreadyInMain = mainChapter.items.some(item => item.file === txtFile);
       if (!alreadyExists && !alreadyInMain) {
+        const txtFilePath = path.join(destShastraPath, txtFile);
+        const fileTitle = readTitleFromTxt(txtFilePath);
         mainChapter.items.push({
           file: txtFile,
           gathaNum: baseName,
-          title: `गाथा ${baseName}`
+          title: fileTitle || `गाथा ${baseName}`
         });
       }
     }
@@ -1373,6 +1385,27 @@ const configs = [
       title: "श्री तत्त्वार्थ-सूत्र",
       subtitle: "मूल संस्कृत सूत्र, श्री पूज्यपाद-आचार्य विरचित 'सर्वार्थ-सिद्धि' नामक संस्कृत टीका का हिंदी अनुवाद, श्री अकलान्काचार्य विरचित 'तत्त्वार्थ-राजवार्तिक' नामक संस्कृत टीका का हिंदी अनुवाद सहित",
       credits: "आभार : महेंद्र-कुमार जैन 'न्यायाचार्य', सुपार्श्वमती-माताजी"
+    }
+  },
+
+  {
+    id: "yogsaar",
+    title: "योगसार",
+    author: "योगींदुदेव",
+    category: "द्रव्यानुयोग",
+    categoryHi: "द्रव्यानुयोग",
+    categoryEn: "Dravyanuyog",
+    categorySlug: "dravyanuyog",
+    shastraSlug: "yogsaar",
+    categoryDirName: "01_द्रव्यानुयोग",
+    sourceShastraDirName: "14_योगसार--योगींदुदेव",
+    shastraDirName: "11_योगसार--योगींदुदेव",
+    cover: {
+      invocation: "!! श्रीसर्वज्ञवीतरागाय नम: !!",
+      authorPrefix: "श्रीमद्-भगवत्योगींदुदेव-प्रणीत",
+      title: "श्री योगसार",
+      subtitle: "मूल अपभ्रंश गाथा",
+      credits: ""
     }
   }
 ];

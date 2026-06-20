@@ -1093,35 +1093,35 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
 
               case 'gatha_title':
                 return (
-                  <div key={block.id} data-block-id={block.id} className="w-full mb-6">
+                  <div key={block.id} data-block-id={block.id} className="w-full mb-6 break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                     <div className="flex justify-between items-center border-b border-border/40 pb-2 mb-4">
                       <span className="text-xs font-semibold text-gold/80 bg-gold/5 px-2.5 py-1 rounded">📂 {block.data.chapterName}</span>
                       <span className="text-lg font-bold text-gold">#{block.data.gathaNum}</span>
                     </div>
-                    <h3 className="text-3xl font-bold text-center text-rose-900 dark:text-rose-900 devanagari-safe">{block.data.title}</h3>
+                    <h3 className="text-3xl font-bold text-center text-rose-900 dark:text-rose-900 devanagari-safe break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{block.data.title}</h3>
                   </div>
                 );
 
               case 'prakrit':
                 return (
-                  <div key={block.id} data-block-id={block.id} className="p-6 rounded-xl bg-gold/5 border border-gold/20 mb-4 text-center">
+                  <div key={block.id} data-block-id={block.id} className="p-6 rounded-xl bg-gold/5 border border-gold/20 mb-4 text-center overflow-hidden break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                     <h4 className="text-[10px] uppercase text-gold font-bold mb-2">गाथा (प्राकृत)</h4>
-                    <p className="whitespace-pre-line text-2xl font-bold leading-loose text-orange-800 dark:text-orange-400">{block.data}</p>
+                    <p className="whitespace-pre-line text-2xl font-bold leading-loose text-orange-800 dark:text-orange-400 break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{block.data}</p>
                   </div>
                 );
 
               case 'sanskrit':
                 return (
-                  <div key={block.id} data-block-id={block.id} className="p-4 rounded-lg bg-secondary/30 border border-border/30 mb-4 text-center">
+                  <div key={block.id} data-block-id={block.id} className="p-4 rounded-lg bg-secondary/30 border border-border/30 mb-4 text-center overflow-hidden break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                     <h4 className="text-[10px] uppercase text-muted-foreground/80 font-bold mb-2">संस्कृत छाया</h4>
-                    <p className="whitespace-pre-line text-base text-sky-900 dark:text-sky-900 leading-loose">{block.data}</p>
+                    <p className="whitespace-pre-line text-base text-sky-900 dark:text-sky-900 leading-loose break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{block.data}</p>
                   </div>
                 );
 
               case 'gadya':
                 return (
-                  <div key={block.id} data-block-id={block.id} className="text-center italic text-foreground/90 my-6 px-6 border-l-2 border-r-2 border-gold/30">
-                    <p className="leading-relaxed whitespace-pre-line">{block.data}</p>
+                  <div key={block.id} data-block-id={block.id} className="text-center italic text-foreground/90 my-6 px-6 border-l-2 border-r-2 border-gold/30 break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                    <p className="leading-relaxed whitespace-pre-line break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{block.data}</p>
                   </div>
                 );
 

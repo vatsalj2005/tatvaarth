@@ -281,29 +281,37 @@ export const DiagramRenderer: React.FC<DiagramRendererProps> = ({ type, nodes })
   const containerRef = React.useRef<HTMLDivElement>(null);
   const contentRef = React.useRef<HTMLDivElement>(null);
   const [scale, setScale] = React.useState(1);
-  const [height, setHeight] = React.useState<number | undefined>(undefined);
+  const [dimensions, setDimensions] = React.useState({ width: 0, height: 0 });
 
   React.useEffect(() => {
     const updateScale = () => {
       if (containerRef.current && contentRef.current) {
-        // Reset scale briefly to measure natural dimensions
-        contentRef.current.style.transform = 'none';
+        // Reset scale and position briefly to measure natural dimensions
+        const prevTransform = contentRef.current.style.transform;
+        const prevPosition = contentRef.current.style.position;
         
-        // Subtract vertical padding (py-4 = 16px each side)
+        contentRef.current.style.transform = 'none';
+        contentRef.current.style.position = 'static';
+        
         const containerWidth = Math.max(0, containerRef.current.clientWidth); 
         const contentWidth = contentRef.current.scrollWidth;
         const contentHeight = contentRef.current.scrollHeight;
 
+        contentRef.current.style.transform = prevTransform;
+        contentRef.current.style.position = prevPosition;
+
+        let newScale = 1;
         if (contentWidth > containerWidth && containerWidth > 0) {
           // Add 16px safety buffer (8px on each side) so it doesn't touch screen edges
           const targetWidth = Math.max(0, containerWidth - 16);
-          const newScale = targetWidth / contentWidth;
-          setScale(newScale);
-          setHeight(contentHeight * newScale);
-        } else {
-          setScale(1);
-          setHeight(undefined);
+          newScale = targetWidth / contentWidth;
+          if (newScale < 0.75) {
+            newScale = 0.75; // cap minimum scale to keep text readable
+          }
         }
+        
+        setScale(newScale);
+        setDimensions({ width: contentWidth, height: contentHeight });
       }
     };
 
@@ -339,23 +347,34 @@ export const DiagramRenderer: React.FC<DiagramRendererProps> = ({ type, nodes })
   return (
     <div 
       ref={containerRef}
-      className="w-full flex justify-center my-6 overflow-hidden py-4 bg-transparent"
-      style={{ height: height ? `${height + 32}px` : 'auto' }}
+      className="w-full overflow-x-auto my-6 py-4 bg-transparent scrollbar-thin"
     >
       <div 
-        ref={contentRef}
-        className="inline-block py-2"
-        style={{ 
-          width: 'max-content',
-          transform: `scale(${scale})`, 
-          transformOrigin: 'top center',
+        style={{
+          width: dimensions.width ? `${dimensions.width * scale}px` : 'auto',
+          height: dimensions.height ? `${dimensions.height * scale}px` : 'auto',
+          position: 'relative',
+          margin: '0 auto',
         }}
       >
-        {type === 'horizontal' ? (
-          <HorizontalBranch node={root} levelColors={levelColors} />
-        ) : (
-          <VerticalBranch node={root} levelColors={levelColors} />
-        )}
+        <div 
+          ref={contentRef}
+          className="inline-block py-2 shrink-0"
+          style={{ 
+            width: 'max-content',
+            transform: `scale(${scale})`, 
+            transformOrigin: 'top left',
+            position: 'absolute',
+            left: 0,
+            top: 0,
+          }}
+        >
+          {type === 'horizontal' ? (
+            <HorizontalBranch node={root} levelColors={levelColors} />
+          ) : (
+            <VerticalBranch node={root} levelColors={levelColors} />
+          )}
+        </div>
       </div>
     </div>
   );

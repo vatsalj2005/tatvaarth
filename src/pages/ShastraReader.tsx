@@ -1438,21 +1438,21 @@ const ShastraReader = () => {
                     </div>
 
                   {/* Header title */}
-                  <h3 className="font-heading text-center font-black text-foreground drop-shadow-[0_4px_12px_rgba(212,175,55,0.8)] mb-6 devanagari-safe tracking-wide" style={{ fontSize: `${contentFontSize * 1.6}px` }}>
+                  <h3 className="font-heading text-center font-black text-foreground drop-shadow-[0_4px_12px_rgba(212,175,55,0.8)] mb-6 devanagari-safe tracking-wide break-words" style={{ fontSize: `${contentFontSize * 1.6}px`, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                     {formatGathaText(content.title)}
                   </h3>
 
                   {/* Prakrit verse */}
                   {chapterName !== 'परिशिष्ट' && content.gatha && (
-                    <div className="p-6 md:p-8 rounded-2xl bg-gold/5 border border-gold/20 shadow-sm relative mb-6">
+                    <div className="p-6 md:p-8 rounded-2xl bg-gold/5 border border-gold/20 shadow-sm relative mb-6 overflow-hidden">
                       <h4 className="text-xs uppercase tracking-wider text-gold font-medium mb-3">{t('prakrit')}</h4>
                       <p 
-                        className={`text-center text-xl md:text-2xl font-semibold devanagari-safe leading-loose ${readingClass} ${
+                        className={`text-center text-xl md:text-2xl font-semibold devanagari-safe leading-loose break-words ${readingClass} ${
                           content.gatha.includes('ओंकारं बिन्दुसंयुक्तं')
                             ? 'text-gold drop-shadow-[0_0_15px_rgba(212,175,55,0.8)]'
                             : 'text-orange-800 dark:text-orange-400 drop-shadow-[0_4px_12px_rgba(234,88,12,0.7)] dark:drop-shadow-[0_4px_12px_rgba(251,146,60,0.8)]'
                         }`}
-                        style={{ fontSize: `${contentFontSize * 1.25}px`, lineHeight: lineSpacing }}
+                        style={{ fontSize: `${contentFontSize * 1.25}px`, lineHeight: lineSpacing, wordBreak: 'break-word', overflowWrap: 'anywhere' }}
                       >
                         {formatGathaText(content.gatha)}
                       </p>
@@ -1461,11 +1461,11 @@ const ShastraReader = () => {
 
                   {/* Sanskrit verse */}
                   {content.gathaS && (
-                    <div className="p-4 rounded-xl bg-secondary/30 border border-border/30 mb-6">
+                    <div className="p-4 rounded-xl bg-secondary/30 border border-border/30 mb-6 overflow-hidden">
                       <h4 className="text-xs uppercase tracking-wider text-muted-foreground/80 font-medium mb-2">{t('sanskrit')}</h4>
                       <p 
-                        className={`text-center text-base md:text-lg text-teal-700 dark:text-teal-400 devanagari-safe leading-loose ${readingClass}`}
-                        style={{ fontSize: `${contentFontSize * 0.8}px`, lineHeight: lineSpacing }}
+                        className={`text-center text-base md:text-lg text-teal-700 dark:text-teal-400 devanagari-safe leading-loose break-words ${readingClass}`}
+                        style={{ fontSize: `${contentFontSize * 0.8}px`, lineHeight: lineSpacing, wordBreak: 'break-word', overflowWrap: 'anywhere' }}
                       >
                         {formatGathaText(content.gathaS)}
                       </p>
@@ -1474,10 +1474,10 @@ const ShastraReader = () => {
 
                   {/* Hindi Poetic Verse (Gadya) */}
                   {content.gadya && chapterName !== 'परिशिष्ट' && (
-                    <div className="text-center italic text-foreground/90 font-serif my-8 px-6 devanagari-safe border-l-2 border-r-2 border-gold/30">
+                    <div className="text-center italic text-foreground/90 font-serif my-8 px-6 devanagari-safe border-l-2 border-r-2 border-gold/30 break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                       <p 
-                        className="leading-relaxed"
-                        style={{ fontSize: `${contentFontSize * 0.8}px`, lineHeight: lineSpacing }}
+                        className="leading-relaxed break-words"
+                        style={{ fontSize: `${contentFontSize * 0.8}px`, lineHeight: lineSpacing, wordBreak: 'break-word', overflowWrap: 'anywhere' }}
                       >
                         {formatGathaText(content.gadya, true)}
                       </p>
