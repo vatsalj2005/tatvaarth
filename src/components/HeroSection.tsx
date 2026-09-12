@@ -1,23 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search } from 'lucide-react';
+import { Search, ArrowRight } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { smartSearch } from '@/lib/smart-search';
-import { getShastras } from '@/data/shastra-loader';
-import { transliterateText } from '@/lib/transliterate';
-
-interface UnifiedSearchResult {
-  id: string;
-  title: string;
-  type: 'bhajan' | 'shastra';
-  bhajanSubdivision?: string;
-  bhajanSlug?: string;
-  shastraCategorySlug?: string;
-  shastraSlug?: string;
-  score: number;
-  subtitle?: string;
-}
+import { siteWideSearch, UnifiedSearchResult } from '@/lib/smart-search';
 
 // Dynamically import all hero images from the assets folder
 const heroImages = Object.values(
@@ -40,105 +26,9 @@ const HeroSection = () => {
   }, []);
 
   useEffect(() => {
-    if (searchQuery.length > 1) {
-      const query = searchQuery.trim().toLowerCase();
-      
-      // 1. Search Bhajans
-      const bhajanResults = smartSearch(query, { limit: 10 });
-      const unifiedBhajans: UnifiedSearchResult[] = bhajanResults.map(r => ({
-        id: `bhajan-${r.id}`,
-        title: r.title,
-        type: 'bhajan',
-        bhajanSubdivision: r.bhajan.subdivision,
-        bhajanSlug: r.bhajan.slug,
-        score: r.relevance_score,
-        subtitle: r.bhajan.singer ? `🎤 ${r.bhajan.singer}` : '🎵 Bhajan'
-      }));
-
-      // 2. Search Shastras
-      const shastras = getShastras();
-      
-      // Vowel normalization (aa -> a, ee -> i, etc.)
-      const normalizeVowel = (str: string) => str
-        .replace(/aa/g, 'a')
-        .replace(/ee/g, 'i')
-        .replace(/oo/g, 'u')
-        .replace(/ii/g, 'i')
-        .replace(/uu/g, 'u')
-        .replace(/ai/g, 'e')
-        .replace(/au/g, 'o');
-
-      // Phonetic / consonant-only normalization
-      const normalizePhonetic = (str: string) => str
-        .replace(/ph/g, 'f')
-        .replace(/sh/g, 's')
-        .replace(/th/g, 't')
-        .replace(/ch/g, 'c')
-        .replace(/kh/g, 'k')
-        .replace(/gh/g, 'g')
-        .replace(/dh/g, 'd')
-        .replace(/bh/g, 'b')
-        .replace(/(.)\1+/g, '$1') // collapse duplicate letters
-        .replace(/[aeiou]/g, '') // remove vowels
-        .trim();
-
-      const normQueryVowel = normalizeVowel(query);
-      const normQueryPhonetic = normalizePhonetic(query);
-
-      const matchText = (text: string) => {
-        const textLower = text.toLowerCase();
-        if (textLower.includes(query)) return 1.0;
-        if (normalizeVowel(textLower).includes(normQueryVowel)) return 0.9;
-        if (normQueryPhonetic.length >= 2 && normalizePhonetic(textLower).includes(normQueryPhonetic)) return 0.8;
-        return 0;
-      };
-
-      const matchedShastras: UnifiedSearchResult[] = [];
-
-      shastras.forEach(s => {
-        const titleLower = s.title.toLowerCase();
-        const authorLower = s.author.toLowerCase();
-        const catHiLower = s.categoryHi.toLowerCase();
-        const catEnLower = s.categoryEn.toLowerCase();
-        const idLower = s.id.toLowerCase();
-        const shastraSlugLower = s.shastraSlug.toLowerCase();
-        const categorySlugLower = s.categorySlug.toLowerCase();
-        const romanTitle = transliterateText(s.title).toLowerCase();
-        const romanAuthor = transliterateText(s.author).toLowerCase();
-
-        // Calculate maximum score
-        const scores = [
-          titleLower === query ? 1.0 : (titleLower.includes(query) ? 0.95 : 0),
-          authorLower === query ? 0.9 : (authorLower.includes(query) ? 0.85 : 0),
-          catHiLower.includes(query) ? 0.7 : 0,
-          catEnLower.includes(query) ? 0.7 : 0,
-          matchText(idLower) * 0.95,
-          matchText(shastraSlugLower) * 0.95,
-          matchText(categorySlugLower) * 0.7,
-          matchText(romanTitle) * 0.9,
-          matchText(romanAuthor) * 0.85
-        ];
-
-        const maxScore = Math.max(...scores);
-        if (maxScore > 0) {
-          matchedShastras.push({
-            id: `shastra-${s.id}`,
-            title: s.title,
-            type: 'shastra',
-            shastraCategorySlug: s.categorySlug,
-            shastraSlug: s.shastraSlug,
-            score: maxScore,
-            subtitle: `📚 ${s.author} (${s.categoryHi})`
-          });
-        }
-      });
-
-      // Combine and sort
-      const combined = [...unifiedBhajans, ...matchedShastras]
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 10);
-
-      setSuggestions(combined);
+    if (searchQuery.trim().length > 1) {
+      const results = siteWideSearch(searchQuery.trim(), { limit: 10 });
+      setSuggestions(results);
     } else {
       setSuggestions([]);
     }
@@ -190,7 +80,7 @@ const HeroSection = () => {
           {t('heroSubtitle')}
         </motion.p>
 
-        {/* Search Bar — Google-style */}
+        {/* Search Bar — Google-style with site-wide intelligent suggestions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -205,7 +95,7 @@ const HeroSection = () => {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               onFocus={() => setIsFocused(true)}
-              onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+              onBlur={() => setTimeout(() => setIsFocused(false), 250)}
               className={`w-full pl-12 pr-4 py-4 bg-card/90 backdrop-blur-md border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold/50 text-base ${
                 showDropdown ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'
               }`}
@@ -218,7 +108,7 @@ const HeroSection = () => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute left-0 right-0 z-20 bg-card/95 backdrop-blur-md border border-border/50 border-t-0 rounded-b-2xl shadow-2xl overflow-hidden"
+                className="absolute left-0 right-0 z-20 bg-card/95 backdrop-blur-md border border-border/50 border-t-0 rounded-b-2xl shadow-2xl overflow-hidden max-h-[440px] overflow-y-auto scrollbar-thin"
               >
                 <div className="border-t border-border/30" />
                 {suggestions.map(s => (
@@ -226,23 +116,45 @@ const HeroSection = () => {
                     key={s.id}
                     onMouseDown={(e) => {
                       e.preventDefault();
-                      if (s.type === 'bhajan') {
-                        navigate(`/bhajan/${s.bhajanSubdivision}/${s.bhajanSlug}`);
-                      } else {
-                        navigate(`/shastra/${s.shastraCategorySlug}/${s.shastraSlug}`);
-                      }
+                      navigate(s.url);
                       setSearchQuery('');
                       setSuggestions([]);
                     }}
-                    className="w-full text-left px-4 py-2.5 hover:bg-secondary/80 transition-colors text-sm flex items-center justify-between gap-3"
+                    className={`w-full text-left px-4 py-3 hover:bg-secondary/80 transition-colors text-sm flex items-center justify-between gap-3 border-b border-border/20 last:border-b-0 group ${
+                      s.type === 'directory' ? 'bg-gold/5 hover:bg-gold/15' : ''
+                    }`}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <Search className="w-3.5 h-3.5 text-muted-foreground/40 flex-shrink-0" />
-                      <span className="text-foreground/90 truncate devanagari-safe">{s.title}</span>
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <span className="text-xl flex-shrink-0 w-7 text-center">
+                        {s.icon || (s.type === 'directory' ? '📂' : s.type === 'shastra' ? '📚' : '🎵')}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-foreground/95 font-medium truncate devanagari-safe">
+                            {s.title}
+                          </span>
+                          {s.badge && (
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${
+                                s.type === 'directory'
+                                  ? 'bg-gold/20 text-gold border border-gold/40'
+                                  : s.type === 'shastra'
+                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                  : 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                              }`}
+                            >
+                              {s.badge}
+                            </span>
+                          )}
+                        </div>
+                        {s.subtitle && (
+                          <p className="text-xs text-muted-foreground/75 truncate devanagari-safe mt-0.5">
+                            {s.subtitle}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    {s.subtitle && (
-                      <span className="text-xs text-muted-foreground/60 flex-shrink-0 devanagari-safe">{s.subtitle}</span>
-                    )}
+                    <ArrowRight className="w-4 h-4 text-gold/60 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                   </button>
                 ))}
               </motion.div>

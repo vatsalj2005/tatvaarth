@@ -11,6 +11,8 @@
 
 import { BhajanData, bhajans } from '@/data/content-loader';
 import { transliterateText } from '@/lib/transliterate';
+import { getShastras, ShastraMetadata } from '@/data/shastra-loader';
+import { siteDirectories, SiteDirectoryItem } from '@/data/site-directory';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -518,5 +520,422 @@ export function smartSearch(query: string, options: SmartSearchOptions = {}): Se
   // Sort and limit
   return Array.from(results.values())
     .sort((a, b) => b.relevance_score - a.relevance_score)
+    .slice(0, limit);
+}
+
+// ─── Site-Wide Search (Directories, Shastras, Bhajans) ────────────────────────
+
+export interface UnifiedSearchResult {
+  id: string;
+  title: string;
+  subtitle: string;
+  type: 'directory' | 'shastra' | 'bhajan';
+  url: string;
+  score: number;
+  badge: string;
+  icon?: string;
+  matchedAs: 'exact' | 'phonetic' | 'category' | 'typo' | 'semantic' | 'partial';
+}
+
+export function siteWideSearch(query: string, options: { limit?: number } = {}): UnifiedSearchResult[] {
+  if (!query || query.trim().length === 0) return [];
+
+  const rawQuery = query.trim();
+  const queryLower = rawQuery.toLowerCase();
+  const queryNorm = normalizeVowelLength(queryLower);
+  const queryPhonetic = phoneticNormalize(queryLower);
+  const limit = options.limit ?? 10;
+
+  const results: Map<string, UnifiedSearchResult> = new Map();
+
+  function addResult(res: UnifiedSearchResult) {
+    const existing = results.get(res.id);
+    if (!existing || existing.score < res.score) {
+      results.set(res.id, res);
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 1. DIRECTORIES & CATEGORIES (Top Priority when matched)
+  // ──────────────────────────────────────────────────────────────────────────
+  for (const dir of siteDirectories) {
+    const nameHiLower = dir.nameHi.toLowerCase();
+    const nameEnLower = dir.nameEn.toLowerCase();
+    const allAliases = [
+      nameEnLower,
+      nameHiLower,
+      ...dir.aliases.map(a => a.toLowerCase())
+    ];
+
+    // Priority 1: Exact Absolute String Match for Category / Folder
+    const isExact = allAliases.some(a => a === queryLower);
+    if (isExact) {
+      addResult({
+        id: `dir-${dir.id}`,
+        title: `${dir.nameHi} (${dir.nameEn})`,
+        subtitle: `📂 ${dir.descHi}`,
+        type: 'directory',
+        url: dir.url,
+        score: 1.15, // Pinned at very top
+        badge: dir.type === 'hub' ? 'Directory' : 'Category',
+        icon: dir.icon,
+        matchedAs: 'exact'
+      });
+      continue;
+    }
+
+    // Priority 2: Closest Absolute String (Phonetic / Vowel Normalized)
+    const isPhonetic = allAliases.some(a => {
+      const aNorm = normalizeVowelLength(a);
+      const aPhonetic = phoneticNormalize(a);
+      return (queryNorm.length >= 3 && aNorm === queryNorm) ||
+             (queryPhonetic.length >= 3 && aPhonetic === queryPhonetic);
+    });
+    if (isPhonetic) {
+      addResult({
+        id: `dir-${dir.id}`,
+        title: `${dir.nameHi} (${dir.nameEn})`,
+        subtitle: `📂 ${dir.descHi}`,
+        type: 'directory',
+        url: dir.url,
+        score: 1.05,
+        badge: dir.type === 'hub' ? 'Directory' : 'Category',
+        icon: dir.icon,
+        matchedAs: 'phonetic'
+      });
+      continue;
+    }
+
+    // Priority 3: Directory / Category Prefix or Word Match (e.g. "bhaj", "drav", "guru")
+    const isPrefixOrWord = allAliases.some(a => {
+      if (queryLower.length >= 3 && (a.startsWith(queryLower) || a.includes(queryLower))) return true;
+      if (queryNorm.length >= 3 && (normalizeVowelLength(a).startsWith(queryNorm) || normalizeVowelLength(a).includes(queryNorm))) return true;
+      return false;
+    });
+    if (isPrefixOrWord) {
+      addResult({
+        id: `dir-${dir.id}`,
+        title: `${dir.nameHi} (${dir.nameEn})`,
+        subtitle: `📂 ${dir.descHi}`,
+        type: 'directory',
+        url: dir.url,
+        score: 0.92,
+        badge: dir.type === 'hub' ? 'Directory' : 'Category',
+        icon: dir.icon,
+        matchedAs: 'category'
+      });
+      continue;
+    }
+
+    // Priority 4: Typo / Levenshtein Distance for Directory
+    if (queryLower.length >= 3) {
+      let minLev = Infinity;
+      for (const a of allAliases) {
+        if (Math.abs(a.length - queryLower.length) > 2) continue;
+        const d = levenshtein(queryNorm, normalizeVowelLength(a));
+        if (d < minLev) minLev = d;
+      }
+      if (minLev <= 1 || (queryLower.length >= 5 && minLev <= 2)) {
+        addResult({
+          id: `dir-${dir.id}`,
+          title: `${dir.nameHi} (${dir.nameEn})`,
+          subtitle: `📂 ${dir.descHi}`,
+          type: 'directory',
+          url: dir.url,
+          score: 0.86,
+          badge: dir.type === 'hub' ? 'Directory' : 'Category',
+          icon: dir.icon,
+          matchedAs: 'typo'
+        });
+      }
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 2. SHASTRAS (Scriptures)
+  // ──────────────────────────────────────────────────────────────────────────
+  const shastras = getShastras();
+  for (const s of shastras) {
+    const titleLower = s.title.toLowerCase();
+    const romanTitle = transliterateText(s.title).toLowerCase();
+    const romanTitleNorm = normalizeVowelLength(romanTitle);
+    const romanTitlePhonetic = phoneticNormalize(romanTitle);
+    const slugLower = s.shastraSlug.toLowerCase();
+    const idLower = s.id.toLowerCase();
+    const authorLower = s.author.toLowerCase();
+    const romanAuthor = transliterateText(s.author).toLowerCase();
+    const romanAuthorNorm = normalizeVowelLength(romanAuthor);
+    const romanAuthorPhonetic = phoneticNormalize(romanAuthor);
+    const url = `/shastra/${s.categorySlug}/${s.shastraSlug}`;
+    const subtitle = `📚 ${s.author} • ${s.categoryHi} (${s.gathaCount} गाथाएं)`;
+
+    // Priority 1: Exact Absolute Match
+    if (titleLower === queryLower || romanTitle === queryLower || slugLower === queryLower || idLower === queryLower) {
+      addResult({
+        id: `shastra-${s.id}`,
+        title: s.title,
+        subtitle,
+        type: 'shastra',
+        url,
+        score: 1.00,
+        badge: 'Shastra',
+        icon: '📚',
+        matchedAs: 'exact'
+      });
+      continue;
+    }
+
+    // Priority 2: Closest Absolute String (Phonetic / Vowel Normalized)
+    if ((queryNorm.length >= 3 && romanTitleNorm === queryNorm) ||
+        (queryPhonetic.length >= 3 && romanTitlePhonetic === queryPhonetic)) {
+      addResult({
+        id: `shastra-${s.id}`,
+        title: s.title,
+        subtitle,
+        type: 'shastra',
+        url,
+        score: 0.95,
+        badge: 'Shastra',
+        icon: '📚',
+        matchedAs: 'phonetic'
+      });
+      continue;
+    }
+
+    // Author Exact or Phonetic Match
+    if (authorLower === queryLower || romanAuthor === queryLower || romanAuthorNorm === queryNorm) {
+      addResult({
+        id: `shastra-${s.id}`,
+        title: s.title,
+        subtitle,
+        type: 'shastra',
+        url,
+        score: 0.90,
+        badge: 'Author Match',
+        icon: '✍️',
+        matchedAs: 'exact'
+      });
+      continue;
+    }
+
+    // Priority 4: Typo / Levenshtein Distance (e.g. "smaaysar" -> Samaysar)
+    if (queryLower.length >= 4) {
+      const dTitle = levenshtein(queryNorm, romanTitleNorm);
+      if (dTitle <= 2 || dTitle / Math.max(queryNorm.length, romanTitleNorm.length) <= 0.3) {
+        addResult({
+          id: `shastra-${s.id}`,
+          title: s.title,
+          subtitle,
+          type: 'shastra',
+          url,
+          score: 0.83,
+          badge: 'Shastra',
+          icon: '📚',
+          matchedAs: 'typo'
+        });
+        continue;
+      }
+
+      // Check author typo
+      const dAuthor = levenshtein(queryNorm, romanAuthorNorm);
+      if (dAuthor <= 2 || dAuthor / Math.max(queryNorm.length, romanAuthorNorm.length) <= 0.3) {
+        addResult({
+          id: `shastra-${s.id}`,
+          title: s.title,
+          subtitle,
+          type: 'shastra',
+          url,
+          score: 0.80,
+          badge: 'Author Match',
+          icon: '✍️',
+          matchedAs: 'typo'
+        });
+        continue;
+      }
+    }
+
+    // Priority 5: Partial Substring Match
+    if (titleLower.includes(queryLower) || romanTitle.includes(queryLower) || romanTitleNorm.includes(queryNorm)) {
+      addResult({
+        id: `shastra-${s.id}`,
+        title: s.title,
+        subtitle,
+        type: 'shastra',
+        url,
+        score: 0.74,
+        badge: 'Shastra',
+        icon: '📚',
+        matchedAs: 'partial'
+      });
+      continue;
+    }
+
+    if (authorLower.includes(queryLower) || romanAuthor.includes(queryLower) || romanAuthorNorm.includes(queryNorm)) {
+      addResult({
+        id: `shastra-${s.id}`,
+        title: s.title,
+        subtitle,
+        type: 'shastra',
+        url,
+        score: 0.70,
+        badge: 'Author Match',
+        icon: '✍️',
+        matchedAs: 'partial'
+      });
+      continue;
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 3. BHAJANS (Dev, Shastra, Guru, Bhakti)
+  // ──────────────────────────────────────────────────────────────────────────
+  const bhajanIndex = getSearchIndex();
+  for (const entry of bhajanIndex) {
+    const b = entry.bhajan;
+    const url = `/bhajan/${b.subdivision}/${b.slug}`;
+    const singerStr = b.singer ? ` • 🎤 ${b.singer}` : '';
+    const subtitle = `🎵 ${b.subdivision.charAt(0).toUpperCase() + b.subdivision.slice(1)} Bhajan${singerStr}`;
+
+    // Priority 1: Exact Absolute String Match on Bhajan Title
+    if (entry.titleLower === queryLower || entry.romanTitle === queryLower) {
+      addResult({
+        id: `bhajan-${b.id}`,
+        title: b.title,
+        subtitle,
+        type: 'bhajan',
+        url,
+        score: 0.98,
+        badge: 'Bhajan',
+        icon: '🎵',
+        matchedAs: 'exact'
+      });
+      continue;
+    }
+
+    // Priority 2: Closest Absolute String ("Mahavir or Mahaveer", "Adinath", "Paras")
+    // Check if query is an exact match for a significant word in the title (e.g. "Mahavir" in "Mahavir Swami")
+    const titleWords = entry.romanTitle.split(/\s+/);
+    const titleWordsNorm = titleWords.map(w => normalizeVowelLength(w));
+    const titleWordsPhonetic = titleWords.map(w => phoneticNormalize(w));
+
+    const isWordExactOrPhonetic = titleWordsNorm.some((wNorm, idx) => {
+      if (wNorm === queryNorm) return true;
+      if (queryPhonetic.length >= 3 && titleWordsPhonetic[idx] === queryPhonetic) return true;
+      return false;
+    });
+
+    if (isWordExactOrPhonetic) {
+      addResult({
+        id: `bhajan-${b.id}`,
+        title: b.title,
+        subtitle,
+        type: 'bhajan',
+        url,
+        score: 0.93,
+        badge: 'Bhajan',
+        icon: '🎵',
+        matchedAs: 'phonetic'
+      });
+      continue;
+    }
+
+    // Priority 4: Typo / Levenshtein Distance on Bhajan Title Words
+    if (queryLower.length >= 4) {
+      let isTypo = false;
+      for (const wNorm of titleWordsNorm) {
+        if (Math.abs(wNorm.length - queryNorm.length) > 2) continue;
+        const d = levenshtein(queryNorm, wNorm);
+        if (d <= 1 || (queryNorm.length >= 6 && d <= 2)) {
+          isTypo = true;
+          break;
+        }
+      }
+      if (isTypo) {
+        addResult({
+          id: `bhajan-${b.id}`,
+          title: b.title,
+          subtitle,
+          type: 'bhajan',
+          url,
+          score: 0.81,
+          badge: 'Bhajan',
+          icon: '🎵',
+          matchedAs: 'typo'
+        });
+        continue;
+      }
+    }
+
+    // Priority 5: Partial Substring in Title or Tags
+    if (entry.titleLower.includes(queryLower) || entry.romanTitle.includes(queryLower) || entry.romanTitleNorm.includes(queryNorm)) {
+      addResult({
+        id: `bhajan-${b.id}`,
+        title: b.title,
+        subtitle,
+        type: 'bhajan',
+        url,
+        score: 0.72,
+        badge: 'Bhajan',
+        icon: '🎵',
+        matchedAs: 'partial'
+      });
+      continue;
+    }
+
+    if (entry.tagsLower.some(t => t.includes(queryLower))) {
+      addResult({
+        id: `bhajan-${b.id}`,
+        title: b.title,
+        subtitle,
+        type: 'bhajan',
+        url,
+        score: 0.65,
+        badge: 'Tag Match',
+        icon: '🏷️',
+        matchedAs: 'partial'
+      });
+      continue;
+    }
+
+    // Priority 5: Lyrics Content Match
+    if (entry.lyricsLower.includes(queryLower) || (queryNorm.length >= 4 && entry.romanLyricsNorm.includes(queryNorm))) {
+      addResult({
+        id: `bhajan-${b.id}`,
+        title: b.title,
+        subtitle,
+        type: 'bhajan',
+        url,
+        score: 0.55,
+        badge: 'Lyrics Match',
+        icon: '📜',
+        matchedAs: 'partial'
+      });
+      continue;
+    }
+
+    // Priority 5: Semantic / Mood / Hinglish Mapping
+    const hindiSynonyms = hinglishToHindi[queryLower] || [];
+    if (hindiSynonyms.length > 0) {
+      const synMatch = hindiSynonyms.some(s => entry.titleLower.includes(s) || entry.lyricsLower.includes(s));
+      if (synMatch) {
+        addResult({
+          id: `bhajan-${b.id}`,
+          title: b.title,
+          subtitle,
+          type: 'bhajan',
+          url,
+          score: 0.58,
+          badge: 'Semantic Match',
+          icon: '✨',
+          matchedAs: 'semantic'
+        });
+        continue;
+      }
+    }
+  }
+
+  // Sort by priority score descending and limit results
+  return Array.from(results.values())
+    .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 }
