@@ -4,9 +4,13 @@
  * Handles:
  * - Hinglish → Hindi transliteration
  * - Fuzzy / phonetic matching with vowel-length normalization
- * - Semantic & mood inference
- * - Partial / prefix matching
- * - Typo tolerance
+ * - 5-Tier Priority Search:
+ *   1. Absolute string matches (Directories, Shastras, Bhajans)
+ *   2. Closest absolute / phonetic / vowel-normalized matches
+ *   3. Categories & Folders matching directory names
+ *   4. Typo tolerance via Levenshtein distance
+ *   5. Partial & semantic substring search
+ * - Scoped local search with automatic global fallback
  */
 
 import { BhajanData, bhajans } from '@/data/content-loader';
@@ -23,6 +27,23 @@ export interface SearchResult {
   match_reason: string;
   matched_as: 'exact' | 'transliterated' | 'semantic' | 'phonetic' | 'partial';
   bhajan: BhajanData;
+}
+
+export interface UnifiedSearchResult {
+  id: string;
+  title: string;
+  subtitle: string;
+  type: 'directory' | 'shastra' | 'bhajan';
+  url: string;
+  score: number;
+  badge: string;
+  icon?: string;
+  matchedAs: 'exact' | 'phonetic' | 'category' | 'typo' | 'semantic' | 'partial';
+}
+
+export interface SmartSearchOptions {
+  subdivisionId?: string;
+  limit?: number;
 }
 
 // ─── Hinglish → Hindi Dictionary ─────────────────────────────────────────────
@@ -93,65 +114,8 @@ const hinglishToHindi: Record<string, string[]> = {
   'bin': ['बिन', 'बिना'],
 };
 
-// ─── Semantic Mood / Theme Mapping ───────────────────────────────────────────
+// ─── Normalization & Distance Helpers ─────────────────────────────────────────
 
-const semanticMoodMap: Record<string, string[]> = {
-  'devotion': ['भक्ति', 'प्रभु', 'भगवान', 'पूजा', 'आराधना', 'वंदना', 'स्तुति'],
-  'devotional': ['भक्ति', 'प्रभु', 'भगवान', 'पूजा', 'आराधना'],
-  'prayer': ['प्रार्थना', 'वंदना', 'स्तुति', 'नमन', 'नमस्कार'],
-  'peace': ['शांति', 'शान्ति', 'विश्राम', 'सुख'],
-  'peaceful': ['शांति', 'शान्ति', 'शीतल', 'सुख'],
-  'surrender': ['समर्पण', 'शरण', 'चरण', 'प्रभु'],
-  'renunciation': ['त्याग', 'वैराग्य', 'मोक्ष', 'तप', 'तपस्या'],
-  'detachment': ['वैराग्य', 'विरक्ति', 'त्याग'],
-  'liberation': ['मोक्ष', 'मुक्ति', 'निर्वाण', 'कैवल्य'],
-  'freedom': ['मुक्ति', 'मोक्ष', 'स्वतंत्र'],
-  'knowledge': ['ज्ञान', 'विद्या', 'बोध', 'प्रज्ञा'],
-  'wisdom': ['ज्ञान', 'बुद्धि', 'विवेक'],
-  'compassion': ['दया', 'करुणा', 'अहिंसा'],
-  'love': ['प्रेम', 'प्यार', 'स्नेह', 'भक्ति'],
-  'praise': ['स्तुति', 'महिमा', 'गुणगान', 'जय'],
-  'morning': ['प्रभात', 'सुबह', 'भोर', 'उषा'],
-  'evening': ['संध्या', 'शाम', 'सायं'],
-  'celebration': ['जय', 'उत्सव', 'महोत्सव', 'जश्न'],
-  'victory': ['जय', 'विजय'],
-  'blessing': ['आशीर्वाद', 'कृपा', 'दया'],
-  'grace': ['कृपा', 'दया', 'आशीर्वाद'],
-  'sacred': ['पवित्र', 'शुद्ध', 'पावन'],
-  'holy': ['पवित्र', 'पावन', 'पुण्य'],
-  'beautiful': ['सुंदर', 'मनोहर', 'रूप'],
-  'soul': ['आत्मा', 'जीव', 'अंतरात्मा'],
-  'god': ['प्रभु', 'भगवान', 'ईश्वर', 'परमात्मा'],
-  'lord': ['प्रभु', 'भगवान', 'स्वामी', 'नाथ'],
-  'feet': ['चरण', 'पद', 'पाद'],
-  'teacher': ['गुरु', 'आचार्य', 'उपाध्याय'],
-  'saint': ['मुनि', 'साधु', 'संत'],
-  'temple': ['मंदिर', 'जिनालय', 'देरासर'],
-  'worship': ['पूजा', 'अर्चना', 'आराधना', 'भक्ति'],
-  'meditation': ['ध्यान', 'समाधि', 'सामायिक'],
-  'truth': ['सत्य', 'सच'],
-  'nonviolence': ['अहिंसा'],
-  'forgiveness': ['क्षमा', 'माफ़ी'],
-  'happiness': ['सुख', 'आनंद', 'खुशी'],
-  'happy': ['सुख', 'आनंद', 'खुशी'],
-  'joy': ['आनंद', 'हर्ष', 'प्रसन्न'],
-  'sad': ['दुख', 'पीड़ा', 'वेदना'],
-  'suffering': ['दुख', 'पीड़ा', 'कष्ट'],
-  'life': ['जीवन', 'जिंदगी', 'संसार'],
-  'world': ['संसार', 'लोक', 'जग', 'जगत'],
-  'shradha': ['श्रद्धा'], 'shraddha': ['श्रद्धा'],
-  'samarpan': ['समर्पण'], 'sharan': ['शरण'],
-  'kshama': ['क्षमा'], 'vinay': ['विनय'],
-  'sukh': ['सुख'], 'dukh': ['दुख'], 'anand': ['आनंद'],
-};
-
-// ─── Vowel-Length Normalization ───────────────────────────────────────────────
-
-/**
- * Normalize a romanized string by collapsing vowel-length differences.
- * "tumhaare" and "tumhare" both become "tumhare".
- * This is the KEY fix for Hinglish matching.
- */
 function normalizeVowelLength(str: string): string {
   return str
     .toLowerCase()
@@ -162,9 +126,6 @@ function normalizeVowelLength(str: string): string {
     .replace(/uu/g, 'u');
 }
 
-/**
- * Normalize for phonetic comparison — collapse aspirates and vowels entirely.
- */
 function phoneticNormalize(str: string): string {
   return str
     .toLowerCase()
@@ -186,9 +147,6 @@ function phoneticNormalize(str: string): string {
     .trim();
 }
 
-/**
- * Levenshtein distance for typo tolerance
- */
 function levenshtein(a: string, b: string): number {
   const m = a.length;
   const n = b.length;
@@ -207,346 +165,155 @@ function levenshtein(a: string, b: string): number {
   return dp[m][n];
 }
 
-// ─── Pre-computed Search Index ───────────────────────────────────────────────
+// ─── Pre-computed Indices ────────────────────────────────────────────────────
 
-interface SearchIndexEntry {
+interface BhajanIndexEntry {
   bhajan: BhajanData;
   titleLower: string;
+  titleWords: string[];
   lyricsLower: string;
   romanTitle: string;
+  romanWords: string[];
   romanLyrics: string;
-  // Vowel-normalized versions for flexible matching
   romanTitleNorm: string;
   romanLyricsNorm: string;
-  singerLower: string;
+  titleWordsNorm: string[];
+  titleWordsPhonetic: string[];
   tagsLower: string[];
-  allText: string;
 }
 
-let _searchIndex: SearchIndexEntry[] | null = null;
+let _bhajanIndex: BhajanIndexEntry[] | null = null;
 
-function getSearchIndex(): SearchIndexEntry[] {
-  if (_searchIndex) return _searchIndex;
+function getSearchIndex(): BhajanIndexEntry[] {
+  if (_bhajanIndex) return _bhajanIndex;
 
-  _searchIndex = bhajans.map(b => {
-    const romanTitle = transliterateText(b.title).toLowerCase();
-    const romanLyrics = transliterateText(b.lyrics).toLowerCase();
+  _bhajanIndex = bhajans.map(b => {
     const titleLower = b.title.toLowerCase();
     const lyricsLower = b.lyrics.toLowerCase();
-    const singerLower = (b.singer || '').toLowerCase();
-    const tagsLower = b.tags.map(t => t.toLowerCase());
+    const romanTitle = transliterateText(b.title).toLowerCase();
+    const romanLyrics = transliterateText(b.lyrics).toLowerCase();
+    const romanTitleNorm = normalizeVowelLength(romanTitle);
+    const romanLyricsNorm = normalizeVowelLength(romanLyrics);
+    const titleWords = titleLower.split(/[\s\-_/]+/).filter(Boolean);
+    const romanWords = romanTitle.split(/[\s\-_/]+/).filter(Boolean);
 
     return {
       bhajan: b,
       titleLower,
+      titleWords,
       lyricsLower,
       romanTitle,
+      romanWords,
       romanLyrics,
-      romanTitleNorm: normalizeVowelLength(romanTitle),
-      romanLyricsNorm: normalizeVowelLength(romanLyrics),
-      singerLower,
-      tagsLower,
-      allText: `${titleLower} ${lyricsLower} ${romanTitle} ${romanLyrics} ${singerLower} ${tagsLower.join(' ')}`,
+      romanTitleNorm,
+      romanLyricsNorm,
+      titleWordsNorm: romanWords.map(w => normalizeVowelLength(w)),
+      titleWordsPhonetic: romanWords.map(w => phoneticNormalize(w)),
+      tagsLower: b.tags.map(t => t.toLowerCase()),
     };
   });
 
-  return _searchIndex;
+  return _bhajanIndex;
 }
 
-// ─── Core Search Function ────────────────────────────────────────────────────
-
-export interface SmartSearchOptions {
-  /** If set, only return results from this subdivision */
-  subdivisionId?: string;
-  /** Maximum results to return */
-  limit?: number;
-}
-
-export function smartSearch(query: string, options: SmartSearchOptions = {}): SearchResult[] {
-  if (!query || query.trim().length === 0) return [];
-
-  const rawQuery = query.trim();
-  const queryLower = rawQuery.toLowerCase();
-  const queryNorm = normalizeVowelLength(queryLower);
-  const limit = options.limit ?? 10;
-
-  let index = getSearchIndex();
-
-  // Filter by subdivision if specified
-  if (options.subdivisionId) {
-    index = index.filter(e => e.bhajan.subdivision === options.subdivisionId);
-  }
-
-  const results: Map<string, SearchResult> = new Map();
-
-  function addResult(
-    entry: SearchIndexEntry,
-    score: number,
-    reason: string,
-    matchType: SearchResult['matched_as']
-  ) {
-    const existing = results.get(entry.bhajan.id);
-    if (!existing || existing.relevance_score < score) {
-      results.set(entry.bhajan.id, {
-        id: entry.bhajan.id,
-        title: entry.bhajan.title,
-        relevance_score: Math.min(score, 1.0),
-        match_reason: reason,
-        matched_as: matchType,
-        bhajan: entry.bhajan,
-      });
-    }
-  }
-
-  // ── Pass 1: Exact & partial matching on Hindi text ────────────────────────
-
-  for (const entry of index) {
-    if (entry.titleLower === queryLower || entry.titleLower.includes(queryLower)) {
-      const isExact = entry.titleLower === queryLower;
-      addResult(entry, isExact ? 1.0 : 0.95, entry.bhajan.title, 'exact');
-      continue;
-    }
-    if (entry.lyricsLower.includes(queryLower)) {
-      addResult(entry, 0.85, entry.bhajan.title, 'exact');
-    }
-    if (entry.singerLower && entry.singerLower.includes(queryLower)) {
-      addResult(entry, 0.8, `🎤 ${entry.bhajan.singer}`, 'exact');
-    }
-    if (entry.tagsLower.some(t => t.includes(queryLower))) {
-      addResult(entry, 0.75, entry.bhajan.title, 'exact');
-    }
-  }
-
-  // ── Pass 2: Romanized matching (exact + vowel-normalized) ─────────────────
-
-  for (const entry of index) {
-    if (results.has(entry.bhajan.id) && results.get(entry.bhajan.id)!.relevance_score >= 0.85) continue;
-
-    // Exact roman match
-    if (entry.romanTitle.includes(queryLower)) {
-      addResult(entry, 0.92, entry.bhajan.title, 'transliterated');
-      continue;
-    }
-
-    // Vowel-normalized match (this is what catches "tumhare" → "tumhaare")
-    if (entry.romanTitleNorm.includes(queryNorm)) {
-      addResult(entry, 0.9, entry.bhajan.title, 'transliterated');
-      continue;
-    }
-
-    // Roman lyrics match
-    if (entry.romanLyrics.includes(queryLower)) {
-      addResult(entry, 0.8, entry.bhajan.title, 'transliterated');
-      continue;
-    }
-
-    // Vowel-normalized lyrics match
-    if (entry.romanLyricsNorm.includes(queryNorm)) {
-      addResult(entry, 0.78, entry.bhajan.title, 'transliterated');
-    }
-  }
-
-  // ── Pass 3: Hinglish → Hindi transliteration lookup ───────────────────────
-
-  const queryWords = queryLower.split(/\s+/);
-  const hindiExpansions: string[] = [];
-
-  for (const word of queryWords) {
-    // Direct match
-    if (hinglishToHindi[word]) {
-      hindiExpansions.push(...hinglishToHindi[word]);
-    }
-    // Also try vowel-normalized key lookup
-    const wordNorm = normalizeVowelLength(word);
-    for (const [key, vals] of Object.entries(hinglishToHindi)) {
-      const keyNorm = normalizeVowelLength(key);
-      if (keyNorm === wordNorm && key !== word) {
-        hindiExpansions.push(...vals);
-      }
-      // Prefix match
-      if (key.startsWith(word) && key !== word) {
-        hindiExpansions.push(...vals);
-      }
-      if (keyNorm.startsWith(wordNorm) && keyNorm !== wordNorm) {
-        hindiExpansions.push(...vals);
-      }
-    }
-  }
-
-  if (hindiExpansions.length > 0) {
-    const uniqueExpansions = [...new Set(hindiExpansions)];
-    for (const entry of index) {
-      if (results.has(entry.bhajan.id) && results.get(entry.bhajan.id)!.relevance_score >= 0.85) continue;
-
-      for (const hindiWord of uniqueExpansions) {
-        if (entry.titleLower.includes(hindiWord)) {
-          addResult(entry, 0.88, entry.bhajan.title, 'transliterated');
-          break;
-        }
-        if (entry.lyricsLower.includes(hindiWord)) {
-          addResult(entry, 0.78, entry.bhajan.title, 'transliterated');
-          break;
-        }
-      }
-    }
-  }
-
-  // ── Pass 4: Semantic / mood inference ─────────────────────────────────────
-
-  const semanticHindiKeywords: string[] = [];
-  for (const word of queryWords) {
-    if (semanticMoodMap[word]) {
-      semanticHindiKeywords.push(...semanticMoodMap[word]);
-    }
-    for (const [key, vals] of Object.entries(semanticMoodMap)) {
-      if (key.startsWith(word) && word.length >= 3) {
-        semanticHindiKeywords.push(...vals);
-      }
-    }
-  }
-
-  if (semanticHindiKeywords.length > 0) {
-    const uniqueSemantic = [...new Set(semanticHindiKeywords)];
-    for (const entry of index) {
-      if (results.has(entry.bhajan.id) && results.get(entry.bhajan.id)!.relevance_score >= 0.75) continue;
-
-      let matchCount = 0;
-      for (const kw of uniqueSemantic) {
-        if (entry.lyricsLower.includes(kw) || entry.titleLower.includes(kw)) {
-          matchCount++;
-        }
-      }
-
-      if (matchCount > 0) {
-        const score = Math.min(0.5 + matchCount * 0.1, 0.72);
-        addResult(entry, score, entry.bhajan.title, 'semantic');
-      }
-    }
-  }
-
-  // ── Pass 5: Partial / prefix matching on romanized words ──────────────────
-
-  if (queryLower.length >= 2) {
-    for (const entry of index) {
-      if (results.has(entry.bhajan.id)) continue;
-
-      // Check title words (both exact and normalized)
-      const romanWords = entry.romanTitle.split(/\s+/);
-      const matchedWord = romanWords.find(w =>
-        w.startsWith(queryLower) || normalizeVowelLength(w).startsWith(queryNorm)
-      );
-      if (matchedWord) {
-        addResult(entry, 0.6, entry.bhajan.title, 'partial');
-        continue;
-      }
-
-      // Check lyrics prefix (first 500 chars)
-      const lyricsSnippet = entry.romanLyrics.slice(0, 500);
-      const lyricWords = lyricsSnippet.split(/\s+/);
-      const lyricMatch = lyricWords.find(w =>
-        w.startsWith(queryLower) || normalizeVowelLength(w).startsWith(queryNorm)
-      );
-      if (lyricMatch) {
-        addResult(entry, 0.5, entry.bhajan.title, 'partial');
-      }
-    }
-  }
-
-  // ── Pass 6: Phonetic / typo tolerance ─────────────────────────────────────
-
-  if (results.size < 5 && queryLower.length >= 3) {
-    const queryPhonetic = phoneticNormalize(queryLower);
-
-    for (const entry of index) {
-      if (results.has(entry.bhajan.id)) continue;
-
-      const titleWords = entry.romanTitle.split(/\s+/);
-      for (const tw of titleWords) {
-        const twPhonetic = phoneticNormalize(tw);
-        if (twPhonetic.length === 0 || queryPhonetic.length === 0) continue;
-
-        if (twPhonetic.includes(queryPhonetic) || queryPhonetic.includes(twPhonetic)) {
-          addResult(entry, 0.45, entry.bhajan.title, 'phonetic');
-          break;
-        }
-
-        if (queryLower.length <= 10 && tw.length <= 12) {
-          const dist = levenshtein(queryLower, tw);
-          const maxLen = Math.max(queryLower.length, tw.length);
-          if (dist <= Math.ceil(maxLen * 0.35)) {
-            addResult(entry, Math.max(0.3, 0.5 - dist * 0.05), entry.bhajan.title, 'phonetic');
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  // ── Pass 7: Fuzzy substring in all text ───────────────────────────────────
-
-  if (results.size === 0 && queryLower.length >= 2) {
-    for (const word of queryWords) {
-      if (word.length < 2) continue;
-      const wordNorm = normalizeVowelLength(word);
-      for (const entry of index) {
-        if (results.has(entry.bhajan.id)) continue;
-        if (entry.allText.includes(word) || normalizeVowelLength(entry.allText).includes(wordNorm)) {
-          addResult(entry, 0.3, entry.bhajan.title, 'partial');
-        }
-      }
-    }
-  }
-
-  // ── Last resort: phonetically closest ─────────────────────────────────────
-
-  if (results.size === 0 && queryLower.length >= 2) {
-    const scored: { entry: SearchIndexEntry; dist: number }[] = [];
-    for (const entry of index) {
-      const titleWords = entry.romanTitle.split(/\s+/);
-      let bestDist = Infinity;
-      for (const tw of titleWords) {
-        if (tw.length < 2) continue;
-        const dist = levenshtein(queryNorm, normalizeVowelLength(tw));
-        if (dist < bestDist) bestDist = dist;
-      }
-      scored.push({ entry, dist: bestDist });
-    }
-    scored.sort((a, b) => a.dist - b.dist);
-    for (const { entry } of scored.slice(0, 3)) {
-      addResult(entry, 0.15, entry.bhajan.title, 'phonetic');
-    }
-  }
-
-  // Sort and limit
-  return Array.from(results.values())
-    .sort((a, b) => b.relevance_score - a.relevance_score)
-    .slice(0, limit);
-}
-
-// ─── Site-Wide Search (Directories, Shastras, Bhajans) ────────────────────────
-
-export interface UnifiedSearchResult {
-  id: string;
-  title: string;
-  subtitle: string;
-  type: 'directory' | 'shastra' | 'bhajan';
+interface ShastraIndexEntry {
+  shastra: ShastraMetadata;
+  titleLower: string;
+  titleWords: string[];
+  romanTitle: string;
+  romanWords: string[];
+  romanTitleNorm: string;
+  romanTitlePhonetic: string;
+  slugLower: string;
+  idLower: string;
+  authorLower: string;
+  authorWords: string[];
+  romanAuthor: string;
+  romanAuthorWords: string[];
+  romanAuthorNorm: string;
   url: string;
-  score: number;
-  badge: string;
-  icon?: string;
-  matchedAs: 'exact' | 'phonetic' | 'category' | 'typo' | 'semantic' | 'partial';
+  subtitle: string;
 }
+
+let _shastraIndex: ShastraIndexEntry[] | null = null;
+
+function getShastraSearchIndex(): ShastraIndexEntry[] {
+  if (_shastraIndex) return _shastraIndex;
+
+  const shastras = getShastras();
+  _shastraIndex = shastras.map(s => {
+    const titleLower = s.title.toLowerCase();
+    const romanTitle = transliterateText(s.title).toLowerCase();
+    const romanTitleNorm = normalizeVowelLength(romanTitle);
+    const authorLower = s.author.toLowerCase();
+    const romanAuthor = transliterateText(s.author).toLowerCase();
+
+    return {
+      shastra: s,
+      titleLower,
+      titleWords: titleLower.split(/[\s\-_/]+/).filter(Boolean),
+      romanTitle,
+      romanWords: romanTitle.split(/[\s\-_/]+/).filter(Boolean),
+      romanTitleNorm,
+      romanTitlePhonetic: phoneticNormalize(romanTitle),
+      slugLower: s.shastraSlug.toLowerCase(),
+      idLower: s.id.toLowerCase(),
+      authorLower,
+      authorWords: authorLower.split(/[\s\-_/]+/).filter(Boolean),
+      romanAuthor,
+      romanAuthorWords: romanAuthor.split(/[\s\-_/]+/).filter(Boolean),
+      romanAuthorNorm: normalizeVowelLength(romanAuthor),
+      url: `/shastra/${s.categorySlug}/${s.shastraSlug}`,
+      subtitle: `📚 ${s.author} • ${s.categoryHi} (${s.gathaCount} गाथाएं)`,
+    };
+  });
+
+  return _shastraIndex;
+}
+
+interface DirectoryIndexEntry {
+  dir: SiteDirectoryItem;
+  allAliases: string[];
+  aliasesNorm: string[];
+  aliasesPhonetic: string[];
+}
+
+let _dirIndex: DirectoryIndexEntry[] | null = null;
+
+function getDirectorySearchIndex(): DirectoryIndexEntry[] {
+  if (_dirIndex) return _dirIndex;
+
+  _dirIndex = siteDirectories.map(dir => {
+    const allAliases = [
+      dir.nameEn.toLowerCase(),
+      dir.nameHi.toLowerCase(),
+      ...dir.aliases.map(a => a.toLowerCase())
+    ];
+    return {
+      dir,
+      allAliases,
+      aliasesNorm: allAliases.map(a => normalizeVowelLength(a)),
+      aliasesPhonetic: allAliases.map(a => phoneticNormalize(a)),
+    };
+  });
+
+  return _dirIndex;
+}
+
+// ─── Site-Wide 5-Tier Priority Search ────────────────────────────────────────
 
 export function siteWideSearch(query: string, options: { limit?: number } = {}): UnifiedSearchResult[] {
   if (!query || query.trim().length === 0) return [];
 
   const rawQuery = query.trim();
   const queryLower = rawQuery.toLowerCase();
+  const romanQuery = transliterateText(rawQuery).toLowerCase();
   const queryNorm = normalizeVowelLength(queryLower);
+  const romanQueryNorm = normalizeVowelLength(romanQuery);
   const queryPhonetic = phoneticNormalize(queryLower);
   const limit = options.limit ?? 10;
 
-  const results: Map<string, UnifiedSearchResult> = new Map();
+  const results = new Map<string, UnifiedSearchResult>();
 
   function addResult(res: UnifiedSearchResult) {
     const existing = results.get(res.id);
@@ -555,28 +322,17 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
     }
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
   // 1. DIRECTORIES & CATEGORIES (Top Priority when matched)
-  // ──────────────────────────────────────────────────────────────────────────
-  for (const dir of siteDirectories) {
-    const nameHiLower = dir.nameHi.toLowerCase();
-    const nameEnLower = dir.nameEn.toLowerCase();
-    const allAliases = [
-      nameEnLower,
-      nameHiLower,
-      ...dir.aliases.map(a => a.toLowerCase())
-    ];
-
-    // Priority 1: Exact Absolute String Match for Category / Folder
-    const isExact = allAliases.some(a => a === queryLower);
-    if (isExact) {
+  for (const { dir, allAliases, aliasesNorm, aliasesPhonetic } of getDirectorySearchIndex()) {
+    // Priority 1: Exact Absolute String Match
+    if (allAliases.includes(queryLower) || allAliases.includes(romanQuery)) {
       addResult({
         id: `dir-${dir.id}`,
         title: `${dir.nameHi} (${dir.nameEn})`,
         subtitle: `📂 ${dir.descHi}`,
         type: 'directory',
         url: dir.url,
-        score: 1.15, // Pinned at very top
+        score: 1.15,
         badge: dir.type === 'hub' ? 'Directory' : 'Category',
         icon: dir.icon,
         matchedAs: 'exact'
@@ -584,13 +340,9 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       continue;
     }
 
-    // Priority 2: Closest Absolute String (Phonetic / Vowel Normalized)
-    const isPhonetic = allAliases.some(a => {
-      const aNorm = normalizeVowelLength(a);
-      const aPhonetic = phoneticNormalize(a);
-      return (queryNorm.length >= 3 && aNorm === queryNorm) ||
-             (queryPhonetic.length >= 3 && aPhonetic === queryPhonetic);
-    });
+    // Priority 2: Closest Absolute / Phonetic Match (requires >= 3 chars)
+    const isPhonetic = (queryNorm.length >= 3 && (aliasesNorm.includes(queryNorm) || aliasesNorm.includes(romanQueryNorm))) ||
+                       (queryPhonetic.length >= 3 && aliasesPhonetic.includes(queryPhonetic));
     if (isPhonetic) {
       addResult({
         id: `dir-${dir.id}`,
@@ -606,12 +358,25 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       continue;
     }
 
-    // Priority 3: Directory / Category Prefix or Word Match (e.g. "bhaj", "drav", "guru")
-    const isPrefixOrWord = allAliases.some(a => {
-      if (queryLower.length >= 3 && (a.startsWith(queryLower) || a.includes(queryLower))) return true;
-      if (queryNorm.length >= 3 && (normalizeVowelLength(a).startsWith(queryNorm) || normalizeVowelLength(a).includes(queryNorm))) return true;
+    // Priority 3: Directory / Category Prefix or Word-Initial Match
+    const isPrefixOrWord = allAliases.some((a, idx) => {
+      // Direct prefix
+      if (a.startsWith(queryLower) || a.startsWith(romanQuery)) return true;
+      if (queryLower.length >= 3) {
+        const aNorm = aliasesNorm[idx];
+        if (aNorm.startsWith(queryNorm) || aNorm.startsWith(romanQueryNorm)) return true;
+      }
+
+      // Word-initial match
+      const words = a.split(/[\s\-_/]+/);
+      if (words.some(w => w.startsWith(queryLower) || w.startsWith(romanQuery))) return true;
+      if (queryLower.length >= 3) {
+        const normWords = aliasesNorm[idx].split(/[\s\-_/]+/);
+        return normWords.some(w => w.startsWith(queryNorm) || w.startsWith(romanQueryNorm));
+      }
       return false;
     });
+
     if (isPrefixOrWord) {
       addResult({
         id: `dir-${dir.id}`,
@@ -619,7 +384,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
         subtitle: `📂 ${dir.descHi}`,
         type: 'directory',
         url: dir.url,
-        score: 0.92,
+        score: 0.95,
         badge: dir.type === 'hub' ? 'Directory' : 'Category',
         icon: dir.icon,
         matchedAs: 'category'
@@ -627,15 +392,15 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       continue;
     }
 
-    // Priority 4: Typo / Levenshtein Distance for Directory
-    if (queryLower.length >= 3) {
+    // Priority 4: Typo / Levenshtein Distance (requires >= 4 chars to prevent false positives)
+    if (queryLower.length >= 4) {
       let minLev = Infinity;
-      for (const a of allAliases) {
-        if (Math.abs(a.length - queryLower.length) > 2) continue;
-        const d = levenshtein(queryNorm, normalizeVowelLength(a));
+      for (const aNorm of aliasesNorm) {
+        if (Math.abs(aNorm.length - queryNorm.length) > 1) continue;
+        const d = levenshtein(queryNorm, aNorm);
         if (d < minLev) minLev = d;
       }
-      if (minLev <= 1 || (queryLower.length >= 5 && minLev <= 2)) {
+      if (minLev <= 1 || (queryLower.length >= 6 && minLev <= 2)) {
         addResult({
           id: `dir-${dir.id}`,
           title: `${dir.nameHi} (${dir.nameEn})`,
@@ -651,32 +416,16 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
     }
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
   // 2. SHASTRAS (Scriptures)
-  // ──────────────────────────────────────────────────────────────────────────
-  const shastras = getShastras();
-  for (const s of shastras) {
-    const titleLower = s.title.toLowerCase();
-    const romanTitle = transliterateText(s.title).toLowerCase();
-    const romanTitleNorm = normalizeVowelLength(romanTitle);
-    const romanTitlePhonetic = phoneticNormalize(romanTitle);
-    const slugLower = s.shastraSlug.toLowerCase();
-    const idLower = s.id.toLowerCase();
-    const authorLower = s.author.toLowerCase();
-    const romanAuthor = transliterateText(s.author).toLowerCase();
-    const romanAuthorNorm = normalizeVowelLength(romanAuthor);
-    const romanAuthorPhonetic = phoneticNormalize(romanAuthor);
-    const url = `/shastra/${s.categorySlug}/${s.shastraSlug}`;
-    const subtitle = `📚 ${s.author} • ${s.categoryHi} (${s.gathaCount} गाथाएं)`;
-
+  for (const s of getShastraSearchIndex()) {
     // Priority 1: Exact Absolute Match
-    if (titleLower === queryLower || romanTitle === queryLower || slugLower === queryLower || idLower === queryLower) {
+    if (s.titleLower === queryLower || s.romanTitle === queryLower || s.slugLower === queryLower || s.idLower === queryLower || s.romanTitle === romanQuery) {
       addResult({
-        id: `shastra-${s.id}`,
-        title: s.title,
-        subtitle,
+        id: `shastra-${s.shastra.id}`,
+        title: s.shastra.title,
+        subtitle: s.subtitle,
         type: 'shastra',
-        url,
+        url: s.url,
         score: 1.00,
         badge: 'Shastra',
         icon: '📚',
@@ -685,15 +434,15 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       continue;
     }
 
-    // Priority 2: Closest Absolute String (Phonetic / Vowel Normalized)
-    if ((queryNorm.length >= 3 && romanTitleNorm === queryNorm) ||
-        (queryPhonetic.length >= 3 && romanTitlePhonetic === queryPhonetic)) {
+    // Priority 2: Closest Absolute String (Phonetic / Vowel Normalized) - min 3 chars
+    if ((queryNorm.length >= 3 && (s.romanTitleNorm === queryNorm || s.romanTitleNorm === romanQueryNorm)) ||
+        (queryPhonetic.length >= 3 && s.romanTitlePhonetic === queryPhonetic)) {
       addResult({
-        id: `shastra-${s.id}`,
-        title: s.title,
-        subtitle,
+        id: `shastra-${s.shastra.id}`,
+        title: s.shastra.title,
+        subtitle: s.subtitle,
         type: 'shastra',
-        url,
+        url: s.url,
         score: 0.95,
         badge: 'Shastra',
         icon: '📚',
@@ -702,14 +451,39 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       continue;
     }
 
-    // Author Exact or Phonetic Match
-    if (authorLower === queryLower || romanAuthor === queryLower || romanAuthorNorm === queryNorm) {
+    // Priority 3: Title Prefix or Word-Initial Match (Top priority for queries like "sa", "samay", "pravachan")
+    const isTitlePrefix =
+      s.titleLower.startsWith(queryLower) ||
+      s.romanTitle.startsWith(queryLower) ||
+      (romanQuery && s.romanTitle.startsWith(romanQuery)) ||
+      s.slugLower.startsWith(queryLower) ||
+      s.idLower.startsWith(queryLower) ||
+      s.titleWords.some(w => w.startsWith(queryLower)) ||
+      s.romanWords.some(w => w.startsWith(queryLower) || (romanQuery && w.startsWith(romanQuery)));
+
+    if (isTitlePrefix) {
       addResult({
-        id: `shastra-${s.id}`,
-        title: s.title,
-        subtitle,
+        id: `shastra-${s.shastra.id}`,
+        title: s.shastra.title,
+        subtitle: s.subtitle,
         type: 'shastra',
-        url,
+        url: s.url,
+        score: 0.88,
+        badge: 'Shastra',
+        icon: '📚',
+        matchedAs: 'exact'
+      });
+      continue;
+    }
+
+    // Author Exact Match
+    if (s.authorLower === queryLower || s.romanAuthor === queryLower || (queryNorm.length >= 3 && s.romanAuthorNorm === queryNorm)) {
+      addResult({
+        id: `shastra-${s.shastra.id}`,
+        title: s.shastra.title,
+        subtitle: s.subtitle,
+        type: 'shastra',
+        url: s.url,
         score: 0.90,
         badge: 'Author Match',
         icon: '✍️',
@@ -718,16 +492,38 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       continue;
     }
 
-    // Priority 4: Typo / Levenshtein Distance (e.g. "smaaysar" -> Samaysar)
+    // Author Prefix Match
+    const isAuthorPrefix =
+      s.authorLower.startsWith(queryLower) ||
+      s.romanAuthor.startsWith(queryLower) ||
+      s.authorWords.some(w => w.startsWith(queryLower)) ||
+      s.romanAuthorWords.some(w => w.startsWith(queryLower));
+
+    if (isAuthorPrefix) {
+      addResult({
+        id: `shastra-${s.shastra.id}`,
+        title: s.shastra.title,
+        subtitle: s.subtitle,
+        type: 'shastra',
+        url: s.url,
+        score: 0.82,
+        badge: 'Author Match',
+        icon: '✍️',
+        matchedAs: 'exact'
+      });
+      continue;
+    }
+
+    // Priority 4: Typo / Levenshtein Distance (requires >= 4 chars to prevent false positives)
     if (queryLower.length >= 4) {
-      const dTitle = levenshtein(queryNorm, romanTitleNorm);
-      if (dTitle <= 2 || dTitle / Math.max(queryNorm.length, romanTitleNorm.length) <= 0.3) {
+      const dTitle = levenshtein(queryNorm, s.romanTitleNorm);
+      if (dTitle <= 2 || dTitle / Math.max(queryNorm.length, s.romanTitleNorm.length) <= 0.3) {
         addResult({
-          id: `shastra-${s.id}`,
-          title: s.title,
-          subtitle,
+          id: `shastra-${s.shastra.id}`,
+          title: s.shastra.title,
+          subtitle: s.subtitle,
           type: 'shastra',
-          url,
+          url: s.url,
           score: 0.83,
           badge: 'Shastra',
           icon: '📚',
@@ -736,15 +532,14 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
         continue;
       }
 
-      // Check author typo
-      const dAuthor = levenshtein(queryNorm, romanAuthorNorm);
-      if (dAuthor <= 2 || dAuthor / Math.max(queryNorm.length, romanAuthorNorm.length) <= 0.3) {
+      const dAuthor = levenshtein(queryNorm, s.romanAuthorNorm);
+      if (dAuthor <= 2 || dAuthor / Math.max(queryNorm.length, s.romanAuthorNorm.length) <= 0.3) {
         addResult({
-          id: `shastra-${s.id}`,
-          title: s.title,
-          subtitle,
+          id: `shastra-${s.shastra.id}`,
+          title: s.shastra.title,
+          subtitle: s.subtitle,
           type: 'shastra',
-          url,
+          url: s.url,
           score: 0.80,
           badge: 'Author Match',
           icon: '✍️',
@@ -754,41 +549,41 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       }
     }
 
-    // Priority 5: Partial Substring Match
-    if (titleLower.includes(queryLower) || romanTitle.includes(queryLower) || romanTitleNorm.includes(queryNorm)) {
-      addResult({
-        id: `shastra-${s.id}`,
-        title: s.title,
-        subtitle,
-        type: 'shastra',
-        url,
-        score: 0.74,
-        badge: 'Shastra',
-        icon: '📚',
-        matchedAs: 'partial'
-      });
-      continue;
-    }
+    // Priority 5: Partial Substring Match (ONLY for queries >= 3 characters)
+    if (queryLower.length >= 3) {
+      if (s.titleLower.includes(queryLower) || s.romanTitle.includes(queryLower) || (romanQuery && s.romanTitle.includes(romanQuery))) {
+        addResult({
+          id: `shastra-${s.shastra.id}`,
+          title: s.shastra.title,
+          subtitle: s.subtitle,
+          type: 'shastra',
+          url: s.url,
+          score: 0.74,
+          badge: 'Shastra',
+          icon: '📚',
+          matchedAs: 'partial'
+        });
+        continue;
+      }
 
-    if (authorLower.includes(queryLower) || romanAuthor.includes(queryLower) || romanAuthorNorm.includes(queryNorm)) {
-      addResult({
-        id: `shastra-${s.id}`,
-        title: s.title,
-        subtitle,
-        type: 'shastra',
-        url,
-        score: 0.70,
-        badge: 'Author Match',
-        icon: '✍️',
-        matchedAs: 'partial'
-      });
-      continue;
+      if (s.authorLower.includes(queryLower) || s.romanAuthor.includes(queryLower)) {
+        addResult({
+          id: `shastra-${s.shastra.id}`,
+          title: s.shastra.title,
+          subtitle: s.subtitle,
+          type: 'shastra',
+          url: s.url,
+          score: 0.70,
+          badge: 'Author Match',
+          icon: '✍️',
+          matchedAs: 'partial'
+        });
+        continue;
+      }
     }
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // 3. BHAJANS (Dev, Shastra, Guru, Bhakti)
-  // ──────────────────────────────────────────────────────────────────────────
+  // 3. BHAJANS
   const bhajanIndex = getSearchIndex();
   for (const entry of bhajanIndex) {
     const b = entry.bhajan;
@@ -797,7 +592,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
     const subtitle = `🎵 ${b.subdivision.charAt(0).toUpperCase() + b.subdivision.slice(1)} Bhajan${singerStr}`;
 
     // Priority 1: Exact Absolute String Match on Bhajan Title
-    if (entry.titleLower === queryLower || entry.romanTitle === queryLower) {
+    if (entry.titleLower === queryLower || entry.romanTitle === queryLower || (romanQuery && entry.romanTitle === romanQuery)) {
       addResult({
         id: `bhajan-${b.id}`,
         title: b.title,
@@ -812,37 +607,56 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       continue;
     }
 
-    // Priority 2: Closest Absolute String ("Mahavir or Mahaveer", "Adinath", "Paras")
-    // Check if query is an exact match for a significant word in the title (e.g. "Mahavir" in "Mahavir Swami")
-    const titleWords = entry.romanTitle.split(/\s+/);
-    const titleWordsNorm = titleWords.map(w => normalizeVowelLength(w));
-    const titleWordsPhonetic = titleWords.map(w => phoneticNormalize(w));
+    // Priority 2: Closest Absolute String in Title Words (min 3 chars)
+    if (queryNorm.length >= 3) {
+      const isWordMatch = entry.titleWordsNorm.some((wNorm, idx) => {
+        if (wNorm === queryNorm || (romanQueryNorm && wNorm === romanQueryNorm)) return true;
+        return queryPhonetic.length >= 3 && entry.titleWordsPhonetic[idx] === queryPhonetic;
+      });
 
-    const isWordExactOrPhonetic = titleWordsNorm.some((wNorm, idx) => {
-      if (wNorm === queryNorm) return true;
-      if (queryPhonetic.length >= 3 && titleWordsPhonetic[idx] === queryPhonetic) return true;
-      return false;
-    });
+      if (isWordMatch) {
+        addResult({
+          id: `bhajan-${b.id}`,
+          title: b.title,
+          subtitle,
+          type: 'bhajan',
+          url,
+          score: 0.93,
+          badge: 'Bhajan',
+          icon: '🎵',
+          matchedAs: 'phonetic'
+        });
+        continue;
+      }
+    }
 
-    if (isWordExactOrPhonetic) {
+    // Priority 3: Bhajan Title Prefix or Word-Initial Match
+    const isBhajanPrefix =
+      entry.titleLower.startsWith(queryLower) ||
+      entry.romanTitle.startsWith(queryLower) ||
+      (romanQuery && entry.romanTitle.startsWith(romanQuery)) ||
+      entry.titleWords.some(w => w.startsWith(queryLower)) ||
+      entry.romanWords.some(w => w.startsWith(queryLower) || (romanQuery && w.startsWith(romanQuery)));
+
+    if (isBhajanPrefix) {
       addResult({
         id: `bhajan-${b.id}`,
         title: b.title,
         subtitle,
         type: 'bhajan',
         url,
-        score: 0.93,
+        score: 0.85,
         badge: 'Bhajan',
         icon: '🎵',
-        matchedAs: 'phonetic'
+        matchedAs: 'exact'
       });
       continue;
     }
 
-    // Priority 4: Typo / Levenshtein Distance on Bhajan Title Words
+    // Priority 4: Typo / Levenshtein Distance (min 4 chars)
     if (queryLower.length >= 4) {
       let isTypo = false;
-      for (const wNorm of titleWordsNorm) {
+      for (const wNorm of entry.titleWordsNorm) {
         if (Math.abs(wNorm.length - queryNorm.length) > 2) continue;
         const d = levenshtein(queryNorm, wNorm);
         if (d <= 1 || (queryNorm.length >= 6 && d <= 2)) {
@@ -866,56 +680,58 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       }
     }
 
-    // Priority 5: Partial Substring in Title or Tags
-    if (entry.titleLower.includes(queryLower) || entry.romanTitle.includes(queryLower) || entry.romanTitleNorm.includes(queryNorm)) {
-      addResult({
-        id: `bhajan-${b.id}`,
-        title: b.title,
-        subtitle,
-        type: 'bhajan',
-        url,
-        score: 0.72,
-        badge: 'Bhajan',
-        icon: '🎵',
-        matchedAs: 'partial'
-      });
-      continue;
+    // Priority 5: Partial Substring in Title or Tags (ONLY if queryLower.length >= 3)
+    if (queryLower.length >= 3) {
+      if (entry.titleLower.includes(queryLower) || entry.romanTitle.includes(queryLower) || (romanQuery && entry.romanTitle.includes(romanQuery))) {
+        addResult({
+          id: `bhajan-${b.id}`,
+          title: b.title,
+          subtitle,
+          type: 'bhajan',
+          url,
+          score: 0.72,
+          badge: 'Bhajan',
+          icon: '🎵',
+          matchedAs: 'partial'
+        });
+        continue;
+      }
+
+      if (entry.tagsLower.some(t => t.includes(queryLower))) {
+        addResult({
+          id: `bhajan-${b.id}`,
+          title: b.title,
+          subtitle,
+          type: 'bhajan',
+          url,
+          score: 0.65,
+          badge: 'Tag Match',
+          icon: '🏷️',
+          matchedAs: 'partial'
+        });
+        continue;
+      }
+
+      // Lyrics Match (min 4 chars)
+      if (entry.lyricsLower.includes(queryLower) || (queryLower.length >= 4 && entry.romanLyrics.includes(queryLower))) {
+        addResult({
+          id: `bhajan-${b.id}`,
+          title: b.title,
+          subtitle,
+          type: 'bhajan',
+          url,
+          score: 0.55,
+          badge: 'Lyrics Match',
+          icon: '📜',
+          matchedAs: 'partial'
+        });
+        continue;
+      }
     }
 
-    if (entry.tagsLower.some(t => t.includes(queryLower))) {
-      addResult({
-        id: `bhajan-${b.id}`,
-        title: b.title,
-        subtitle,
-        type: 'bhajan',
-        url,
-        score: 0.65,
-        badge: 'Tag Match',
-        icon: '🏷️',
-        matchedAs: 'partial'
-      });
-      continue;
-    }
-
-    // Priority 5: Lyrics Content Match
-    if (entry.lyricsLower.includes(queryLower) || (queryNorm.length >= 4 && entry.romanLyricsNorm.includes(queryNorm))) {
-      addResult({
-        id: `bhajan-${b.id}`,
-        title: b.title,
-        subtitle,
-        type: 'bhajan',
-        url,
-        score: 0.55,
-        badge: 'Lyrics Match',
-        icon: '📜',
-        matchedAs: 'partial'
-      });
-      continue;
-    }
-
-    // Priority 5: Semantic / Mood / Hinglish Mapping
-    const hindiSynonyms = hinglishToHindi[queryLower] || [];
-    if (hindiSynonyms.length > 0) {
+    // Hinglish Mapping
+    const hindiSynonyms = hinglishToHindi[queryLower];
+    if (hindiSynonyms) {
       const synMatch = hindiSynonyms.some(s => entry.titleLower.includes(s) || entry.lyricsLower.includes(s));
       if (synMatch) {
         addResult({
@@ -929,13 +745,96 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
           icon: '✨',
           matchedAs: 'semantic'
         });
-        continue;
       }
     }
   }
 
-  // Sort by priority score descending and limit results
   return Array.from(results.values())
     .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+}
+
+// ─── Scoped Search (Local Directory First with Global Fallback) ───────────────
+
+export interface ScopedSearchOptions {
+  limit?: number;
+  scope?: {
+    pathPrefix?: string;
+    subdivisionId?: string;
+    categorySlug?: string;
+    label?: string;
+  };
+}
+
+export interface ScopedSearchResponse {
+  results: UnifiedSearchResult[];
+  isFallback: boolean;
+  scopeLabel?: string;
+}
+
+export function scopedSiteSearch(query: string, options: ScopedSearchOptions = {}): ScopedSearchResponse {
+  if (!query || query.trim().length === 0) {
+    return { results: [], isFallback: false };
+  }
+
+  const allMatches = siteWideSearch(query, { limit: 50 });
+  const limit = options.limit ?? 10;
+
+  if (!options.scope || (!options.scope.pathPrefix && !options.scope.subdivisionId && !options.scope.categorySlug)) {
+    return {
+      results: allMatches.slice(0, limit),
+      isFallback: false
+    };
+  }
+
+  const { pathPrefix, subdivisionId, categorySlug, label } = options.scope;
+
+  const localMatches = allMatches.filter(r => {
+    if (pathPrefix && r.url.startsWith(pathPrefix)) return true;
+    if (subdivisionId && r.url.startsWith(`/bhajan/${subdivisionId}`)) return true;
+    if (categorySlug && r.url.startsWith(`/shastra/${categorySlug}`)) return true;
+    return false;
+  });
+
+  if (localMatches.length > 0) {
+    return {
+      results: localMatches.slice(0, limit),
+      isFallback: false,
+      scopeLabel: label
+    };
+  }
+
+  return {
+    results: allMatches.slice(0, limit),
+    isFallback: true,
+    scopeLabel: label
+  };
+}
+
+// ─── Backward-Compatibility Adapter ──────────────────────────────────────────
+
+export function smartSearch(query: string, options: SmartSearchOptions = {}): SearchResult[] {
+  if (!query || query.trim().length === 0) return [];
+  const limit = options.limit ?? 10;
+  const unified = siteWideSearch(query, { limit: 50 });
+  const index = getSearchIndex();
+  const bhajanMap = new Map(index.map(e => [e.bhajan.id, e.bhajan]));
+
+  return unified
+    .filter(r => r.type === 'bhajan')
+    .map(r => {
+      const id = r.id.replace('bhajan-', '');
+      const bhajan = bhajanMap.get(id);
+      if (!bhajan) return null;
+      return {
+        id,
+        title: r.title,
+        relevance_score: r.score,
+        match_reason: r.subtitle,
+        matched_as: (r.matchedAs === 'category' ? 'partial' : r.matchedAs === 'typo' ? 'phonetic' : r.matchedAs) as SearchResult['matched_as'],
+        bhajan,
+      };
+    })
+    .filter((r): r is SearchResult => r !== null && (!options.subdivisionId || r.bhajan.subdivision === options.subdivisionId))
     .slice(0, limit);
 }

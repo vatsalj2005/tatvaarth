@@ -100,18 +100,18 @@ const buildTree = (nodes: DiagramNode[]): TreeNode | null => {
   return root;
 };
 
-// Recursive horizontal branch renderer
-const HorizontalBranch: React.FC<{ 
-  node: TreeNode; 
-  levelColors: { bg: string; shadow: string; border: string }[]; 
-}> = ({ node, levelColors }) => {
-  const level = node.level ?? 0;
-  const color = levelColors[level] || PREMIUM_COLORS[0];
-  const nodeStyle: React.CSSProperties = {
+const getLevelStyle = (level: number): React.CSSProperties => {
+  const color = PREMIUM_COLORS[level % PREMIUM_COLORS.length];
+  return {
     background: color.bg,
     borderColor: color.border,
     boxShadow: `0 4px 15px -2px ${color.shadow}, 0 0 10px ${color.shadow}, inset 0 1px 1px rgba(255, 255, 255, 0.3)`,
   };
+};
+
+// Recursive horizontal branch renderer
+const HorizontalBranch: React.FC<{ node: TreeNode }> = ({ node }) => {
+  const nodeStyle = getLevelStyle(node.level ?? 0);
   
   if (node.children.length === 0) {
     return (
@@ -137,7 +137,7 @@ const HorizontalBranch: React.FC<{
       </div>
 
       {/* Connecting line to the children column */}
-      <div className="w-4 h-[2px] bg-foreground shrink-0"></div>
+      <div className="w-4 h-[2px] bg-foreground shrink-0" />
 
       {/* Children Column */}
       <div className="flex flex-col relative pl-4 py-1">
@@ -148,22 +148,18 @@ const HorizontalBranch: React.FC<{
           return (
             <div key={child.id} className="relative flex items-center py-1">
               {node.children.length === 1 ? (
-                // Single child: straight horizontal line
                 <div className="absolute -left-4 top-1/2 w-4 h-[2px] bg-foreground -translate-y-1/2" />
               ) : isFirst ? (
-                // First child: curves from bottom-left to top-right (border-t + border-l)
                 <div className="absolute -left-4 top-1/2 bottom-0 w-4 border-t-2 border-l-2 border-foreground rounded-tl-[8px]" />
               ) : isLast ? (
-                // Last child: curves from top-left to bottom-right (border-b + border-l)
                 <div className="absolute -left-4 top-0 bottom-1/2 w-4 border-b-2 border-l-2 border-foreground rounded-bl-[8px]" />
               ) : (
-                // Middle child: straight vertical line on left + horizontal line to child
                 <>
                   <div className="absolute -left-4 top-0 bottom-0 w-[2px] bg-foreground" />
                   <div className="absolute -left-4 top-1/2 w-4 h-[2px] bg-foreground -translate-y-1/2" />
                 </>
               )}
-              <HorizontalBranch node={child} levelColors={levelColors} />
+              <HorizontalBranch node={child} />
             </div>
           );
         })}
@@ -173,17 +169,8 @@ const HorizontalBranch: React.FC<{
 };
 
 // Recursive vertical branch renderer
-const VerticalBranch: React.FC<{ 
-  node: TreeNode; 
-  levelColors: { bg: string; shadow: string; border: string }[]; 
-}> = ({ node, levelColors }) => {
-  const level = node.level ?? 0;
-  const color = levelColors[level] || PREMIUM_COLORS[0];
-  const nodeStyle: React.CSSProperties = {
-    background: color.bg,
-    borderColor: color.border,
-    boxShadow: `0 4px 15px -2px ${color.shadow}, 0 0 10px ${color.shadow}, inset 0 1px 1px rgba(255, 255, 255, 0.3)`,
-  };
+const VerticalBranch: React.FC<{ node: TreeNode }> = ({ node }) => {
+  const nodeStyle = getLevelStyle(node.level ?? 0);
 
   if (node.children.length === 0) {
     return (
@@ -209,7 +196,7 @@ const VerticalBranch: React.FC<{
       </div>
 
       {/* Connecting line down */}
-      <div className="w-[2px] h-4 bg-foreground"></div>
+      <div className="w-[2px] h-4 bg-foreground" />
 
       {/* Children Row */}
       <div className="flex flex-row justify-center relative pt-4">
@@ -220,22 +207,18 @@ const VerticalBranch: React.FC<{
           return (
             <div key={child.id} className="relative flex flex-col items-center px-1.5">
               {node.children.length === 1 ? (
-                // Single child: straight vertical line
                 <div className="absolute top-0 left-1/2 h-4 w-[2px] -translate-y-full -translate-x-1/2 bg-foreground" />
               ) : isFirst ? (
-                // First child (left): curves from top-right to bottom-center (border-t + border-l)
                 <div className="absolute right-0 top-0 h-4 w-1/2 -translate-y-full border-t-2 border-l-2 border-foreground rounded-tl-[8px]" />
               ) : isLast ? (
-                // Last child (right): curves from top-left to bottom-center (border-t + border-r)
                 <div className="absolute left-0 top-0 h-4 w-1/2 -translate-y-full border-t-2 border-r-2 border-foreground rounded-tr-[8px]" />
               ) : (
-                // Middle child: straight horizontal bar + vertical line down
                 <>
                   <div className="absolute top-0 left-0 right-0 h-[2px] bg-foreground -translate-y-[16px]" />
                   <div className="absolute top-0 left-1/2 h-4 w-[2px] bg-foreground -translate-y-full -translate-x-1/2" />
                 </>
               )}
-              <VerticalBranch node={child} levelColors={levelColors} />
+              <VerticalBranch node={child} />
             </div>
           );
         })}
@@ -252,31 +235,6 @@ export const DiagramRenderer: React.FC<DiagramRendererProps> = ({ type, nodes })
     assignLevels(r, 0);
     return r;
   }, [nodesStr]);
-
-  const levelColors = React.useMemo(() => {
-    // Determine maximum depth of the tree
-    const getTreeDepth = (n: TreeNode | null): number => {
-      if (!n) return 0;
-      if (n.children.length === 0) return 1;
-      return 1 + Math.max(...n.children.map(getTreeDepth));
-    };
-    const depth = getTreeDepth(root);
-    
-    // Generate a random color for each level
-    const colors: { bg: string; shadow: string; border: string }[] = [];
-    let prevIndex = -1;
-    
-    for (let i = 0; i < depth; i++) {
-      let availableIndices = PREMIUM_COLORS.map((_, idx) => idx);
-      if (prevIndex !== -1 && availableIndices.length > 1) {
-        availableIndices = availableIndices.filter(idx => idx !== prevIndex);
-      }
-      const randomIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
-      colors.push(PREMIUM_COLORS[randomIndex]);
-      prevIndex = randomIndex;
-    }
-    return colors;
-  }, [root]);
 
   const containerRef = React.useRef<HTMLDivElement>(null);
   const contentRef = React.useRef<HTMLDivElement>(null);
@@ -370,9 +328,9 @@ export const DiagramRenderer: React.FC<DiagramRendererProps> = ({ type, nodes })
           }}
         >
           {type === 'horizontal' ? (
-            <HorizontalBranch node={root} levelColors={levelColors} />
+            <HorizontalBranch node={root} />
           ) : (
-            <VerticalBranch node={root} levelColors={levelColors} />
+            <VerticalBranch node={root} />
           )}
         </div>
       </div>

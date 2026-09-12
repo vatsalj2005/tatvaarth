@@ -56,11 +56,19 @@ export interface GathaContent {
   teekas: TeekaData[];
 }
 
-// 1. Eagerly load all index.json metadata files for the shastras (touched to force glob reload for yogsaar)
+// 1. Eagerly load all index.json metadata files for the shastras
 const shastraIndices = import.meta.glob('../content/granth/**/index.json', { eager: true }) as Record<string, any>;
 
-// 2. Eagerly load all .txt gatha files for the shastras
-const gathaTexts = import.meta.glob('../content/granth/**/*.txt', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+// 2. Lazily load gatha text files on-demand for the active scripture
+const gathaTextLoaders = import.meta.glob('../content/granth/**/*.txt', { query: '?raw', import: 'default' }) as Record<string, () => Promise<string>>;
+
+// Pre-indexed scripture metadata map for O(1) slug lookups
+const shastrasList = globalManifest as ShastraMetadata[];
+const shastraBySlug = new Map<string, ShastraMetadata>(shastrasList.map(s => [s.shastraSlug, s]));
+
+// Memory caches for parsed indices and gathas
+const shastraIndexCache = new Map<string, ShastraIndex | null>();
+const gathaParsedCache = new Map<string, GathaContent | null>();
 
 // Helper: Parse the custom formatted gatha text
 export function parseGathaText(raw: string): GathaContent {
@@ -115,31 +123,76 @@ export function parseGathaText(raw: string): GathaContent {
 
 // Get the list of all available scriptures
 export function getShastras(): ShastraMetadata[] {
-  return globalManifest as ShastraMetadata[];
+  return shastrasList;
 }
 
 // Get the index.json metadata for a specific scripture
 export function getShastraIndex(shastraSlug: string): ShastraIndex | null {
-  const shastra = getShastras().find(s => s.shastraSlug === shastraSlug);
-  if (!shastra) return null;
+  if (shastraIndexCache.has(shastraSlug)) {
+    return shastraIndexCache.get(shastraSlug)!;
+  }
+
+  const shastra = shastraBySlug.get(shastraSlug);
+  if (!shastra) {
+    shastraIndexCache.set(shastraSlug, null);
+    return null;
+  }
 
   // Build the relative path key for glob lookup
   // e.g. "../content/granth/01_द्रव्यानुयोग/01_समयसार--कुन्दकुन्दाचार्य/index.json"
   const key = `../content/granth/${shastra.path}/index.json`;
   const data = shastraIndices[key];
-  return data ? (data.default || data) as ShastraIndex : null;
+  const index = data ? ((data.default || data) as ShastraIndex) : null;
+  shastraIndexCache.set(shastraSlug, index);
+  return index;
 }
 
-// Get parsed gatha content
-export function getGathaContent(shastraSlug: string, file: string): GathaContent | null {
-  const shastra = getShastras().find(s => s.shastraSlug === shastraSlug);
-  if (!shastra) return null;
+// Asynchronously load all gathas for a specific scripture on-demand
+export async function loadGathasForShastra(
+  shastraSlug: string,
+  chapters: Chapter[]
+): Promise<{ item: GathaItem; content: GathaContent; chapterName: string }[]> {
+  const shastra = shastraBySlug.get(shastraSlug);
+  if (!shastra) return [];
 
-  // Build the relative path key for glob lookup
-  // e.g. "../content/granth/01_द्रव्यानुयोग/01_समयसार--कुन्दकुन्दाचार्य/001.txt"
-  const key = `../content/granth/${shastra.path}/${file}`;
-  const rawText = gathaTexts[key];
-  
-  if (!rawText) return null;
-  return parseGathaText(rawText);
+  const itemsToLoad: { item: GathaItem; chapterName: string; key: string; cacheKey: string }[] = [];
+  for (const chapter of chapters) {
+    for (const item of chapter.items) {
+      itemsToLoad.push({
+        item,
+        chapterName: chapter.name,
+        key: `../content/granth/${shastra.path}/${item.file}`,
+        cacheKey: `${shastraSlug}/${item.file}`,
+      });
+    }
+  }
+
+  const results = await Promise.all(
+    itemsToLoad.map(async ({ item, chapterName, key, cacheKey }) => {
+      const cached = gathaParsedCache.get(cacheKey);
+      if (cached) {
+        return { item, content: cached, chapterName };
+      }
+
+      const loader = gathaTextLoaders[key];
+      if (!loader) return null;
+
+      try {
+        const rawText = await loader();
+        const content = parseGathaText(rawText);
+        gathaParsedCache.set(cacheKey, content);
+        return { item, content, chapterName };
+      } catch (err) {
+        console.error(`Failed to load gatha ${key}:`, err);
+        return null;
+      }
+    })
+  );
+
+  return results.filter((r): r is { item: GathaItem; content: GathaContent; chapterName: string } => r !== null);
+}
+
+// Synchronously get already-loaded gatha content from cache
+export function getGathaContent(shastraSlug: string, file: string): GathaContent | null {
+  return gathaParsedCache.get(`${shastraSlug}/${file}`) || null;
 }

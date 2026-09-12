@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useApp } from '@/contexts/AppContext';
-import { Music, BookOpen, Library, FileText, ScrollText } from 'lucide-react';
+import { Music, BookOpen, Library, ScrollText } from 'lucide-react';
 
 const categories = [
   { key: 'bhajan', path: '/bhajan', icon: Music, ready: true },

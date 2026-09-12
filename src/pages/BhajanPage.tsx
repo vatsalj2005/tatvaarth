@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useApp } from '@/contexts/AppContext';
@@ -20,8 +20,10 @@ const BhajanPage = () => {
   const subdivision = subdivisions.find(s => s.id === bhajan.subdivision);
   const related = getRelatedBhajans(bhajan, 4);
   
-  // Generate romanized text automatically
-  const romanizedLyrics = transliterateText(bhajan.lyrics);
+  // Generate romanized text only when roman script is toggled on
+  const romanizedLyrics = useMemo(() => {
+    return showRoman ? transliterateText(bhajan.lyrics) : '';
+  }, [showRoman, bhajan.lyrics]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(bhajan.lyrics);

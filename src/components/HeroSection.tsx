@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ArrowRight } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { siteWideSearch, UnifiedSearchResult } from '@/lib/smart-search';
@@ -37,9 +37,9 @@ const HeroSection = () => {
   const showDropdown = isFocused && suggestions.length > 0;
 
   return (
-    <section className="relative h-screen flex items-center justify-center overflow-hidden">
+    <section className="relative min-h-screen flex flex-col items-center justify-center pt-16 pb-24">
       {/* Fixed wallpaper background — completely isolated from content */}
-      <div className="fixed inset-0" style={{ zIndex: 0 }}>
+      <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0 }}>
         <AnimatePresence mode="wait">
           <motion.div
             key={currentSlide}
@@ -61,7 +61,7 @@ const HeroSection = () => {
       </div>
 
       {/* Content — always visible, never affected by wallpaper transitions */}
-      <div className="relative text-center px-4 max-w-3xl mx-auto" style={{ zIndex: 1 }}>
+      <div className="relative text-center px-4 max-w-5xl mx-auto" style={{ zIndex: 1 }}>
         <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -80,26 +80,42 @@ const HeroSection = () => {
           {t('heroSubtitle')}
         </motion.p>
 
-        {/* Search Bar — Google-style with site-wide intelligent suggestions */}
+        {/* Search Bar — 150% horizontal length (864px vs 576px max-w-xl) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
-          className="relative max-w-xl mx-auto"
+          className="relative w-full max-w-[864px] mx-auto"
         >
-          <div className={`relative ${showDropdown ? 'rounded-t-2xl' : 'rounded-2xl'}`}>
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+          <div
+            className={`relative flex items-center gap-3 px-4 py-3 border transition-all duration-300 ${
+              showDropdown
+                ? 'rounded-t-xl border-gold/50 bg-card shadow-lg shadow-gold/5 border-b-0'
+                : `rounded-xl ${isFocused ? 'border-gold/50 bg-card shadow-lg shadow-gold/5' : 'border-border/50 bg-card/90 backdrop-blur-md hover:border-border'}`
+            }`}
+          >
+            <Search className={`w-5 h-5 flex-shrink-0 transition-colors duration-300 ${isFocused ? 'text-gold' : 'text-muted-foreground'}`} />
             <input
               type="text"
               placeholder={t('searchPlaceholder')}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               onFocus={() => setIsFocused(true)}
-              onBlur={() => setTimeout(() => setIsFocused(false), 250)}
-              className={`w-full pl-12 pr-4 py-4 bg-card/90 backdrop-blur-md border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold/50 text-base ${
-                showDropdown ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'
-              }`}
+              onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+              className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground/60 outline-none text-sm devanagari-safe"
             />
+            {searchQuery && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setSuggestions([]);
+                }}
+                className="p-1 rounded-lg hover:bg-secondary transition-colors"
+                title="Clear search"
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            )}
           </div>
 
           <AnimatePresence>
@@ -108,7 +124,7 @@ const HeroSection = () => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute left-0 right-0 z-20 bg-card/95 backdrop-blur-md border border-border/50 border-t-0 rounded-b-2xl shadow-2xl overflow-hidden max-h-[440px] overflow-y-auto scrollbar-thin"
+                className="absolute left-0 right-0 z-30 bg-card border border-gold/50 border-t-0 rounded-b-xl shadow-lg shadow-gold/5 overflow-hidden max-h-[320px] overflow-y-auto scrollbar-thin"
               >
                 <div className="border-t border-border/30" />
                 {suggestions.map(s => (
@@ -120,17 +136,17 @@ const HeroSection = () => {
                       setSearchQuery('');
                       setSuggestions([]);
                     }}
-                    className={`w-full text-left px-4 py-3 hover:bg-secondary/80 transition-colors text-sm flex items-center justify-between gap-3 border-b border-border/20 last:border-b-0 group ${
-                      s.type === 'directory' ? 'bg-gold/5 hover:bg-gold/15' : ''
+                    className={`w-full text-left px-4 py-2.5 hover:bg-secondary/80 transition-colors text-sm flex items-center justify-between gap-3 border-b border-border/20 last:border-b-0 group ${
+                      s.type === 'directory' ? 'bg-gold/5' : ''
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <span className="text-xl flex-shrink-0 w-7 text-center">
+                      <span className="text-base flex-shrink-0 w-5 text-center">
                         {s.icon || (s.type === 'directory' ? '📂' : s.type === 'shastra' ? '📚' : '🎵')}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-foreground/95 font-medium truncate devanagari-safe">
+                        <div className="flex items-center gap-2">
+                          <span className="text-foreground/90 font-medium truncate devanagari-safe">
                             {s.title}
                           </span>
                           {s.badge && (
@@ -148,13 +164,12 @@ const HeroSection = () => {
                           )}
                         </div>
                         {s.subtitle && (
-                          <p className="text-xs text-muted-foreground/75 truncate devanagari-safe mt-0.5">
+                          <p className="text-xs text-muted-foreground/60 truncate devanagari-safe mt-0.5">
                             {s.subtitle}
                           </p>
                         )}
                       </div>
                     </div>
-                    <ArrowRight className="w-4 h-4 text-gold/60 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                   </button>
                 ))}
               </motion.div>

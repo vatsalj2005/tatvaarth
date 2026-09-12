@@ -11,6 +11,9 @@ export default defineConfig({
     hmr: {
       overlay: false,
     },
+    watch: {
+      ignored: ['**/Database/**', '**/.git/**'],
+    },
   },
 
   plugins: [
@@ -18,6 +21,11 @@ export default defineConfig({
   ],
 
   optimizeDeps: {
+    entries: ['index.html'],
+  },
+
+  build: {
+    chunkSizeWarningLimit: 1200,
     rolldownOptions: {
       output: {
         manualChunks(id) {
@@ -30,24 +38,14 @@ export default defineConfig({
             }
             return 'vendor';
           }
-        }
-      }
-    }
-  },
-
-  build: {
-    chunkSizeWarningLimit: 1000,
-    rolldownOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('jspdf')) {
-              return 'vendor-jspdf';
+          if (id.includes('content/granth/') || id.includes('content\\granth\\')) {
+            const match = id.match(/content[\\/]granth[\\/]([^\\/]+)[\\/]([^\\/]+)/);
+            if (match) {
+              const anuyog = match[1].slice(0, 2);
+              const shastra = match[2].slice(0, 2);
+              return `granth-${anuyog}-${shastra}`;
             }
-            if (id.includes('framer-motion')) {
-              return 'vendor-framer-motion';
-            }
-            return 'vendor';
+            return 'granth-common';
           }
         }
       }

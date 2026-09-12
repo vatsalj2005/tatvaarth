@@ -5,6 +5,14 @@ import { useApp } from '@/contexts/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import SettingsPanel from './SettingsPanel';
 
+const navItems = [
+  { path: '/', key: 'home' },
+  { path: '/bhajan', key: 'bhajan' },
+  { path: '/pooja', key: 'pooja' },
+  { path: '/granth', key: 'granth' },
+  { path: '/paath', key: 'paath' },
+] as const;
+
 const Header = () => {
   const { t, language, setLanguage } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -27,11 +35,11 @@ const Header = () => {
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-6">
-            <Link to="/" className="text-sm text-foreground/80 hover:text-gold transition-colors">{t('home')}</Link>
-            <Link to="/bhajan" className="text-sm text-foreground/80 hover:text-gold transition-colors">{t('bhajan')}</Link>
-            <Link to="/pooja" className="text-sm text-foreground/80 hover:text-gold transition-colors">{t('pooja')}</Link>
-            <Link to="/granth" className="text-sm text-foreground/80 hover:text-gold transition-colors">{t('granth')}</Link>
-            <Link to="/paath" className="text-sm text-foreground/80 hover:text-gold transition-colors">{t('paath')}</Link>
+            {navItems.map(item => (
+              <Link key={item.path} to={item.path} className="text-sm text-foreground/80 hover:text-gold transition-colors">
+                {t(item.key)}
+              </Link>
+            ))}
           </nav>
 
           <div className="flex items-center gap-2">
@@ -69,19 +77,16 @@ const Header = () => {
               className="md:hidden overflow-hidden border-t border-border/50 bg-background/95 backdrop-blur-xl"
             >
               <div className="container mx-auto px-4 py-4 flex flex-col gap-3">
-                {['/', '/bhajan', '/pooja', '/granth', '/paath'].map((path, i) => {
-                  const keys = ['home', 'bhajan', 'pooja', 'granth', 'paath'] as const;
-                  return (
-                    <Link
-                      key={path}
-                      to={path}
-                      onClick={() => setMenuOpen(false)}
-                      className="text-foreground/80 hover:text-gold py-2 transition-colors"
-                    >
-                      {t(keys[i])}
-                    </Link>
-                  );
-                })}
+                {navItems.map(item => (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setMenuOpen(false)}
+                    className="text-foreground/80 hover:text-gold py-2 transition-colors"
+                  >
+                    {t(item.key)}
+                  </Link>
+                ))}
               </div>
             </motion.nav>
           )}

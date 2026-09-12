@@ -42,6 +42,10 @@ const hindiStopwords = new Set([
  * Clean and romanize Devanagari slugs for URLs
  */
 function getRomanizedSlug(originalSlug: string): string {
+  // Fast path for alphanumeric ASCII slugs
+  if (/^[\w-]+$/.test(originalSlug)) {
+    return originalSlug.toLowerCase().replace(/_+/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+  }
   const roman = transliterateToRoman(originalSlug);
   return roman
     .toLowerCase()
@@ -54,47 +58,35 @@ function getRomanizedSlug(originalSlug: string): string {
  * Generate title from filename
  * If filename contains Hindi characters, use as-is
  * If filename is in English (hyphens/underscores), convert to title case
- * Example: mahavir-prabhu-vandana -> Mahavir Prabhu Vandana
- * Example: महावीर_स्वामी_की_जय -> महावीर स्वामी की जय
  */
 function generateTitleFromFilename(filename: string): string {
-  // Replace double dashes with colon and space
-  let title = filename.replace(/--/g, ': ');
-  // Replace remaining hyphens and underscores with spaces
-  title = title.replace(/[-_]/g, ' ');
-  // Clean up extra spaces
-  title = title.replace(/\s+/g, ' ').trim();
+  let title = filename.replace(/--/g, ': ').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
 
   // Check if filename contains Devanagari characters
-  const hasHindi = /[\u0900-\u097F]/.test(title);
-  
-  if (hasHindi) {
+  if (/[\u0900-\u097F]/.test(title)) {
     return title;
-  } else {
-    // English filename - convert to title case
-    return title
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
   }
+  // English filename - convert to title case
+  return title
+    .split(' ')
+    .map(word => word ? word.charAt(0).toUpperCase() + word.slice(1) : '')
+    .join(' ');
 }
 
 /**
  * Extract meaningful tags from Hindi text
  */
 function extractTags(text: string): string[] {
-  // Split by whitespace and punctuation
   const words = text.split(/[\s।॥,;.!?\-—()[\]{}]+/);
   const wordFreq: Record<string, number> = {};
   
-  words.forEach(word => {
-    const cleaned = word.trim();
+  for (let i = 0; i < words.length; i++) {
+    const cleaned = words[i].trim();
     if (cleaned.length > 2 && !hindiStopwords.has(cleaned)) {
       wordFreq[cleaned] = (wordFreq[cleaned] || 0) + 1;
     }
-  });
+  }
   
-  // Get top 5 most frequent meaningful words
   return Object.entries(wordFreq)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
@@ -105,6 +97,9 @@ function extractTags(text: string): string[] {
  * Parse frontmatter if exists, otherwise return raw content
  */
 function parseFrontmatter(raw: string): { metadata: Record<string, string>; content: string } {
+  if (!raw.startsWith('---')) {
+    return { metadata: {}, content: raw.trim() };
+  }
   const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
   if (!match) return { metadata: {}, content: raw.trim() };
   const metadata: Record<string, string> = {};
@@ -132,13 +127,8 @@ function buildBhajans(): BhajanData[] {
     const originalSlug = pathMatch[2];
     const romanizedSlug = getRomanizedSlug(originalSlug);
     
-    // Parse content (support both old metadata format and new plain text)
     const { metadata, content } = parseFrontmatter(rawContent);
-    
-    // Generate title from filename
     const title = metadata.title || generateTitleFromFilename(originalSlug);
-    
-    // Extract tags dynamically from content
     const tags = extractTags(content);
 
     results.push({
@@ -158,23 +148,43 @@ function buildBhajans(): BhajanData[] {
 
 export const bhajans: BhajanData[] = buildBhajans();
 
+// Pre-index for O(1) lookups
+const bhajansBySubdivisionMap = new Map<string, BhajanData[]>();
+for (const sub of subdivisions) {
+  bhajansBySubdivisionMap.set(sub.id, []);
+}
+const bhajanByIdMap = new Map<string, BhajanData>();
+
+for (const b of bhajans) {
+  const list = bhajansBySubdivisionMap.get(b.subdivision);
+  if (list) {
+    list.push(b);
+  } else {
+    bhajansBySubdivisionMap.set(b.subdivision, [b]);
+  }
+  bhajanByIdMap.set(`${b.subdivision}/${b.slug}`, b);
+}
+
 export const getBhajansBySubdivision = (subdivisionId: string) =>
-  bhajans.filter(b => b.subdivision === subdivisionId);
+  bhajansBySubdivisionMap.get(subdivisionId) || [];
 
 export const getBhajanById = (subdivisionId: string, bhajanSlug: string) =>
-  bhajans.find(b => b.subdivision === subdivisionId && b.slug === bhajanSlug);
+  bhajanByIdMap.get(`${subdivisionId}/${bhajanSlug}`);
 
 export const getRelatedBhajans = (bhajan: BhajanData, limit = 4): BhajanData[] => {
   if (!bhajan.tags.length) {
-    return bhajans.filter(b => b.id !== bhajan.id && b.subdivision === bhajan.subdivision).slice(0, limit);
+    return (bhajansBySubdivisionMap.get(bhajan.subdivision) || [])
+      .filter(b => b.id !== bhajan.id)
+      .slice(0, limit);
   }
-  const scored = bhajans
+  return bhajans
     .filter(b => b.id !== bhajan.id)
     .map(b => ({
       bhajan: b,
       score: b.tags.filter(t => bhajan.tags.includes(t)).length + (b.subdivision === bhajan.subdivision ? 0.5 : 0),
     }))
     .filter(s => s.score > 0)
-    .sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit).map(s => s.bhajan);
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(s => s.bhajan);
 };

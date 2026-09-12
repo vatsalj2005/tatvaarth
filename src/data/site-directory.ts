@@ -67,7 +67,7 @@ export const siteDirectories: SiteDirectoryItem[] = [
     url: '/bhajan/dev',
     type: 'bhajan-category',
     icon: '🙏',
-    aliases: ['dev', 'dev bhajan', 'tirthankar', 'jinendra', 'bhagwan', 'देव', 'देव भजन', 'तीर्थंकर', 'जिनेन्द्र']
+    aliases: ['dev', 'dev bhajan', 'देव', 'देव भजन']
   },
   {
     id: 'bhajan-shastra',
@@ -89,7 +89,7 @@ export const siteDirectories: SiteDirectoryItem[] = [
     url: '/bhajan/guru',
     type: 'bhajan-category',
     icon: '🧘',
-    aliases: ['guru', 'guru bhajan', 'muni', 'acharya', 'sadhu', 'गुरु', 'गुरु भजन', 'मुनि']
+    aliases: ['guru', 'guru bhajan', 'गुरु', 'गुरु भजन']
   },
   {
     id: 'bhajan-bhakti',
@@ -100,7 +100,7 @@ export const siteDirectories: SiteDirectoryItem[] = [
     url: '/bhajan/bhakti',
     type: 'bhajan-category',
     icon: '💖',
-    aliases: ['bhakti', 'bhakti bhajan', 'vairagya', 'aradhana', 'भक्ति', 'भक्ति भजन', 'वैराग्य']
+    aliases: ['bhakti', 'bhakti bhajan', 'vairagya', 'भक्ति', 'भक्ति भजन']
   },
 
   // ─── Shastra Categories (Anuyogas) ──────────────────────────────────────────

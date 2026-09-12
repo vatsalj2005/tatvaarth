@@ -1,75 +1,12 @@
 import jsPDF from 'jspdf';
 import { GathaContent, GathaItem } from '@/data/shastra-loader';
+import { themeColors, devanagariFontFamily, sanitizeText, loadDevanagariFont, PdfTheme } from './pdf-utils';
 
 interface FullShastraPdfOptions {
   title: string;
   author: string;
   gathas: { item: GathaItem; content: GathaContent; chapterName: string }[];
-  theme: 'dark' | 'soft-dark' | 'light' | 'sepia';
-}
-
-const themeColors: Record<string, { bg: [number, number, number]; text: [number, number, number]; accent: [number, number, number]; divider: [number, number, number] }> = {
-  dark: {
-    bg: [24, 26, 33],
-    text: [220, 210, 190],
-    accent: [212, 168, 83],
-    divider: [80, 75, 65],
-  },
-  'soft-dark': {
-    bg: [38, 40, 48],
-    text: [215, 208, 195],
-    accent: [212, 168, 83],
-    divider: [90, 85, 75],
-  },
-  light: {
-    bg: [248, 244, 235],
-    text: [30, 32, 45],
-    accent: [160, 120, 50],
-    divider: [200, 190, 170],
-  },
-  sepia: {
-    bg: [240, 228, 205],
-    text: [50, 40, 25],
-    accent: [140, 95, 40],
-    divider: [200, 185, 155],
-  },
-};
-
-const devanagariFontFile = 'NotoSansDevanagari-Regular.ttf';
-const devanagariFontFamily = 'NotoSansDevanagari';
-let devanagariFontBase64: string | null = null;
-
-function sanitizeText(text: string): string {
-  if (!text) return '';
-  let cleaned = text.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/g, '');
-  cleaned = cleaned.normalize('NFC');
-  cleaned = cleaned.replace(/[\u200B-\u200D\uFEFF]/g, '');
-  cleaned = cleaned.split('\n').map(line => line.trim()).join('\n');
-  return cleaned;
-}
-
-async function loadDevanagariFont(doc: jsPDF) {
-  try {
-    if (!devanagariFontBase64) {
-      const basePath = import.meta.env.BASE_URL || '/';
-      const fontPath = `${basePath}fonts/${devanagariFontFile}`;
-      const response = await fetch(fontPath);
-      if (!response.ok) throw new Error('Font not found');
-      const arrayBuffer = await response.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      let binary = '';
-      for (let i = 0; i < uint8Array.length; i++) {
-        binary += String.fromCharCode(uint8Array[i]);
-      }
-      devanagariFontBase64 = btoa(binary);
-    }
-    doc.addFileToVFS(devanagariFontFile, devanagariFontBase64);
-    doc.addFont(devanagariFontFile, devanagariFontFamily, 'normal');
-    return true;
-  } catch (err) {
-    console.error('Failed to load Devanagari font for PDF:', err);
-    return false;
-  }
+  theme: PdfTheme;
 }
 
 export async function generateFullShastraPdf({ title, author, gathas, theme }: FullShastraPdfOptions) {
