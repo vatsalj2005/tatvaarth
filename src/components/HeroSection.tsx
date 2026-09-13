@@ -61,7 +61,7 @@ const HeroSection = () => {
       </div>
 
       {/* Content — always visible, never affected by wallpaper transitions */}
-      <div className="relative text-center px-4 max-w-5xl mx-auto" style={{ zIndex: 1 }}>
+      <div className="relative text-center px-4 w-full max-w-5xl mx-auto" style={{ zIndex: 1 }}>
         <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -80,12 +80,12 @@ const HeroSection = () => {
           {t('heroSubtitle')}
         </motion.p>
 
-        {/* Search Bar — 150% horizontal length (864px vs 576px max-w-xl) */}
+        {/* Search Bar — horizontal length matches subdirectory search bars (max-w-xl) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
-          className="relative w-full max-w-[864px] mx-auto"
+          className="relative w-full max-w-xl mx-auto"
         >
           <div
             className={`relative flex items-center gap-3 px-4 py-3 border transition-all duration-300 ${
