@@ -6,7 +6,7 @@ import { getShastras } from '@/data/shastra-loader';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ScopedSearchBar from '@/components/ScopedSearchBar';
-import { BookOpen, User, ListCollapse, ChevronLeft } from 'lucide-react';
+import { BookOpen, User, ListCollapse, ArrowLeft } from 'lucide-react';
 
 const getShastraNumber = (path: string): number | null => {
   const match = path?.match(/\/(\d+)_/);
@@ -141,14 +141,14 @@ const ShastraLanding = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
-      <div className="pt-28 pb-16 px-4 flex-1">
-        <div className="container mx-auto max-w-4xl">
+      <div className="pt-24 pb-16 px-4 flex-1">
+        <div className="container mx-auto">
           {/* Back to categories button */}
           <Link
             to="/shastra"
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-gold transition-colors mb-6"
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-gold transition-colors mb-6"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4" />
             {language === 'hi' ? 'सभी अनुयोग' : 'All Anuyogas'}
           </Link>
 
@@ -156,65 +156,74 @@ const ShastraLanding = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-left mb-10 border-b border-border/40 pb-6 flex items-start gap-4"
+            className="mb-8"
           >
-            <span className="text-4xl">{currentCategory?.icon}</span>
-            <div>
-              <h1 className="text-3xl md:text-4xl font-heading text-gradient-gold mb-2 devanagari-safe">
+            <h1 className="text-3xl md:text-4xl font-heading mb-2 devanagari-safe flex items-center gap-3">
+              <span className="flex-shrink-0">{currentCategory?.icon}</span>
+              <span className="text-gradient-gold">
                 {language === 'hi' ? currentCategory?.nameHi : currentCategory?.nameEn}
-              </h1>
-              <p className="text-sm text-muted-foreground devanagari-safe leading-relaxed">
-                {language === 'hi' ? currentCategory?.descHi : currentCategory?.descEn}
-              </p>
-            </div>
+              </span>
+            </h1>
+            <p className="text-muted-foreground">
+              {language === 'hi' ? currentCategory?.descHi : currentCategory?.descEn}
+            </p>
           </motion.div>
 
           {/* Scoped Search Bar */}
           <ScopedSearchBar
             scope={searchScope}
             placeholder={searchPlaceholder}
+            className="mb-8 max-w-xl relative"
           />
 
           {/* Shastras Grid */}
-          <div className="space-y-6">
+          <div>
             {categoryShastras.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {categoryShastras.map(s => (
-                  <Link
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {categoryShastras.map((s, idx) => (
+                  <motion.div
                     key={s.id}
-                    to={`/shastra/${s.categorySlug}/${s.shastraSlug}`}
-                    className="p-6 rounded-2xl border border-border/50 bg-card hover:border-gold/30 hover:bg-secondary/50 transition-all group relative overflow-hidden"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min(idx * 0.02, 0.3) }}
                   >
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-gold/5 rounded-bl-full flex items-center justify-center translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform">
-                      <BookOpen className="w-6 h-6 text-gold/30 -translate-x-2 translate-y-2" />
-                    </div>
-                    
-                    <h3 className="text-xl font-heading text-foreground group-hover:text-gold transition-colors devanagari-safe pr-8">
-                      {s.title}
-                    </h3>
-                    
-                    <div className="flex flex-col gap-1.5 mt-3 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1.5 devanagari-safe">
-                        <User className="w-4 h-4 text-gold/50 flex-shrink-0" />
-                        {t('author')}: {s.author}
-                      </span>
-                      <span className="flex items-center gap-1.5 devanagari-safe">
-                        <ListCollapse className="w-4 h-4 text-gold/50 flex-shrink-0" />
-                        {t('gathas')}: {s.gathaCount}
-                      </span>
-                    </div>
-
-                    {/* Shastra Index Number */}
-                    {(() => {
-                      const num = getShastraNumber(s.path);
-                      if (num === null) return null;
-                      return (
-                        <div className="absolute bottom-4 right-4 text-3xl font-heading font-black text-gold/20 group-hover:text-gold/45 transition-colors pointer-events-none">
-                          #{num}
+                    <Link
+                      to={`/shastra/${s.categorySlug}/${s.shastraSlug}`}
+                      className="p-6 rounded-2xl border border-border/50 bg-card hover:border-gold/30 hover:bg-secondary/50 transition-all group relative overflow-hidden flex flex-col justify-between h-full min-h-[160px]"
+                    >
+                      <div>
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-gold/5 rounded-bl-full flex items-center justify-center translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform pointer-events-none">
+                          <BookOpen className="w-6 h-6 text-gold/30 -translate-x-2 translate-y-2" />
                         </div>
-                      );
-                    })()}
-                  </Link>
+                        
+                        <h3 className="text-xl font-heading text-foreground group-hover:text-gold transition-colors devanagari-safe pr-8">
+                          {s.title}
+                        </h3>
+                        
+                        <div className="flex flex-col gap-1.5 mt-3 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1.5 devanagari-safe">
+                            <User className="w-4 h-4 text-gold/50 flex-shrink-0" />
+                            {t('author')}: {s.author}
+                          </span>
+                          <span className="flex items-center gap-1.5 devanagari-safe">
+                            <ListCollapse className="w-4 h-4 text-gold/50 flex-shrink-0" />
+                            {t('gathas')}: {s.gathaCount}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Shastra Index Number */}
+                      {(() => {
+                        const num = getShastraNumber(s.path);
+                        if (num === null) return null;
+                        return (
+                          <div className="absolute bottom-4 right-4 text-3xl font-heading font-black text-gold/20 group-hover:text-gold/45 transition-colors pointer-events-none">
+                            #{num}
+                          </div>
+                        );
+                      })()}
+                    </Link>
+                  </motion.div>
                 ))}
               </div>
             ) : (

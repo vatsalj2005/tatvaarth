@@ -337,7 +337,13 @@ const renderFormattedCommentary = (
       return;
     }
 
-    if (inVerse) {
+    const isGreenMangal = 
+      unwrapped.startsWith("मंगलं भगवान् वीरो") || 
+      unwrapped.startsWith("मंगलं कुन्दकुन्दार्यो") || 
+      unwrapped.startsWith("सर्वमंगलमांगल्यं") || 
+      unwrapped.startsWith("प्रधानं सर्वधर्माणां");
+
+    if (inVerse || isGreenMangal) {
       renderedElements.push(
         <div 
           key={index} 

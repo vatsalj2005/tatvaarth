@@ -119,5 +119,16 @@
     "shastraSlug": "yogsaar",
     "path": "01_द्रव्यानुयोग/11_योगसार--योगींदुदेव",
     "gathaCount": 108
+  },
+  {
+    "id": "panchadhyayi",
+    "title": "पंचाध्यायी",
+    "author": "पं-राजमलजी",
+    "categoryHi": "द्रव्यानुयोग",
+    "categoryEn": "Dravyanuyog",
+    "categorySlug": "dravyanuyog",
+    "shastraSlug": "panchadhyayi",
+    "path": "01_द्रव्यानुयोग/12_पंचाध्यायी--पं-राजमलजी",
+    "gathaCount": 1545
   }
 ]

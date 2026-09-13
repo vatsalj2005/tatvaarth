@@ -294,6 +294,13 @@ function parseGathaHtml(filePath) {
         gatha = gatha.substring(0, splitIdx).trim();
       }
     }
+
+    if (bhavarth && bhavarth.includes("मंगलं भगवान् वीरो") && !bhavarth.includes("{मंगलं भगवान् वीरो}")) {
+      bhavarth = bhavarth.replace(
+        /(मंगलं भगवान् वीरो[^\n\r]*)\r?\n(मंगलं कुन्दकुन्दार्यो[^\n\r]*)\r?\n(सर्वमंगलमांगल्यं[^\n\r]*)\r?\n(प्रधानं सर्वधर्माणां[^\n\r]*)/,
+        "(मंगल)\n{$1}\n{$2}\n{$3}\n{$4}"
+      );
+    }
     
     return {
       title,
@@ -329,6 +336,17 @@ function parseGathaHtml(filePath) {
   const gathaMatch = mainHtml.match(/<div[^>]*class=["']?gatha["']?[^>]*>([\s\S]*?)<\/div>/i);
   if (gathaMatch) {
     gatha = stripHtml(gathaMatch[1]);
+  }
+
+  if (!title && gatha) {
+    const firstLine = gatha.split(/\r?\n/)[0].replace(/[॥।\d\-–\s]+$/, '').trim();
+    if (firstLine) {
+      const dandaPart = firstLine.split(/[।॥]/)[0].trim();
+      title = dandaPart.length > 5 ? dandaPart : firstLine;
+      if (title.length > 60) {
+        title = title.substring(0, 60).trim() + '...';
+      }
+    }
   }
 
   // 3. Sanskrit Equivalent (GathaS)
@@ -828,22 +846,82 @@ function convertShastra(config) {
     }
   }
 
-  // Read all HTML files in the directory, excluding indexes
-  const files = fs.readdirSync(htmlFolder).filter(f => f.endsWith('.html') && !f.includes('index'));
+  // Check if external teeka file exists in Database/teeka/
+  const teekaIndexPath = path.join(__dirname, '..', 'Database', 'teeka', categoryDirName, config.sourceShastraDirName || shastraDirName, 'html', 'index.html');
+  let teekaBlocks = null;
+  if (fs.existsSync(teekaIndexPath)) {
+    try {
+      const teekaIndexContent = fs.readFileSync(teekaIndexPath, 'utf-8');
+      teekaBlocks = teekaIndexContent.split(/<hr class=type_7>/i);
+      console.log(`Loaded external teeka index with ${teekaBlocks.length} blocks for ${title}.`);
+    } catch (e) {
+      console.error(`Failed to load external teeka file for ${title}:`, e);
+    }
+  }
+
+  // Read all HTML files in the directory, excluding indexes and incomplete placeholders
+  const files = fs.readdirSync(htmlFolder).filter(f => f.endsWith('.html') && !f.includes('index') && f !== '3-0000.html');
   
   let processedCount = 0;
-  for (const file of files) {
+  for (let fileIdx = 0; fileIdx < files.length; fileIdx++) {
+    const file = files[fileIdx];
     const htmlFilePath = path.join(htmlFolder, file);
     try {
       const parsedData = parseGathaHtml(htmlFilePath);
+
+      // If no teekas were found in the file itself, check external teeka blocks
+      if (parsedData.teekas.length === 0 && teekaBlocks && teekaBlocks[fileIdx + 1]) {
+        let block = teekaBlocks[fileIdx + 1];
+        // Fix database typo where div is closed prematurely inside span
+        block = block.replace(/\(पक्का घड़ा<\/div><\/b>/g, '(पक्का घड़ा)। ');
+        const teekaMatches = [...block.matchAll(/<div[^>]*class=["']?teeka["']?[^>]*>([\s\S]*?)<\/div>/gi)];
+        if (teekaMatches.length > 0) {
+          const paras = [];
+          let commentatorName = "विशेषार्थ";
+          for (const tm of teekaMatches) {
+            let tHtml = tm[1];
+            const commMatch = tHtml.match(/teeka\d+\s*([^<:]+)\s*:/i);
+            if (commMatch) {
+              commentatorName = commMatch[1].trim();
+            }
+            if (/teeka\d+\s*[^<:]+\s*:/i.test(tHtml) && !tHtml.replace(/<[^>]+>/g, '').replace(/teeka\d+\s*[^<:]+\s*:/i, '').trim()) {
+              continue;
+            }
+            tHtml = tHtml.replace(/<b><font color=[^>]*>teeka\d+\s*[^<:]+\s*:\s*<\/font><\/b>/i, '');
+            tHtml = tHtml.replace(/<b>teeka\d+\s*[^<:]+\s*:\s*<\/b>/i, '');
+            tHtml = tHtml.replace(/teeka\d+\s*[^<:]+\s*:\s*/i, '');
+            
+            const clean = stripHtml(tHtml);
+            if (clean) {
+              paras.push(clean);
+            }
+          }
+          if (paras.length > 0) {
+            parsedData.teekas.push({
+              id: 'teeka00',
+              commentator: commentatorName,
+              sanskrit: '',
+              hindi: paras.join('\n\n')
+            });
+          }
+        }
+      }
+
       const formattedText = formatGathaText(parsedData);
       
       const txtFileName = file.replace('.html', '.txt');
       const txtFilePath = path.join(destShastraPath, txtFileName);
       
       // Do not overwrite existing txt files to prevent losing manual formatting/edits (e.g. Mangalacharans)
+      // BUT if the file exists and is missing teekas while parsedData has teekas, update it (except mangalacharan files).
+      const isMangala = file.startsWith('0000_') || file.startsWith('000_');
       if (!fs.existsSync(txtFilePath)) {
         fs.writeFileSync(txtFilePath, formattedText, 'utf-8');
+      } else if (!isMangala && parsedData.teekas.length > 0) {
+        const existingTxt = fs.readFileSync(txtFilePath, 'utf-8');
+        if (!existingTxt.includes('=== Teeka:')) {
+          fs.writeFileSync(txtFilePath, formattedText, 'utf-8');
+        }
       }
       processedCount++;
     } catch (err) {
@@ -1061,16 +1139,16 @@ function convertShastra(config) {
         base.startsWith('0000_शास्त्र-मंगलाचरण') || 
         base.startsWith('000_शास्त्र-मंगलाचरण') || 
         base.startsWith('000_मंगलाचरण') || 
-        (base === '001' && !shastraDirName.includes('योगसार-प्राभृत') && !shastraDirName.includes('yogsaarprabhrat')) || 
+        (base === '001' && !shastraDirName.includes('योगसार-प्राभृत') && !shastraDirName.includes('yogsaarprabhrat') && !shastraDirName.includes('panchadhyayi') && !shastraDirName.includes('पंचाध्यायी')) || 
         base === '01' ||
-        base === '1-001';
+        (base === '1-001' && !shastraDirName.includes('panchadhyayi') && !shastraDirName.includes('पंचाध्यायी'));
       
       const isMangalaTitle = 
-        (item.title.includes('मंगलाचरण') && !shastraDirName.includes('योगसार-प्राभृत') && !shastraDirName.includes('yogsaarprabhrat')) || 
+        (item.title.includes('मंगलाचरण') && !shastraDirName.includes('योगसार-प्राभृत') && !shastraDirName.includes('yogsaarprabhrat') && !shastraDirName.includes('panchadhyayi') && !shastraDirName.includes('पंचाध्यायी')) || 
         item.gathaNum === '000' || 
-        (item.gathaNum === '001' && !shastraDirName.includes('योगसार-प्राभृत') && !shastraDirName.includes('yogsaarprabhrat')) || 
+        (item.gathaNum === '001' && !shastraDirName.includes('योगसार-प्राभृत') && !shastraDirName.includes('yogsaarprabhrat') && !shastraDirName.includes('panchadhyayi') && !shastraDirName.includes('पंचाध्यायी')) || 
         item.gathaNum === '01' ||
-        item.gathaNum === '1-001' ||
+        (item.gathaNum === '1-001' && !shastraDirName.includes('panchadhyayi') && !shastraDirName.includes('पंचाध्यायी')) ||
         item.gathaNum === '000_मंगलाचरण';
 
       return isMangalaFile || isMangalaTitle;
@@ -1172,6 +1250,58 @@ function convertShastra(config) {
     }
 
     shastraChapters = yogsaarChapters.filter(ch => ch.items.length > 0);
+  }
+
+  if (config.id === 'panchadhyayi') {
+    const panchadhyayiChapters = [
+      { name: "मंगलाचरण", items: [] },
+      { name: "प्रथम अध्याय (पूर्वार्ध)", items: [] },
+      { name: "द्वितीय अध्याय (उत्तरार्ध)", items: [] }
+    ];
+
+    const allTxtFiles = fs.readdirSync(destShastraPath).filter(f => f.endsWith('.txt')).sort();
+    for (const txtFile of allTxtFiles) {
+      const baseName = path.basename(txtFile, '.txt');
+      if (baseName.startsWith('3-') || baseName === 'index') {
+        continue;
+      }
+      const txtFilePath = path.join(destShastraPath, txtFile);
+      const fileTitle = readTitleFromTxt(txtFilePath);
+      const item = {
+        file: txtFile,
+        gathaNum: baseName.startsWith('0000_') ? '000' : baseName,
+        title: fileTitle || `गाथा ${baseName}`
+      };
+
+      if (baseName.startsWith('0000_') || baseName.includes('मंगलाचरण')) {
+        panchadhyayiChapters[0].items.push(item);
+      } else if (baseName.startsWith('1-')) {
+        panchadhyayiChapters[1].items.push(item);
+      } else if (baseName.startsWith('2-')) {
+        panchadhyayiChapters[2].items.push(item);
+      }
+    }
+
+    const sortPanchadhyayiItems = (items) => {
+      items.sort((a, b) => {
+        const getVal = (itm) => {
+          const base = path.basename(itm.file, '.txt');
+          if (base.startsWith('0000_')) return 0;
+          const m = base.match(/^(\d+)[-_](\d+)/);
+          if (m) {
+            return parseInt(m[1], 10) * 100000 + parseInt(m[2], 10);
+          }
+          return 99999999;
+        };
+        return getVal(a) - getVal(b);
+      });
+    };
+
+    sortPanchadhyayiItems(panchadhyayiChapters[0].items);
+    sortPanchadhyayiItems(panchadhyayiChapters[1].items);
+    sortPanchadhyayiItems(panchadhyayiChapters[2].items);
+
+    shastraChapters = panchadhyayiChapters.filter(ch => ch.items.length > 0);
   }
 
   const shastraIndexJson = {
@@ -1407,6 +1537,26 @@ const configs = [
       subtitle: "मूल अपभ्रंश गाथा",
       credits: ""
     }
+  },
+  {
+    id: "panchadhyayi",
+    title: "पंचाध्यायी",
+    author: "पं-राजमलजी",
+    category: "द्रव्यानुयोग",
+    categoryHi: "द्रव्यानुयोग",
+    categoryEn: "Dravyanuyog",
+    categorySlug: "dravyanuyog",
+    shastraSlug: "panchadhyayi",
+    categoryDirName: "01_द्रव्यानुयोग",
+    sourceShastraDirName: "15_पंचाध्यायी",
+    shastraDirName: "12_पंचाध्यायी--पं-राजमलजी",
+    cover: {
+      invocation: "!! श्रीसर्वज्ञवीतरागाय नम: !!",
+      authorPrefix: "कविवर-पंडित-राजमलजी-विरचित",
+      title: "श्री पंचाध्यायी",
+      subtitle: "मूल संस्कृत गाथा, हिंदी अन्वयार्थ एवं विशेषार्थ",
+      credits: ""
+    }
   }
 ];
 
@@ -1457,6 +1607,9 @@ function getActualGathaCount(chapters, configId) {
         }
       }
     }
+  }
+  if (configId === 'panchadhyayi') {
+    return 1545;
   }
   if (configId === 'tatvaarthsutra' || configId === 'paramatmaprakash') {
     return totalValidItems;

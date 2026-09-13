@@ -351,6 +351,12 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                   (/^[०-९0-9]+(?:\s+)?[a-zA-Z\u0900-\u097F]/.test(clean) && !clean.startsWith('|') && !clean.startsWith('**'));
                 const isBoldTitle = clean.startsWith('**') && clean.endsWith('**') && !clean.startsWith('**[');
 
+                const isGreenMangal = 
+                  clean.startsWith("मंगलं भगवान् वीरो") || 
+                  clean.startsWith("मंगलं कुन्दकुन्दार्यो") || 
+                  clean.startsWith("सर्वमंगलमांगल्यं") || 
+                  clean.startsWith("प्रधानं सर्वधर्माणां");
+
                 if (isMeterHeader) {
                   inVerse = true;
                   list.push({
@@ -369,7 +375,7 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                     chapterName,
                     data: { isSanskrit: true, text: clean, isMeterHeader: false, inVerse: false, isStarLine: false, isBoldTitle: false }
                   });
-                } else if (inVerse) {
+                } else if (inVerse || isGreenMangal) {
                   list.push({
                     id: `gatha-${gathaNum}-teeka-${comm}-sanskrit-p-${partIdx}-${pIdx++}`,
                     type: 'teeka_content_para',
@@ -471,6 +477,12 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                   (/^[०-९0-9]+(?:\s+)?[a-zA-Z\u0900-\u097F]/.test(clean) && !clean.startsWith('|') && !clean.startsWith('**'));
                 const isBoldTitle = clean.startsWith('**') && clean.endsWith('**') && !clean.startsWith('**[');
 
+                const isGreenMangal = 
+                  clean.startsWith("मंगलं भगवान् वीरो") || 
+                  clean.startsWith("मंगलं कुन्दकुन्दार्यो") || 
+                  clean.startsWith("सर्वमंगलमांगल्यं") || 
+                  clean.startsWith("प्रधानं सर्वधर्माणां");
+
                 if (isMeterHeader) {
                   inVerse = true;
                   list.push({
@@ -489,7 +501,7 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                     chapterName,
                     data: { isSanskrit: false, text: clean, isMeterHeader: false, inVerse: false, isStarLine: false, isBoldTitle: false }
                   });
-                } else if (inVerse) {
+                } else if (inVerse || isGreenMangal) {
                   list.push({
                     id: `gatha-${gathaNum}-teeka-${comm}-hindi-p-${partIdx}-${pIdx++}`,
                     type: 'teeka_content_para',
