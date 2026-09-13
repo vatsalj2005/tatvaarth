@@ -1,123 +1,134 @@
 # 🕉️ तत्त्वार्थ (Tatvaarth) — Jain Digital Library
 
-> A high-performance, premium, offline-first digital library and reader for Jain Scriptures (Shastras), Commentaries (Teekas), and Devotional Bhajans.
+> A high-performance, offline-first digital library and reader for Jain Scriptures (*Shastras*), Commentaries (*Teekas*), and Devotional Hymns (*Bhajans*).
 
-![Tatvaarth Banner](./src/assets/hero-1.jpg)
+<p align="center">
+  <img src="./src/assets/hero-1.jpg" alt="Tatvaarth Banner" width="92%" style="border-radius: 12px;" />
+</p>
 
----
-
-## ✨ Core Features
-
-### 📖 Interactive Scripture (Shastra) Reader
-- **IntersectionObserver Navigation**: The sidebar table of contents automatically highlights the active verse as you scroll.
-- **Auto-Follow Sidebar**: The sidebar smoothly scrolls to keep the currently active verse centered in view.
-- **Multi-Commentary Support**: Switch between multiple commentators (such as *अमृतचंद्राचार्य* and *जयसेनाचार्य*) instantly using tabs.
-- **Toggleable Sanskrit Text**: View original Sanskrit commentaries side-by-side with Hindi translations, or hide them for a cleaner reading experience.
-- **Dynamic Commentary Tables**: Parses Markdown-style tables inside raw commentaries and renders them as beautiful HTML tables. Highlights specific rows and cells dynamically corresponding to the currently active verse.
-- **Matra Clipping Prevention**: Implements custom typographic line heights (`.devanagari-safe`) to ensure Hindi/Devanagari characters and vowel markings (matras) are never clipped or truncated.
-
-### 🎵 Devotional Bhajans
-- **Categorized Playlists**: Browse bhajans grouped into Dev, Shastra, Guru, and Bhakti subdivisions.
-- **transliteration**: View lyrics in Devanagari or toggle Roman script transliteration.
-- **Clean Formatting**: Auto-formatted stanzas, normalized chorus markers, and consistent verse numbering.
-
-### 🎨 Premium UI/UX & Customizations
-- **Reading Themes**: Choose between **Dark** (default), **Soft Dark**, **Light**, and **Sepia** themes.
-- **Typographic Adjustments**: Customize font size, line spacing, and toggle between Serif and Sans-serif fonts to optimize reading comfort.
-- **Export & Print**: Render clean print layouts and download scriptures directly as PDFs using `html2canvas` and `jsPDF`.
+<p align="center">
+  <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-18-blue.svg" alt="Built with React" /></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.8-blue.svg" alt="TypeScript" /></a>
+  <a href="https://vitejs.dev/"><img src="https://img.shields.io/badge/Vite-8-646CFF.svg" alt="Vite" /></a>
+  <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/Tailwind-3.4-38B2AC.svg" alt="Tailwind CSS" /></a>
+  <a href="#-acknowledgments--license"><img src="https://img.shields.io/badge/License-Educational%20%2F%20Non--Commercial-amber.svg" alt="License" /></a>
+</p>
 
 ---
 
-## 🛠️ Technology Stack
+## 🌟 Highlights
 
-- **Framework**: React 18 + TypeScript + Vite 8
-- **Styling**: Tailwind CSS + Custom Vanilla CSS Variables (supporting HSL-based theme switching)
-- **Animations**: Framer Motion
-- **Icons**: Lucide React
-- **PDF Generation**: `jspdf` & `html2canvas`
+- **📖 Interactive Scripture Reader**: Original Prakrit verses, Sanskrit *Chhaya*, Hindi poetic translations (*Gadya*), word-by-word meanings (*Anvayarth*), and comprehensive Acharya commentaries (*Teekas*).
+- **📑 Multi-Commentary Tabs**: Seamlessly switch between commentators (e.g., *Acharya Amritchandra*, *Acharya Jayasena*) with optional toggleable original Sanskrit commentary.
+- **🧭 Auto-Follow Table of Contents**: Sidebar highlights the current verse using `IntersectionObserver` and smoothly centers the active chapter.
+- **📊 Dynamic Commentary Tables & Diagrams**: Renders embedded comparison tables with active verse highlighting, as well as tree-based conceptual mindmaps.
+- **🎵 Devotional Bhajans**: Categorized bhajan collection with real-time Roman transliteration, lyric copying, and formatted export.
+- **🔍 5-Tier Smart Search**: Intelligent search supporting Hinglish phonetics, typo tolerance (Levenshtein), category scoping, and automatic site-wide fallback.
+- **🎨 Reading Customization**: Four curated reading themes (*Dark*, *Soft Dark*, *Light*, *Sepia*), adjustable font sizes, line spacing, and Serif/Sans-serif typography.
+- **🖨️ PDF Generation**: High-fidelity, client-side PDF export for both individual bhajans and entire scriptures with embedded Devanagari fonts.
+- **⚡ Static & Serverless**: Bundled with Vite for instant loading, zero database latency, and automated deployment to GitHub Pages.
 
 ---
 
-## ⚙️ Architecture & Data Migration
-
-Tatvaarth is **entirely serverless** and **static**. At build time, it eagerly scans, parses, and bundles all content files. This ensures lightning-fast loading speeds, complete offline-first usability, and zero database latency at runtime.
-
-### Directory Structure
+## 📂 Project Architecture
 
 ```text
-├── Database/               # Raw HTML scripture databases (source)
-├── New_bhajans/            # Raw HTML bhajan files (source)
-├── scripts/                # Python/Node migration scripts
-│   ├── parse-shastras.js   # Parses shastra HTMLs to flat txt & JSON manifests
-│   ├── extract.js          # Extracts & formats raw bhajans to formatted txt
-│   └── update-sitemap.cjs  # Romanizes sitemap.xml loc URLs
-├── public/                 # Static assets, fonts, sitemap
-└── src/
-    ├── assets/             # Images and design assets
-    ├── components/         # Shared React components (Header, Settings, PrintTemplate)
-    ├── content/            # Migrated text databases (Target content)
-    │   ├── granth/         # Output of parse-shastras.js
-    │   └── bhajans/        # Output of extract.js
-    ├── data/               # Vite import.meta.glob content loaders
-    ├── contexts/           # AppState (Theme, FontSize, LineSpacing, Language)
-    └── pages/              # Main UI views (Index, Reader, BhajanPage)
+Tatvaarth/
+├── src/
+│   ├── assets/             # Media and heritage illustrations
+│   ├── components/         # Shared UI: Header, Footer, Hero, Settings, Reader components
+│   ├── content/
+│   │   ├── granth/         # Parsed scriptures and chapter manifests
+│   │   └── bhajans/        # Formatted devotional hymn texts
+│   ├── contexts/           # AppState (Theme, Font Size, Line Spacing, Language)
+│   ├── data/               # Vite import.meta.glob eager & on-demand loaders
+│   ├── i18n/               # Hindi & English localized dictionaries
+│   ├── lib/                # Smart search engine, transliterator, PDF compiler, text parsers
+│   └── pages/              # Application routes (Home, Reader, Bhajan directories)
+├── scripts/
+│   ├── parse-shastras.js   # Parser for raw scripture databases
+│   ├── extract.js          # Formatter for raw bhajan files
+│   └── update-sitemap.cjs  # Sitemap URL synchronizer
+├── public/                 # Favicon, fonts, sitemap.xml, robots.txt, 404 fallback
+└── Database/               # Source databases (raw scriptures and commentaries)
 ```
-
-### Migration Pipelines
-
-1. **Scripture Migration (`node scripts/parse-shastras.js`)**:
-   Reads JQuery structures in raw `myItem.js` files, parses HTML gathas, extracts titles, Prakrit, Sanskrit, Hindi verses, Anvayarths, and Teekas (including nested Sanskrit commentaries), and converts them into flat, easily parsable `.txt` files under `src/content/granth/` alongside local `index.json` manifests.
-   
-2. **Bhajan Extraction (`node scripts/extract.js`)**:
-   Extracts bhajan text from raw source files, normalizes stanzas, inserts proper refrain-abbreviations, ensures exact double-newline layout styling, and outputs them under `src/content/bhajans/`.
-
-3. **Static Content Loader (`src/data/shastra-loader.ts`)**:
-   Leverages Vite's `import.meta.glob` to eagerly load raw text files:
-   ```typescript
-   const gathaTexts = import.meta.glob('../content/granth/**/*.txt', { 
-     query: '?raw', 
-     import: 'default', 
-     eager: true 
-   }) as Record<string, string>;
-   ```
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
-Make sure you have Node.js (v18+) and npm installed.
+- [Node.js](https://nodejs.org/) (version 18 or higher recommended)
+- `npm` (bundled with Node.js)
 
 ### 1. Installation
 Clone the repository and install dependencies:
 ```bash
+git clone https://github.com/vatsalj2005/tatvaarth.git
+cd tatvaarth
 npm install
 ```
 
-### 2. Run Database Migration
-If you need to parse the latest scriptures and bhajans from the `Database/` and `New_bhajans/` folders:
-```bash
-# Run scripture migration
-node scripts/parse-shastras.js
-
-# Run bhajan migration
-node scripts/extract.js
-```
-
-### 3. Run Development Server
+### 2. Development Server
 Start the local development server:
 ```bash
 npm run dev
 ```
-Open `http://localhost:8080/tatvaarth/` in your browser.
+Open [http://localhost:8080/tatvaarth/](http://localhost:8080/tatvaarth/) in your browser.
 
-### 4. Build for Production
-To build the application for deployment (outputs static build to `dist/`):
+### 3. Production Build
+Compile and bundle static assets for production:
 ```bash
 npm run build
+```
+The optimized output will be generated inside the `dist/` directory.
+
+---
+
+## 🛠️ Data Pipeline & Migration
+
+If you modify or add raw content in the `Database/` or `New_bhajans/` folders:
+
+```bash
+# Ingest and parse raw scriptures into structured text and manifests
+node scripts/parse-shastras.js
+
+# Format raw hymns into standardized bhajan entries
+node scripts/extract.js
+
+# Update sitemap with romanized URLs
+node scripts/update-sitemap.cjs
 ```
 
 ---
 
-## 📄 License
-This project is private and created for religious study and reference. All scriptures and translations are subject to their respective copyright holders and scholars. Special thanks to Vijay Kumar Jain, Pandit Jayachandji Chhabra, and Dr. Hukamchand Bharill.
+## 📜 Available Scriptures
+
+Currently migrated scriptures under **द्रव्यानुयोग (Dravyanuyog)**:
+
+1. **समयसार** (*Samayasara*) — कुन्दकुन्दाचार्य
+2. **प्रवचनसार** (*Pravachanasara*) — कुन्दकुन्दाचार्य
+3. **पञ्चास्तिकाय** (*Panchastikaya*) — कुन्दकुन्दाचार्य
+4. **द्रव्यसंग्रह** (*Dravyasangraha*) — नेमिचंद्र सिद्धांतचक्रवर्ती
+5. **समाधितन्त्र** (*Samadhitantra*) — आचार्य पूज्यपाद
+6. **स्वरूप-संबोधन** (*Swaroop Sambodhan*) — अकलंक देव
+7. **इष्टोपदेश** (*Ishtopadesh*) — आचार्य पूज्यपाद
+8. **परमात्मप्रकाश** (*Paramatmaprakash*) — योगींदुदेव
+9. **योगसार-प्राभृत** (*Yogasar Prabhrit*) — अमितगति आचार्य
+10. **तत्त्वार्थसूत्र** (*Tatvaarthasutra*) — आचार्य उमास्वामी
+11. **योगसार** (*Yogasar*) — योगींदुदेव
+
+---
+
+## 🙏 Acknowledgments & License
+
+This project is created for religious study, spiritual contemplation, and educational reference. All original scriptures, verses, and translations belong to their respective revered Acharyas, scholars, and trust publications.
+
+Special gratitude to the scholarly contributions of:
+- **पंडित जयचंदजी छाबड़ा**
+- **आचार्य ज्ञानसागर**
+- **क्षुल्लक मनोहर वर्णी**
+- **डॉ. हुकमचंद भारिल्ल**
+- **आर्यिका ज्ञानमती माताजी**
+- **प्रो. पारसमल अग्रवाल**
+- **श्री विजय कुमार जैन**
