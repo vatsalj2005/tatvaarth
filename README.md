@@ -118,6 +118,7 @@ Currently migrated scriptures under **द्रव्यानुयोग (Drav
 10. **तत्त्वार्थसूत्र** (*Tatvaarthasutra*) — आचार्य उमास्वामी
 11. **योगसार** (*Yogasar*) — योगींदुदेव
 12. **पंचाध्यायी** (*Panchadhyayi*) — पं. राजमलजी
+13. **पाहुड-दोहा** (*Pahud-Doha*) — राम-सिंह-मुनि
 
 ---
 

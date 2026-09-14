@@ -1,0 +1,1084 @@
+{
+  "title": "पाहुड-दोहा",
+  "author": "राम-सिंह-मुनि",
+  "category": "द्रव्यानुयोग",
+  "cover": {
+    "invocation": "!! श्रीसर्वज्ञवीतरागाय नम: !!",
+    "authorPrefix": "श्रीमद्‌-राम-सिंह मुनि-प्रणीत",
+    "title": "श्री पाहुड-दोहा",
+    "subtitle": "मूल अपभ्रंश/प्राकृत दोहा एवं हिंदी अन्वयार्थ",
+    "credits": ""
+  },
+  "chapters": [
+    {
+      "name": "मंगलाचरण",
+      "items": [
+        {
+          "file": "0000_शास्त्र-मंगलाचरण.txt",
+          "gathaNum": "000",
+          "title": "शास्त्र-मंगलाचरण"
+        },
+        {
+          "file": "001.txt",
+          "gathaNum": "001",
+          "title": "मंगलाचरण"
+        }
+      ]
+    },
+    {
+      "name": "मूल ग्रंथ",
+      "items": [
+        {
+          "file": "002.txt",
+          "gathaNum": "002",
+          "title": "गाथा 2"
+        },
+        {
+          "file": "003.txt",
+          "gathaNum": "003",
+          "title": "गाथा 3"
+        },
+        {
+          "file": "004.txt",
+          "gathaNum": "004",
+          "title": "गाथा 4"
+        },
+        {
+          "file": "005.txt",
+          "gathaNum": "005",
+          "title": "गाथा 5"
+        },
+        {
+          "file": "006.txt",
+          "gathaNum": "006",
+          "title": "गाथा 6"
+        },
+        {
+          "file": "007.txt",
+          "gathaNum": "007",
+          "title": "गाथा 7"
+        },
+        {
+          "file": "008.txt",
+          "gathaNum": "008",
+          "title": "गाथा 8"
+        },
+        {
+          "file": "009.txt",
+          "gathaNum": "009",
+          "title": "गाथा 9"
+        },
+        {
+          "file": "010.txt",
+          "gathaNum": "010",
+          "title": "गाथा 10"
+        },
+        {
+          "file": "011.txt",
+          "gathaNum": "011",
+          "title": "गाथा 11"
+        },
+        {
+          "file": "012.txt",
+          "gathaNum": "012",
+          "title": "गाथा 12"
+        },
+        {
+          "file": "013.txt",
+          "gathaNum": "013",
+          "title": "गाथा 13"
+        },
+        {
+          "file": "014.txt",
+          "gathaNum": "014",
+          "title": "गाथा 14"
+        },
+        {
+          "file": "015.txt",
+          "gathaNum": "015",
+          "title": "गाथा 15"
+        },
+        {
+          "file": "016.txt",
+          "gathaNum": "016",
+          "title": "गाथा 16"
+        },
+        {
+          "file": "017.txt",
+          "gathaNum": "017",
+          "title": "गाथा 17"
+        },
+        {
+          "file": "018.txt",
+          "gathaNum": "018",
+          "title": "गाथा 18"
+        },
+        {
+          "file": "019.txt",
+          "gathaNum": "019",
+          "title": "गाथा 19"
+        },
+        {
+          "file": "020.txt",
+          "gathaNum": "020",
+          "title": "गाथा 20"
+        },
+        {
+          "file": "021.txt",
+          "gathaNum": "021",
+          "title": "गाथा 21"
+        },
+        {
+          "file": "022.txt",
+          "gathaNum": "022",
+          "title": "गाथा 22"
+        },
+        {
+          "file": "023.txt",
+          "gathaNum": "023",
+          "title": "गाथा 23"
+        },
+        {
+          "file": "024.txt",
+          "gathaNum": "024",
+          "title": "गाथा 24"
+        },
+        {
+          "file": "025.txt",
+          "gathaNum": "025",
+          "title": "गाथा 25"
+        },
+        {
+          "file": "026.txt",
+          "gathaNum": "026",
+          "title": "गाथा 26"
+        },
+        {
+          "file": "027-033.txt",
+          "gathaNum": "027-033",
+          "title": "गाथा 27-33"
+        },
+        {
+          "file": "034-036.txt",
+          "gathaNum": "034-036",
+          "title": "गाथा 34-36"
+        },
+        {
+          "file": "037.txt",
+          "gathaNum": "037",
+          "title": "गाथा 37"
+        },
+        {
+          "file": "038.txt",
+          "gathaNum": "038",
+          "title": "गाथा 38"
+        },
+        {
+          "file": "039.txt",
+          "gathaNum": "039",
+          "title": "गाथा 39"
+        },
+        {
+          "file": "040.txt",
+          "gathaNum": "040",
+          "title": "गाथा 40"
+        },
+        {
+          "file": "041.txt",
+          "gathaNum": "041",
+          "title": "गाथा 41"
+        },
+        {
+          "file": "042.txt",
+          "gathaNum": "042",
+          "title": "गाथा 42"
+        },
+        {
+          "file": "043.txt",
+          "gathaNum": "043",
+          "title": "गाथा 43"
+        },
+        {
+          "file": "044.txt",
+          "gathaNum": "044",
+          "title": "गाथा 44"
+        },
+        {
+          "file": "045.txt",
+          "gathaNum": "045",
+          "title": "गाथा 45"
+        },
+        {
+          "file": "046.txt",
+          "gathaNum": "046",
+          "title": "गाथा 46"
+        },
+        {
+          "file": "047.txt",
+          "gathaNum": "047",
+          "title": "गाथा 47"
+        },
+        {
+          "file": "048.txt",
+          "gathaNum": "048",
+          "title": "गाथा 48"
+        },
+        {
+          "file": "049.txt",
+          "gathaNum": "049",
+          "title": "गाथा 49"
+        },
+        {
+          "file": "050.txt",
+          "gathaNum": "050",
+          "title": "गाथा 50"
+        },
+        {
+          "file": "051.txt",
+          "gathaNum": "051",
+          "title": "गाथा 51"
+        },
+        {
+          "file": "052.txt",
+          "gathaNum": "052",
+          "title": "गाथा 52"
+        },
+        {
+          "file": "053.txt",
+          "gathaNum": "053",
+          "title": "गाथा 53"
+        },
+        {
+          "file": "054.txt",
+          "gathaNum": "054",
+          "title": "गाथा 54"
+        },
+        {
+          "file": "055.txt",
+          "gathaNum": "055",
+          "title": "गाथा 55"
+        },
+        {
+          "file": "056.txt",
+          "gathaNum": "056",
+          "title": "गाथा 56"
+        },
+        {
+          "file": "057.txt",
+          "gathaNum": "057",
+          "title": "गाथा 57"
+        },
+        {
+          "file": "058.txt",
+          "gathaNum": "058",
+          "title": "गाथा 58"
+        },
+        {
+          "file": "059.txt",
+          "gathaNum": "059",
+          "title": "गाथा 59"
+        },
+        {
+          "file": "060.txt",
+          "gathaNum": "060",
+          "title": "गाथा 60"
+        },
+        {
+          "file": "061.txt",
+          "gathaNum": "061",
+          "title": "गाथा 61"
+        },
+        {
+          "file": "062.txt",
+          "gathaNum": "062",
+          "title": "गाथा 62"
+        },
+        {
+          "file": "063.txt",
+          "gathaNum": "063",
+          "title": "गाथा 63"
+        },
+        {
+          "file": "064.txt",
+          "gathaNum": "064",
+          "title": "गाथा 64"
+        },
+        {
+          "file": "065.txt",
+          "gathaNum": "065",
+          "title": "गाथा 65"
+        },
+        {
+          "file": "066.txt",
+          "gathaNum": "066",
+          "title": "गाथा 66"
+        },
+        {
+          "file": "067.txt",
+          "gathaNum": "067",
+          "title": "गाथा 67"
+        },
+        {
+          "file": "068.txt",
+          "gathaNum": "068",
+          "title": "गाथा 68"
+        },
+        {
+          "file": "069.txt",
+          "gathaNum": "069",
+          "title": "गाथा 69"
+        },
+        {
+          "file": "070.txt",
+          "gathaNum": "070",
+          "title": "गाथा 70"
+        },
+        {
+          "file": "071.txt",
+          "gathaNum": "071",
+          "title": "गाथा 71"
+        },
+        {
+          "file": "072.txt",
+          "gathaNum": "072",
+          "title": "गाथा 72"
+        },
+        {
+          "file": "073.txt",
+          "gathaNum": "073",
+          "title": "गाथा 73"
+        },
+        {
+          "file": "074.txt",
+          "gathaNum": "074",
+          "title": "गाथा 74"
+        },
+        {
+          "file": "075.txt",
+          "gathaNum": "075",
+          "title": "गाथा 75"
+        },
+        {
+          "file": "076.txt",
+          "gathaNum": "076",
+          "title": "गाथा 76"
+        },
+        {
+          "file": "077.txt",
+          "gathaNum": "077",
+          "title": "गाथा 77"
+        },
+        {
+          "file": "078.txt",
+          "gathaNum": "078",
+          "title": "गाथा 78"
+        },
+        {
+          "file": "079.txt",
+          "gathaNum": "079",
+          "title": "गाथा 79"
+        },
+        {
+          "file": "080.txt",
+          "gathaNum": "080",
+          "title": "गाथा 80"
+        },
+        {
+          "file": "081.txt",
+          "gathaNum": "081",
+          "title": "गाथा 81"
+        },
+        {
+          "file": "082.txt",
+          "gathaNum": "082",
+          "title": "गाथा 82"
+        },
+        {
+          "file": "083.txt",
+          "gathaNum": "083",
+          "title": "गाथा 83"
+        },
+        {
+          "file": "084.txt",
+          "gathaNum": "084",
+          "title": "गाथा 84"
+        },
+        {
+          "file": "085.txt",
+          "gathaNum": "085",
+          "title": "गाथा 85"
+        },
+        {
+          "file": "086.txt",
+          "gathaNum": "086",
+          "title": "गाथा 86"
+        },
+        {
+          "file": "087.txt",
+          "gathaNum": "087",
+          "title": "गाथा 87"
+        },
+        {
+          "file": "088.txt",
+          "gathaNum": "088",
+          "title": "गाथा 88"
+        },
+        {
+          "file": "089.txt",
+          "gathaNum": "089",
+          "title": "गाथा 89"
+        },
+        {
+          "file": "090.txt",
+          "gathaNum": "090",
+          "title": "गाथा 90"
+        },
+        {
+          "file": "091.txt",
+          "gathaNum": "091",
+          "title": "गाथा 91"
+        },
+        {
+          "file": "092.txt",
+          "gathaNum": "092",
+          "title": "गाथा 92"
+        },
+        {
+          "file": "093.txt",
+          "gathaNum": "093",
+          "title": "गाथा 93"
+        },
+        {
+          "file": "094.txt",
+          "gathaNum": "094",
+          "title": "गाथा 94"
+        },
+        {
+          "file": "095.txt",
+          "gathaNum": "095",
+          "title": "गाथा 95"
+        },
+        {
+          "file": "096.txt",
+          "gathaNum": "096",
+          "title": "गाथा 96"
+        },
+        {
+          "file": "097.txt",
+          "gathaNum": "097",
+          "title": "गाथा 97"
+        },
+        {
+          "file": "098.txt",
+          "gathaNum": "098",
+          "title": "गाथा 98"
+        },
+        {
+          "file": "099.txt",
+          "gathaNum": "099",
+          "title": "गाथा 99"
+        },
+        {
+          "file": "100.txt",
+          "gathaNum": "100",
+          "title": "गाथा 100"
+        },
+        {
+          "file": "101.txt",
+          "gathaNum": "101",
+          "title": "गाथा 101"
+        },
+        {
+          "file": "102.txt",
+          "gathaNum": "102",
+          "title": "गाथा 102"
+        },
+        {
+          "file": "103.txt",
+          "gathaNum": "103",
+          "title": "गाथा 103"
+        },
+        {
+          "file": "104.txt",
+          "gathaNum": "104",
+          "title": "गाथा 104"
+        },
+        {
+          "file": "105.txt",
+          "gathaNum": "105",
+          "title": "गाथा 105"
+        },
+        {
+          "file": "106.txt",
+          "gathaNum": "106",
+          "title": "गाथा 106"
+        },
+        {
+          "file": "107.txt",
+          "gathaNum": "107",
+          "title": "गाथा 107"
+        },
+        {
+          "file": "108.txt",
+          "gathaNum": "108",
+          "title": "गाथा 108"
+        },
+        {
+          "file": "109.txt",
+          "gathaNum": "109",
+          "title": "गाथा 109"
+        },
+        {
+          "file": "110.txt",
+          "gathaNum": "110",
+          "title": "गाथा 110"
+        },
+        {
+          "file": "111.txt",
+          "gathaNum": "111",
+          "title": "गाथा 111"
+        },
+        {
+          "file": "112.txt",
+          "gathaNum": "112",
+          "title": "गाथा 112"
+        },
+        {
+          "file": "113.txt",
+          "gathaNum": "113",
+          "title": "गाथा 113"
+        },
+        {
+          "file": "114.txt",
+          "gathaNum": "114",
+          "title": "गाथा 114"
+        },
+        {
+          "file": "115.txt",
+          "gathaNum": "115",
+          "title": "गाथा 115"
+        },
+        {
+          "file": "116.txt",
+          "gathaNum": "116",
+          "title": "गाथा 116"
+        },
+        {
+          "file": "117.txt",
+          "gathaNum": "117",
+          "title": "गाथा 117"
+        },
+        {
+          "file": "118.txt",
+          "gathaNum": "118",
+          "title": "गाथा 118"
+        },
+        {
+          "file": "119.txt",
+          "gathaNum": "119",
+          "title": "गाथा 119"
+        },
+        {
+          "file": "120.txt",
+          "gathaNum": "120",
+          "title": "गाथा 120"
+        },
+        {
+          "file": "121.txt",
+          "gathaNum": "121",
+          "title": "गाथा 121"
+        },
+        {
+          "file": "122.txt",
+          "gathaNum": "122",
+          "title": "गाथा 122"
+        },
+        {
+          "file": "123.txt",
+          "gathaNum": "123",
+          "title": "गाथा 123"
+        },
+        {
+          "file": "124.txt",
+          "gathaNum": "124",
+          "title": "गाथा 124"
+        },
+        {
+          "file": "125.txt",
+          "gathaNum": "125",
+          "title": "गाथा 125"
+        },
+        {
+          "file": "126.txt",
+          "gathaNum": "126",
+          "title": "गाथा 126"
+        },
+        {
+          "file": "127.txt",
+          "gathaNum": "127",
+          "title": "गाथा 127"
+        },
+        {
+          "file": "128.txt",
+          "gathaNum": "128",
+          "title": "गाथा 128"
+        },
+        {
+          "file": "129.txt",
+          "gathaNum": "129",
+          "title": "गाथा 129"
+        },
+        {
+          "file": "130.txt",
+          "gathaNum": "130",
+          "title": "गाथा 130"
+        },
+        {
+          "file": "131.txt",
+          "gathaNum": "131",
+          "title": "गाथा 131"
+        },
+        {
+          "file": "132.txt",
+          "gathaNum": "132",
+          "title": "गाथा 132"
+        },
+        {
+          "file": "133.txt",
+          "gathaNum": "133",
+          "title": "गाथा 133"
+        },
+        {
+          "file": "134.txt",
+          "gathaNum": "134",
+          "title": "गाथा 134"
+        },
+        {
+          "file": "135.txt",
+          "gathaNum": "135",
+          "title": "गाथा 135"
+        },
+        {
+          "file": "136.txt",
+          "gathaNum": "136",
+          "title": "गाथा 136"
+        },
+        {
+          "file": "137.txt",
+          "gathaNum": "137",
+          "title": "गाथा 137"
+        },
+        {
+          "file": "138.txt",
+          "gathaNum": "138",
+          "title": "गाथा 138"
+        },
+        {
+          "file": "139.txt",
+          "gathaNum": "139",
+          "title": "गाथा 139"
+        },
+        {
+          "file": "140.txt",
+          "gathaNum": "140",
+          "title": "गाथा 140"
+        },
+        {
+          "file": "141.txt",
+          "gathaNum": "141",
+          "title": "गाथा 141"
+        },
+        {
+          "file": "142.txt",
+          "gathaNum": "142",
+          "title": "गाथा 142"
+        },
+        {
+          "file": "143.txt",
+          "gathaNum": "143",
+          "title": "गाथा 143"
+        },
+        {
+          "file": "144.txt",
+          "gathaNum": "144",
+          "title": "गाथा 144"
+        },
+        {
+          "file": "145.txt",
+          "gathaNum": "145",
+          "title": "गाथा 145"
+        },
+        {
+          "file": "146.txt",
+          "gathaNum": "146",
+          "title": "गाथा 146"
+        },
+        {
+          "file": "147.txt",
+          "gathaNum": "147",
+          "title": "गाथा 147"
+        },
+        {
+          "file": "148.txt",
+          "gathaNum": "148",
+          "title": "गाथा 148"
+        },
+        {
+          "file": "149.txt",
+          "gathaNum": "149",
+          "title": "गाथा 149"
+        },
+        {
+          "file": "150.txt",
+          "gathaNum": "150",
+          "title": "गाथा 150"
+        },
+        {
+          "file": "151.txt",
+          "gathaNum": "151",
+          "title": "गाथा 151"
+        },
+        {
+          "file": "152.txt",
+          "gathaNum": "152",
+          "title": "गाथा 152"
+        },
+        {
+          "file": "153-154.txt",
+          "gathaNum": "153-154",
+          "title": "गाथा 153-154"
+        },
+        {
+          "file": "155.txt",
+          "gathaNum": "155",
+          "title": "गाथा 155"
+        },
+        {
+          "file": "156.txt",
+          "gathaNum": "156",
+          "title": "गाथा 156"
+        },
+        {
+          "file": "157.txt",
+          "gathaNum": "157",
+          "title": "गाथा 157"
+        },
+        {
+          "file": "158.txt",
+          "gathaNum": "158",
+          "title": "गाथा 158"
+        },
+        {
+          "file": "159.txt",
+          "gathaNum": "159",
+          "title": "गाथा 159"
+        },
+        {
+          "file": "160.txt",
+          "gathaNum": "160",
+          "title": "गाथा 160"
+        },
+        {
+          "file": "161.txt",
+          "gathaNum": "161",
+          "title": "गाथा 161"
+        },
+        {
+          "file": "162.txt",
+          "gathaNum": "162",
+          "title": "गाथा 162"
+        },
+        {
+          "file": "163.txt",
+          "gathaNum": "163",
+          "title": "गाथा 163"
+        },
+        {
+          "file": "164.txt",
+          "gathaNum": "164",
+          "title": "गाथा 164"
+        },
+        {
+          "file": "165.txt",
+          "gathaNum": "165",
+          "title": "गाथा 165"
+        },
+        {
+          "file": "166.txt",
+          "gathaNum": "166",
+          "title": "गाथा 166"
+        },
+        {
+          "file": "167.txt",
+          "gathaNum": "167",
+          "title": "गाथा 167"
+        },
+        {
+          "file": "168.txt",
+          "gathaNum": "168",
+          "title": "गाथा 168"
+        },
+        {
+          "file": "169.txt",
+          "gathaNum": "169",
+          "title": "गाथा 169"
+        },
+        {
+          "file": "170.txt",
+          "gathaNum": "170",
+          "title": "गाथा 170"
+        },
+        {
+          "file": "171.txt",
+          "gathaNum": "171",
+          "title": "गाथा 171"
+        },
+        {
+          "file": "172.txt",
+          "gathaNum": "172",
+          "title": "गाथा 172"
+        },
+        {
+          "file": "173.txt",
+          "gathaNum": "173",
+          "title": "गाथा 173"
+        },
+        {
+          "file": "174.txt",
+          "gathaNum": "174",
+          "title": "गाथा 174"
+        },
+        {
+          "file": "175.txt",
+          "gathaNum": "175",
+          "title": "गाथा 175"
+        },
+        {
+          "file": "176.txt",
+          "gathaNum": "176",
+          "title": "गाथा 176"
+        },
+        {
+          "file": "177.txt",
+          "gathaNum": "177",
+          "title": "गाथा 177"
+        },
+        {
+          "file": "178.txt",
+          "gathaNum": "178",
+          "title": "गाथा 178"
+        },
+        {
+          "file": "179.txt",
+          "gathaNum": "179",
+          "title": "गाथा 179"
+        },
+        {
+          "file": "180.txt",
+          "gathaNum": "180",
+          "title": "गाथा 180"
+        },
+        {
+          "file": "181.txt",
+          "gathaNum": "181",
+          "title": "गाथा 181"
+        },
+        {
+          "file": "182.txt",
+          "gathaNum": "182",
+          "title": "गाथा 182"
+        },
+        {
+          "file": "183.txt",
+          "gathaNum": "183",
+          "title": "गाथा 183"
+        },
+        {
+          "file": "184.txt",
+          "gathaNum": "184",
+          "title": "गाथा 184"
+        },
+        {
+          "file": "185.txt",
+          "gathaNum": "185",
+          "title": "गाथा 185"
+        },
+        {
+          "file": "186.txt",
+          "gathaNum": "186",
+          "title": "गाथा 186"
+        },
+        {
+          "file": "187.txt",
+          "gathaNum": "187",
+          "title": "गाथा 187"
+        },
+        {
+          "file": "188.txt",
+          "gathaNum": "188",
+          "title": "गाथा 188"
+        },
+        {
+          "file": "189.txt",
+          "gathaNum": "189",
+          "title": "गाथा 189"
+        },
+        {
+          "file": "190.txt",
+          "gathaNum": "190",
+          "title": "गाथा 190"
+        },
+        {
+          "file": "191.txt",
+          "gathaNum": "191",
+          "title": "गाथा 191"
+        },
+        {
+          "file": "192.txt",
+          "gathaNum": "192",
+          "title": "गाथा 192"
+        },
+        {
+          "file": "193-194.txt",
+          "gathaNum": "193-194",
+          "title": "गाथा 193-194"
+        },
+        {
+          "file": "195.txt",
+          "gathaNum": "195",
+          "title": "गाथा 195"
+        },
+        {
+          "file": "196.txt",
+          "gathaNum": "196",
+          "title": "गाथा 196"
+        },
+        {
+          "file": "197.txt",
+          "gathaNum": "197",
+          "title": "गाथा 197"
+        },
+        {
+          "file": "198.txt",
+          "gathaNum": "198",
+          "title": "गाथा 198"
+        },
+        {
+          "file": "199.txt",
+          "gathaNum": "199",
+          "title": "गाथा 199"
+        },
+        {
+          "file": "200.txt",
+          "gathaNum": "200",
+          "title": "गाथा 200"
+        },
+        {
+          "file": "201.txt",
+          "gathaNum": "201",
+          "title": "गाथा 201"
+        },
+        {
+          "file": "202.txt",
+          "gathaNum": "202",
+          "title": "गाथा 202"
+        },
+        {
+          "file": "203.txt",
+          "gathaNum": "203",
+          "title": "गाथा 203"
+        },
+        {
+          "file": "204.txt",
+          "gathaNum": "204",
+          "title": "गाथा 204"
+        },
+        {
+          "file": "205.txt",
+          "gathaNum": "205",
+          "title": "गाथा 205"
+        },
+        {
+          "file": "206.txt",
+          "gathaNum": "206",
+          "title": "गाथा 206"
+        },
+        {
+          "file": "207.txt",
+          "gathaNum": "207",
+          "title": "गाथा 207"
+        },
+        {
+          "file": "208-209.txt",
+          "gathaNum": "208-209",
+          "title": "गाथा 208-209"
+        },
+        {
+          "file": "210.txt",
+          "gathaNum": "210",
+          "title": "गाथा 210"
+        },
+        {
+          "file": "211.txt",
+          "gathaNum": "211",
+          "title": "गाथा 211"
+        },
+        {
+          "file": "212.txt",
+          "gathaNum": "212",
+          "title": "गाथा 212"
+        },
+        {
+          "file": "213.txt",
+          "gathaNum": "213",
+          "title": "गाथा 213"
+        },
+        {
+          "file": "214.txt",
+          "gathaNum": "214",
+          "title": "गाथा 214"
+        },
+        {
+          "file": "215.txt",
+          "gathaNum": "215",
+          "title": "गाथा 215"
+        },
+        {
+          "file": "216.txt",
+          "gathaNum": "216",
+          "title": "गाथा 216"
+        },
+        {
+          "file": "217.txt",
+          "gathaNum": "217",
+          "title": "गाथा 217"
+        },
+        {
+          "file": "218.txt",
+          "gathaNum": "218",
+          "title": "गाथा 218"
+        },
+        {
+          "file": "219.txt",
+          "gathaNum": "219",
+          "title": "गाथा 219"
+        },
+        {
+          "file": "220.txt",
+          "gathaNum": "220",
+          "title": "गाथा 220"
+        },
+        {
+          "file": "221.txt",
+          "gathaNum": "221",
+          "title": "गाथा 221"
+        },
+        {
+          "file": "222.txt",
+          "gathaNum": "222",
+          "title": "गाथा 222"
+        }
+      ]
+    }
+  ]
+}

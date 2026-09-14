@@ -130,5 +130,16 @@
     "shastraSlug": "panchadhyayi",
     "path": "01_द्रव्यानुयोग/12_पंचाध्यायी--पं-राजमलजी",
     "gathaCount": 1545
+  },
+  {
+    "id": "pahuddoha",
+    "title": "पाहुड-दोहा",
+    "author": "राम-सिंह-मुनि",
+    "categoryHi": "द्रव्यानुयोग",
+    "categoryEn": "Dravyanuyog",
+    "categorySlug": "dravyanuyog",
+    "shastraSlug": "pahuddoha",
+    "path": "01_द्रव्यानुयोग/13_पाहुड-दोहा--राम-सिंह-मुनि",
+    "gathaCount": 222
   }
 ]

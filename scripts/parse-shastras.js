@@ -327,7 +327,7 @@ function parseGathaHtml(filePath) {
       .replace(/<span[^>]*class=["']?decFontSz["']?[^>]*>[\s\S]*?<\/span>/gi, '')
       .replace(/<a[^>]*>([\s\S]*?)<\/a>/gi, '$1');
     title = stripHtml(title);
-  } else if (fileName === '001.html') {
+  } else if (fileName === '001.html' && (filePath.includes('द्रव्यसंग्रह') || filePath.includes('dravyasangrah'))) {
     title = "टीकाकार (ब्रह्मदेव सूरि) द्वारा मंगलाचरण";
   }
 
@@ -784,7 +784,7 @@ function convertShastra(config) {
   }
 
   // Prepend 001.html if it exists but is not in chapters
-  const has001Html = fs.existsSync(path.join(htmlFolder, '001.html'));
+  const has001Html = fs.existsSync(path.join(htmlFolder, '001.html')) && !shastraDirName.includes('पाहुड-दोहा') && !shastraDirName.includes('pahuddoha') && !shastraDirName.includes('pahud-doha');
   if (has001Html) {
     let firstChapter = shastraChapters[0];
     if (!firstChapter) {
@@ -907,6 +907,25 @@ function convertShastra(config) {
         }
       }
 
+      const isMangala = file.startsWith('0000_') || file.startsWith('000_');
+      const isPahudDoha = shastraDirName.includes('पाहुड-दोहा') || shastraDirName.includes('pahuddoha');
+
+      if (isPahudDoha && !isMangala) {
+        if (file === '001.html') {
+          parsedData.title = 'मंगलाचरण';
+        } else {
+          const rangeMatch = file.match(/^(\d+)[-–](\d+)/);
+          if (rangeMatch) {
+            parsedData.title = `गाथा ${parseInt(rangeMatch[1], 10)}-${parseInt(rangeMatch[2], 10)}`;
+          } else {
+            const numMatch = file.match(/^(\d+)/);
+            if (numMatch) {
+              parsedData.title = `गाथा ${parseInt(numMatch[1], 10)}`;
+            }
+          }
+        }
+      }
+
       const formattedText = formatGathaText(parsedData);
       
       const txtFileName = file.replace('.html', '.txt');
@@ -914,9 +933,12 @@ function convertShastra(config) {
       
       // Do not overwrite existing txt files to prevent losing manual formatting/edits (e.g. Mangalacharans)
       // BUT if the file exists and is missing teekas while parsedData has teekas, update it (except mangalacharan files).
-      const isMangala = file.startsWith('0000_') || file.startsWith('000_');
       if (!fs.existsSync(txtFilePath)) {
         fs.writeFileSync(txtFilePath, formattedText, 'utf-8');
+      } else if (isPahudDoha && !isMangala) {
+        let content = fs.readFileSync(txtFilePath, 'utf-8');
+        content = content.replace(/^=== Title ===\r?\n[^\r\n]+/m, `=== Title ===\n${parsedData.title}`);
+        fs.writeFileSync(txtFilePath, content, 'utf-8');
       } else if (!isMangala && parsedData.teekas.length > 0) {
         const existingTxt = fs.readFileSync(txtFilePath, 'utf-8');
         if (!existingTxt.includes('=== Teeka:')) {
@@ -1139,14 +1161,14 @@ function convertShastra(config) {
         base.startsWith('0000_शास्त्र-मंगलाचरण') || 
         base.startsWith('000_शास्त्र-मंगलाचरण') || 
         base.startsWith('000_मंगलाचरण') || 
-        (base === '001' && !shastraDirName.includes('योगसार-प्राभृत') && !shastraDirName.includes('yogsaarprabhrat') && !shastraDirName.includes('panchadhyayi') && !shastraDirName.includes('पंचाध्यायी')) || 
+        (base === '001' && !shastraDirName.includes('योगसार-प्राभृत') && !shastraDirName.includes('yogsaarprabhrat') && !shastraDirName.includes('panchadhyayi') && !shastraDirName.includes('पंचाध्यायी') && !shastraDirName.includes('पाहुड-दोहा') && !shastraDirName.includes('pahuddoha')) || 
         base === '01' ||
         (base === '1-001' && !shastraDirName.includes('panchadhyayi') && !shastraDirName.includes('पंचाध्यायी'));
       
       const isMangalaTitle = 
-        (item.title.includes('मंगलाचरण') && !shastraDirName.includes('योगसार-प्राभृत') && !shastraDirName.includes('yogsaarprabhrat') && !shastraDirName.includes('panchadhyayi') && !shastraDirName.includes('पंचाध्यायी')) || 
+        (item.title.includes('मंगलाचरण') && !shastraDirName.includes('योगसार-प्राभृत') && !shastraDirName.includes('yogsaarprabhrat') && !shastraDirName.includes('panchadhyayi') && !shastraDirName.includes('पंचाध्यायी') && !shastraDirName.includes('पाहुड-दोहा') && !shastraDirName.includes('pahuddoha')) || 
         item.gathaNum === '000' || 
-        (item.gathaNum === '001' && !shastraDirName.includes('योगसार-प्राभृत') && !shastraDirName.includes('yogsaarprabhrat') && !shastraDirName.includes('panchadhyayi') && !shastraDirName.includes('पंचाध्यायी')) || 
+        (item.gathaNum === '001' && !shastraDirName.includes('योगसार-प्राभृत') && !shastraDirName.includes('yogsaarprabhrat') && !shastraDirName.includes('panchadhyayi') && !shastraDirName.includes('पंचाध्यायी') && !shastraDirName.includes('पाहुड-दोहा') && !shastraDirName.includes('pahuddoha')) || 
         item.gathaNum === '01' ||
         (item.gathaNum === '1-001' && !shastraDirName.includes('panchadhyayi') && !shastraDirName.includes('पंचाध्यायी')) ||
         item.gathaNum === '000_मंगलाचरण';
@@ -1302,6 +1324,59 @@ function convertShastra(config) {
     sortPanchadhyayiItems(panchadhyayiChapters[2].items);
 
     shastraChapters = panchadhyayiChapters.filter(ch => ch.items.length > 0);
+  }
+
+  if (config.id === 'pahuddoha') {
+    const pahuddohaChapters = [
+      { name: "मंगलाचरण", items: [] },
+      { name: "मूल ग्रंथ", items: [] }
+    ];
+
+    const allTxtFiles = fs.readdirSync(destShastraPath).filter(f => f.endsWith('.txt')).sort();
+    for (const txtFile of allTxtFiles) {
+      const baseName = path.basename(txtFile, '.txt');
+      if (baseName.startsWith('0000_शास्त्र-मंगलाचरण') || baseName.startsWith('000_शास्त्र-मंगलाचरण')) {
+        pahuddohaChapters[0].items.push({
+          file: txtFile,
+          gathaNum: '000',
+          title: 'शास्त्र-मंगलाचरण'
+        });
+      } else if (baseName === '001') {
+        pahuddohaChapters[0].items.push({
+          file: txtFile,
+          gathaNum: '001',
+          title: 'मंगलाचरण'
+        });
+      } else {
+        const rangeMatch = baseName.match(/^(\d+)[-–](\d+)/);
+        let title = '';
+        if (rangeMatch) {
+          title = `गाथा ${parseInt(rangeMatch[1], 10)}-${parseInt(rangeMatch[2], 10)}`;
+        } else {
+          const numMatch = baseName.match(/^(\d+)/);
+          if (numMatch) {
+            title = `गाथा ${parseInt(numMatch[1], 10)}`;
+          } else {
+            title = `गाथा ${baseName}`;
+          }
+        }
+        pahuddohaChapters[1].items.push({
+          file: txtFile,
+          gathaNum: baseName,
+          title
+        });
+      }
+    }
+
+    pahuddohaChapters[0].items.sort((a, b) => a.file.localeCompare(b.file));
+
+    pahuddohaChapters[1].items.sort((a, b) => {
+      const numA = parseInt(a.gathaNum.match(/\d+/)?.[0] || '0', 10);
+      const numB = parseInt(b.gathaNum.match(/\d+/)?.[0] || '0', 10);
+      return numA - numB;
+    });
+
+    shastraChapters = pahuddohaChapters;
   }
 
   const shastraIndexJson = {
@@ -1557,6 +1632,26 @@ const configs = [
       subtitle: "मूल संस्कृत गाथा, हिंदी अन्वयार्थ एवं विशेषार्थ",
       credits: ""
     }
+  },
+  {
+    id: "pahuddoha",
+    title: "पाहुड-दोहा",
+    author: "राम-सिंह-मुनि",
+    category: "द्रव्यानुयोग",
+    categoryHi: "द्रव्यानुयोग",
+    categoryEn: "Dravyanuyog",
+    categorySlug: "dravyanuyog",
+    shastraSlug: "pahuddoha",
+    categoryDirName: "01_द्रव्यानुयोग",
+    sourceShastraDirName: "16_पाहुड-दोहा--राम-सिंह-मुनि",
+    shastraDirName: "13_पाहुड-दोहा--राम-सिंह-मुनि",
+    cover: {
+      invocation: "!! श्रीसर्वज्ञवीतरागाय नम: !!",
+      authorPrefix: "श्रीमद्‌-राम-सिंह मुनि-प्रणीत",
+      title: "श्री पाहुड-दोहा",
+      subtitle: "मूल अपभ्रंश/प्राकृत दोहा एवं हिंदी अन्वयार्थ",
+      credits: ""
+    }
   }
 ];
 
@@ -1610,6 +1705,9 @@ function getActualGathaCount(chapters, configId) {
   }
   if (configId === 'panchadhyayi') {
     return 1545;
+  }
+  if (configId === 'pahuddoha') {
+    return 222;
   }
   if (configId === 'tatvaarthsutra' || configId === 'paramatmaprakash') {
     return totalValidItems;
