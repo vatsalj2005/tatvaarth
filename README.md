@@ -119,6 +119,7 @@ Currently migrated scriptures under **द्रव्यानुयोग (Drav
 11. **योगसार** (*Yogasar*) — योगींदुदेव
 12. **पंचाध्यायी** (*Panchadhyayi*) — पं. राजमलजी
 13. **पाहुड-दोहा** (*Pahud-Doha*) — राम-सिंह-मुनि
+14. **परम-अध्यात्म-तरंगिणी** (*Param Adhyatma Tarangini*) — अमृतचंद्राचार्य
 
 ---
 

@@ -19,7 +19,7 @@ const BhajanLanding = () => {
     <div className="min-h-screen bg-background">
       <Header />
       <div className="pt-24 pb-16 px-4">
-        <div className="container mx-auto max-w-4xl">
+        <div className="container mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -38,7 +38,7 @@ const BhajanLanding = () => {
           />
 
           {/* Subdivision Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {subdivisions.map((sub, i) => {
               const count = getBhajansBySubdivision(sub.id).length;
               return (

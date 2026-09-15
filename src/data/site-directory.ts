@@ -108,12 +108,12 @@ export const siteDirectories: SiteDirectoryItem[] = [
     id: 'shastra-dravyanuyog',
     nameHi: 'द्रव्यानुयोग',
     nameEn: 'Dravyanuyog',
-    descHi: 'जीव, अजीव, शुद्धात्मा और तत्त्वों का आध्यात्मिक विवेचन (13 शास्त्र)',
-    descEn: 'Metaphysics, soul, substance and spiritual philosophy (13 scriptures)',
+    descHi: 'जीव, अजीव, शुद्धात्मा और तत्त्वों का आध्यात्मिक विवेचन (14 शास्त्र)',
+    descEn: 'Metaphysics, soul, substance and spiritual philosophy (14 scriptures)',
     url: '/shastra/dravyanuyog',
     type: 'shastra-category',
     icon: '💎',
-    aliases: ['dravyanuyog', 'dravya', 'dravyanyog', 'dravyanuyoga', 'द्रव्यानुयोग', 'द्रव्य']
+    aliases: ['dravyanuyog', 'dravya', 'dravyanyog', 'dravyanuyoga', 'द्रव्यानुयोग', 'द्रव्य', 'paramadhyatmatarangini', 'paramadhyatma', 'tarangini', 'परम-अध्यात्म-तरंगिणी', 'परम अध्यात्म तरंगिणी']
   },
   {
     id: 'shastra-charananuyog',

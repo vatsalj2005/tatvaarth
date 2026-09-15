@@ -339,7 +339,12 @@ function parseGathaHtml(filePath) {
   }
 
   if (!title && gatha) {
-    const firstLine = gatha.split(/\r?\n/)[0].replace(/[॥।\d\-–\s]+$/, '').trim();
+    const rawLines = gatha.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+    let firstLine = rawLines[0] || '';
+    if (firstLine.match(/^\([^\)]+\)$/) && rawLines.length > 1) {
+      firstLine = rawLines[1];
+    }
+    firstLine = firstLine.replace(/[॥।\d\-–\s]+$/, '').trim();
     if (firstLine) {
       const dandaPart = firstLine.split(/[।॥]/)[0].trim();
       title = dandaPart.length > 5 ? dandaPart : firstLine;
@@ -909,6 +914,7 @@ function convertShastra(config) {
 
       const isMangala = file.startsWith('0000_') || file.startsWith('000_');
       const isPahudDoha = shastraDirName.includes('पाहुड-दोहा') || shastraDirName.includes('pahuddoha');
+      const isTarangini = shastraDirName.includes('परम-अध्यात्म-तरंगिणी') || shastraDirName.includes('paramadhyatmatarangini');
 
       if (isPahudDoha && !isMangala) {
         if (file === '001.html') {
@@ -935,7 +941,7 @@ function convertShastra(config) {
       // BUT if the file exists and is missing teekas while parsedData has teekas, update it (except mangalacharan files).
       if (!fs.existsSync(txtFilePath)) {
         fs.writeFileSync(txtFilePath, formattedText, 'utf-8');
-      } else if (isPahudDoha && !isMangala) {
+      } else if ((isPahudDoha || isTarangini) && !isMangala) {
         let content = fs.readFileSync(txtFilePath, 'utf-8');
         content = content.replace(/^=== Title ===\r?\n[^\r\n]+/m, `=== Title ===\n${parsedData.title}`);
         fs.writeFileSync(txtFilePath, content, 'utf-8');
@@ -1209,125 +1215,10 @@ function convertShastra(config) {
     });
   }
 
-  if (config.id === 'yogsaarprabhrat') {
-    // Group Yogsaar-Prabhrat files into 9 rights (Adhikars) plus Mangalacharan
-    const yogsaarChapters = [
-      { name: "मंगलाचरण", items: [] },
-      { name: "जीव अधिकार", items: [] },
-      { name: "अजीव अधिकार", items: [] },
-      { name: "आस्रव अधिकार", items: [] },
-      { name: "बन्ध अधिकार", items: [] },
-      { name: "संवर अधिकार", items: [] },
-      { name: "निर्जरा अधिकार", items: [] },
-      { name: "मोक्ष अधिकार", items: [] },
-      { name: "चारित्र अधिकार", items: [] },
-      { name: "चूलिका अधिकार", items: [] }
-    ];
 
-    // Collect all items from the existing shastraChapters
-    const allItems = [];
-    const seenFiles = new Set();
-    for (const chapter of shastraChapters) {
-      for (const item of chapter.items) {
-        if (!seenFiles.has(item.file)) {
-          seenFiles.add(item.file);
-          allItems.push(item);
-        }
-      }
-    }
 
-    for (const item of allItems) {
-      const baseName = path.basename(item.file, '.txt');
-      if (baseName.startsWith('0000_शास्त्र-मंगलाचरण') || baseName.startsWith('000_शास्त्र-मंगलाचरण')) {
-        yogsaarChapters[0].items.push(item);
-      } else {
-        const firstNumMatch = baseName.match(/^([०-९0-9]+)/);
-        if (firstNumMatch) {
-          const num = parseInt(firstNumMatch[1], 10);
-          if (num >= 1 && num <= 59) {
-            yogsaarChapters[1].items.push(item);
-          } else if (num >= 60 && num <= 109) {
-            yogsaarChapters[2].items.push(item);
-          } else if (num >= 110 && num <= 149) {
-            yogsaarChapters[3].items.push(item);
-          } else if (num >= 150 && num <= 190) {
-            yogsaarChapters[4].items.push(item);
-          } else if (num >= 191 && num <= 252) {
-            yogsaarChapters[5].items.push(item);
-          } else if (num >= 253 && num <= 302) {
-            yogsaarChapters[6].items.push(item);
-          } else if (num >= 303 && num <= 356) {
-            yogsaarChapters[7].items.push(item);
-          } else if (num >= 357 && num <= 456) {
-            yogsaarChapters[8].items.push(item);
-          } else if (num >= 457 && num <= 540) {
-            yogsaarChapters[9].items.push(item);
-          } else {
-            yogsaarChapters[9].items.push(item);
-          }
-        } else {
-          yogsaarChapters[0].items.push(item);
-        }
-      }
-    }
-
-    shastraChapters = yogsaarChapters.filter(ch => ch.items.length > 0);
-  }
-
-  if (config.id === 'panchadhyayi') {
-    const panchadhyayiChapters = [
-      { name: "मंगलाचरण", items: [] },
-      { name: "प्रथम अध्याय (पूर्वार्ध)", items: [] },
-      { name: "द्वितीय अध्याय (उत्तरार्ध)", items: [] }
-    ];
-
-    const allTxtFiles = fs.readdirSync(destShastraPath).filter(f => f.endsWith('.txt')).sort();
-    for (const txtFile of allTxtFiles) {
-      const baseName = path.basename(txtFile, '.txt');
-      if (baseName.startsWith('3-') || baseName === 'index') {
-        continue;
-      }
-      const txtFilePath = path.join(destShastraPath, txtFile);
-      const fileTitle = readTitleFromTxt(txtFilePath);
-      const item = {
-        file: txtFile,
-        gathaNum: baseName.startsWith('0000_') ? '000' : baseName,
-        title: fileTitle || `गाथा ${baseName}`
-      };
-
-      if (baseName.startsWith('0000_') || baseName.includes('मंगलाचरण')) {
-        panchadhyayiChapters[0].items.push(item);
-      } else if (baseName.startsWith('1-')) {
-        panchadhyayiChapters[1].items.push(item);
-      } else if (baseName.startsWith('2-')) {
-        panchadhyayiChapters[2].items.push(item);
-      }
-    }
-
-    const sortPanchadhyayiItems = (items) => {
-      items.sort((a, b) => {
-        const getVal = (itm) => {
-          const base = path.basename(itm.file, '.txt');
-          if (base.startsWith('0000_')) return 0;
-          const m = base.match(/^(\d+)[-_](\d+)/);
-          if (m) {
-            return parseInt(m[1], 10) * 100000 + parseInt(m[2], 10);
-          }
-          return 99999999;
-        };
-        return getVal(a) - getVal(b);
-      });
-    };
-
-    sortPanchadhyayiItems(panchadhyayiChapters[0].items);
-    sortPanchadhyayiItems(panchadhyayiChapters[1].items);
-    sortPanchadhyayiItems(panchadhyayiChapters[2].items);
-
-    shastraChapters = panchadhyayiChapters.filter(ch => ch.items.length > 0);
-  }
-
-  if (config.id === 'pahuddoha') {
-    const pahuddohaChapters = [
+  if (config.id === 'paramadhyatmatarangini') {
+    const taranginiChapters = [
       { name: "मंगलाचरण", items: [] },
       { name: "मूल ग्रंथ", items: [] }
     ];
@@ -1336,47 +1227,33 @@ function convertShastra(config) {
     for (const txtFile of allTxtFiles) {
       const baseName = path.basename(txtFile, '.txt');
       if (baseName.startsWith('0000_शास्त्र-मंगलाचरण') || baseName.startsWith('000_शास्त्र-मंगलाचरण')) {
-        pahuddohaChapters[0].items.push({
+        taranginiChapters[0].items.push({
           file: txtFile,
           gathaNum: '000',
           title: 'शास्त्र-मंगलाचरण'
         });
-      } else if (baseName === '001') {
-        pahuddohaChapters[0].items.push({
-          file: txtFile,
-          gathaNum: '001',
-          title: 'मंगलाचरण'
-        });
       } else {
-        const rangeMatch = baseName.match(/^(\d+)[-–](\d+)/);
-        let title = '';
-        if (rangeMatch) {
-          title = `गाथा ${parseInt(rangeMatch[1], 10)}-${parseInt(rangeMatch[2], 10)}`;
-        } else {
-          const numMatch = baseName.match(/^(\d+)/);
-          if (numMatch) {
-            title = `गाथा ${parseInt(numMatch[1], 10)}`;
-          } else {
-            title = `गाथा ${baseName}`;
-          }
-        }
-        pahuddohaChapters[1].items.push({
+        const txtFilePath = path.join(destShastraPath, txtFile);
+        const fileTitle = readTitleFromTxt(txtFilePath);
+        const numMatch = baseName.match(/^(\d+)/);
+        const shlokaNumber = numMatch ? parseInt(numMatch[1], 10) : baseName;
+        taranginiChapters[1].items.push({
           file: txtFile,
           gathaNum: baseName,
-          title
+          title: fileTitle || `श्लोक ${shlokaNumber}`
         });
       }
     }
 
-    pahuddohaChapters[0].items.sort((a, b) => a.file.localeCompare(b.file));
+    taranginiChapters[0].items.sort((a, b) => a.file.localeCompare(b.file));
 
-    pahuddohaChapters[1].items.sort((a, b) => {
+    taranginiChapters[1].items.sort((a, b) => {
       const numA = parseInt(a.gathaNum.match(/\d+/)?.[0] || '0', 10);
       const numB = parseInt(b.gathaNum.match(/\d+/)?.[0] || '0', 10);
       return numA - numB;
     });
 
-    shastraChapters = pahuddohaChapters;
+    shastraChapters = taranginiChapters;
   }
 
   const shastraIndexJson = {
@@ -1400,262 +1277,47 @@ function convertShastra(config) {
 
 const configs = [
   {
-    id: "samaysar",
-    title: "समयसार",
-    author: "कुन्दकुन्दाचार्य",
+    id: "paramadhyatmatarangini",
+    title: "परम-अध्यात्म-तरंगिणी",
+    author: "अमृतचंद्राचार्य",
     category: "द्रव्यानुयोग",
     categoryHi: "द्रव्यानुयोग",
     categoryEn: "Dravyanuyog",
     categorySlug: "dravyanuyog",
-    shastraSlug: "samaysar",
+    shastraSlug: "paramadhyatmatarangini",
     categoryDirName: "01_द्रव्यानुयोग",
-    shastraDirName: "01_समयसार--कुन्दकुन्दाचार्य"
-  },
-  {
-    id: "pravachansar",
-    title: "प्रवचनसार",
-    author: "कुन्दकुन्दाचार्य",
-    category: "द्रव्यानुयोग",
-    categoryHi: "द्रव्यानुयोग",
-    categoryEn: "Dravyanuyog",
-    categorySlug: "dravyanuyog",
-    shastraSlug: "pravachansar",
-    categoryDirName: "01_द्रव्यानुयोग",
-    shastraDirName: "02_प्रवचनसार--कुन्दकुन्दाचार्य",
-    cover: {
-      invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
-      authorPrefix: "श्रीमद्-भगवत्कुन्दकुन्दाचार्यदेव-प्रणीत",
-      title: "श्री प्रवचनसार",
-      subtitle: "मूल प्राकृत गाथा, श्री अमृतचंद्राचार्य विरचित 'तत्त्वदीपिका' नामक संस्कृत टीका का हिंदी अनुवाद, श्री जयसेनाचार्य विरचित 'तात्पर्य-वृत्ति' नामक संस्कृत टीका का हिंदी अनुवाद सहित",
-      credits: "आभार : पं जयचंदजी छाबडा, पं हुकमचंद भारिल्ल"
-    }
-  },
-  {
-    id: "panchastikay",
-    title: "पञ्चास्तिकाय",
-    author: "कुन्दकुन्दाचार्य",
-    category: "द्रव्यानुयोग",
-    categoryHi: "द्रव्यानुयोग",
-    categoryEn: "Dravyanuyog",
-    categorySlug: "dravyanuyog",
-    shastraSlug: "panchastikay",
-    categoryDirName: "01_द्रव्यानुयोग",
-    sourceShastraDirName: "05_पञ्चास्तिकाय--कुन्दकुन्दाचार्य",
-    shastraDirName: "03_पञ्चास्तिकाय--कुन्दकुन्दाचार्य",
-    cover: {
-      invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
-      authorPrefix: "श्रीमद्-भगवत्कुन्दकुन्दाचार्य-प्रणीत",
-      title: "श्री पञ्चास्तिकाय",
-      subtitle: "मूल प्राकृत गाथा, श्री अमृतचंद्राचार्य विरचित 'समय-व्याख्या' नामक संस्कृत टीका का हिंदी अनुवाद, श्री जयसेनाचार्य विरचित 'तात्पर्य-वृत्ति' नामक संस्कृत टीका का हिंदी अनुवाद सहित",
-      credits: "आभार : पं जयचंदजी छाबडा, पं हुकमचंद भारिल्ल"
-    }
-  },
-  {
-    id: "dravyasangraha",
-    title: "द्रव्यसंग्रह",
-    author: "नेमिचंद्र-सिद्धांतचक्रवर्ती",
-    category: "द्रव्यानुयोग",
-    categoryHi: "द्रव्यानुयोग",
-    categoryEn: "Dravyanuyog",
-    categorySlug: "dravyanuyog",
-    shastraSlug: "dravyasangraha",
-    categoryDirName: "01_द्रव्यानुयोग",
-    sourceShastraDirName: "06_द्रव्यसंग्रह--नेमिचंद्र-सिद्धांतचक्रवर्ती",
-    shastraDirName: "04_द्रव्यसंग्रह--नेमिचंद्र-सिद्धांतचक्रवर्ती",
-    cover: {
-      invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
-      authorPrefix: "श्रीमद्-भगवन्नेमिचन्द्र-प्रणीत",
-      title: "श्री द्रव्यसंग्रह",
-      subtitle: "मूल शौरसेणी प्राकृत गाथा और ब्रह्मदेव-सूरि (वि० सं० की १२वीं शताब्दी) कृत टीका सहित",
-      credits: "आभार : पद्यानुवाद : आ. डॉ. हुकमचंद भारिल्ल"
-    }
-  },
-  {
-    id: "samadhitantra",
-    title: "समाधितन्त्र",
-    author: "पूज्यपाद",
-    category: "द्रव्यानुयोग",
-    categoryHi: "द्रव्यानुयोग",
-    categoryEn: "Dravyanuyog",
-    categorySlug: "dravyanuyog",
-    shastraSlug: "samadhitantra",
-    categoryDirName: "01_द्रव्यानुयोग",
-    sourceShastraDirName: "07_समाधितन्त्र--आचार्य‌-पूज्यपाद",
-    shastraDirName: "05_समाधितन्त्र--आचार्य‌-पूज्यपाद",
-    cover: {
-      invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
-      authorPrefix: "आचार्य-पूज्यपाद-प्रणीत",
-      title: "श्री समाधितन्त्र",
-      subtitle: "मूल संस्कृत गाथा, श्री प्रभाचंद्र आचार्य द्वारा कृत संस्कृत टीका का हिंदी अनुवाद पं देवेन्द्रकुमार बिजौलियां वाले, श्री क्षु. मनोहर वर्णी द्वारा कृत हिंदी टीका सहित",
-      credits: ""
-    }
-  },
-  {
-    id: "swaroopsambodhan",
-    title: "स्वरूप-संबोधन",
-    author: "अकलंक-देव",
-    category: "द्रव्यानुयोग",
-    categoryHi: "द्रव्यानुयोग",
-    categoryEn: "Dravyanuyog",
-    categorySlug: "dravyanuyog",
-    shastraSlug: "swaroopsambodhan",
-    categoryDirName: "01_द्रव्यानुयोग",
-    sourceShastraDirName: "08_स्वरूप-संबोधन--अकलंक-देव",
-    shastraDirName: "06_स्वरूप-संबोधन--अकलंक-देव",
-    cover: {
-      invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
-      authorPrefix: "श्रीमद्-भगवत्-अकलंक-आचार्यदेव-प्रणीत",
-      title: "श्री स्वरूप-संबोधन",
-      subtitle: "",
-      credits: ""
-    }
-  },
-  {
-    id: "ishtopadesh",
-    title: "इष्टोपदेश",
-    author: "पूज्यपाद",
-    category: "द्रव्यानुयोग",
-    categoryHi: "द्रव्यानुयोग",
-    categoryEn: "Dravyanuyog",
-    categorySlug: "dravyanuyog",
-    shastraSlug: "ishtopadesh",
-    categoryDirName: "01_द्रव्यानुयोग",
-    sourceShastraDirName: "09_इष्टोपदेश--आचार्य‌-पूज्यपाद",
-    shastraDirName: "07_इष्टोपदेश--आचार्य‌-पूज्यपाद",
-    cover: {
-      invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
-      authorPrefix: "श्रीमद्-भगवत्पूज्यपाद-आचार्य-प्रणीत",
-      title: "श्री इष्टोपदेश",
-      subtitle: "मूल संस्कृत गाथा",
-      credits: "आभार : पंडित आशाधरजी"
-    }
-  },
-  {
-    id: "paramatmaprakash",
-    title: "परमात्मप्रकाश",
-    author: "योगींदुदेव",
-    category: "द्रव्यानुयोग",
-    categoryHi: "द्रव्यानुयोग",
-    categoryEn: "Dravyanuyog",
-    categorySlug: "dravyanuyog",
-    shastraSlug: "paramatmaprakash",
-    categoryDirName: "01_द्रव्यानुयोग",
-    sourceShastraDirName: "10_परमात्मप्रकाश--योगींदुदेव",
-    shastraDirName: "08_परमात्मप्रकाश--योगींदुदेव",
-    cover: {
-      invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
-      authorPrefix: "श्रीमद्-भगवत्योगीन्दु-देव-प्रणीत",
-      title: "श्री परमात्मप्रकाश",
-      subtitle: "मूल प्राकृत गाथा,",
-      credits: ""
-    }
-  },
-
-  {
-    id: "yogsaarprabhrat",
-    title: "योगसार-प्राभृत",
-    author: "अमितगति-आचार्य",
-    category: "द्रव्यानुयोग",
-    categoryHi: "द्रव्यानुयोग",
-    categoryEn: "Dravyanuyog",
-    categorySlug: "dravyanuyog",
-    shastraSlug: "yogsaarprabhrat",
-    categoryDirName: "01_द्रव्यानुयोग",
-    sourceShastraDirName: "12_योगसार-प्राभृत--अमितगति-आचार्य",
-    shastraDirName: "09_योगसार-प्राभृत--अमितगति-आचार्य",
+    sourceShastraDirName: "17_परम-अध्यात्म-तरंगिणी--अमृतचंद्राचार्य",
+    shastraDirName: "14_परम-अध्यात्म-तरंगिणी--अमृतचंद्राचार्य",
+    gathaCount: 112,
     cover: {
       invocation: "!! श्रीसर्वज्ञवीतरागाय नम: !!",
-      authorPrefix: "श्रीमद्-भगवत्अमितगतिदेव-प्रणीत",
-      title: "श्री योगसार-प्राभृत",
-      subtitle: "मूल अपभ्रंश गाथा",
-      credits: ""
-    }
-  },
-
-  {
-    id: "tatvaarthsutra",
-    title: "तत्त्वार्थसूत्र",
-    author: "उमास्वामी",
-    category: "द्रव्यानुयोग",
-    categoryHi: "द्रव्यानुयोग",
-    categoryEn: "Dravyanuyog",
-    categorySlug: "dravyanuyog",
-    shastraSlug: "tatvaarthsutra",
-    categoryDirName: "01_द्रव्यानुयोग",
-    sourceShastraDirName: "13_तत्त्वार्थसूत्र--आचार्य-उमास्वामी",
-    shastraDirName: "10_तत्त्वार्थसूत्र--आचार्य-उमास्वामी",
-    cover: {
-      invocation: "!! श्रीसर्वज्ञवीतरागाय नमः !!",
-      authorPrefix: "श्रीमद्‌-भगवत्उमास्वामीदेव-प्रणीत",
-      title: "श्री तत्त्वार्थ-सूत्र",
-      subtitle: "मूल संस्कृत सूत्र, श्री पूज्यपाद-आचार्य विरचित 'सर्वार्थ-सिद्धि' नामक संस्कृत टीका का हिंदी अनुवाद, श्री अकलान्काचार्य विरचित 'तत्त्वार्थ-राजवार्तिक' नामक संस्कृत टीका का हिंदी अनुवाद सहित",
-      credits: "आभार : महेंद्र-कुमार जैन 'न्यायाचार्य', सुपार्श्वमती-माताजी"
-    }
-  },
-
-  {
-    id: "yogsaar",
-    title: "योगसार",
-    author: "योगींदुदेव",
-    category: "द्रव्यानुयोग",
-    categoryHi: "द्रव्यानुयोग",
-    categoryEn: "Dravyanuyog",
-    categorySlug: "dravyanuyog",
-    shastraSlug: "yogsaar",
-    categoryDirName: "01_द्रव्यानुयोग",
-    sourceShastraDirName: "14_योगसार--योगींदुदेव",
-    shastraDirName: "11_योगसार--योगींदुदेव",
-    cover: {
-      invocation: "!! श्रीसर्वज्ञवीतरागाय नम: !!",
-      authorPrefix: "श्रीमद्-भगवत्योगींदुदेव-प्रणीत",
-      title: "श्री योगसार",
-      subtitle: "मूल अपभ्रंश गाथा",
-      credits: ""
-    }
-  },
-  {
-    id: "panchadhyayi",
-    title: "पंचाध्यायी",
-    author: "पं-राजमलजी",
-    category: "द्रव्यानुयोग",
-    categoryHi: "द्रव्यानुयोग",
-    categoryEn: "Dravyanuyog",
-    categorySlug: "dravyanuyog",
-    shastraSlug: "panchadhyayi",
-    categoryDirName: "01_द्रव्यानुयोग",
-    sourceShastraDirName: "15_पंचाध्यायी",
-    shastraDirName: "12_पंचाध्यायी--पं-राजमलजी",
-    cover: {
-      invocation: "!! श्रीसर्वज्ञवीतरागाय नम: !!",
-      authorPrefix: "कविवर-पंडित-राजमलजी-विरचित",
-      title: "श्री पंचाध्यायी",
-      subtitle: "मूल संस्कृत गाथा, हिंदी अन्वयार्थ एवं विशेषार्थ",
-      credits: ""
-    }
-  },
-  {
-    id: "pahuddoha",
-    title: "पाहुड-दोहा",
-    author: "राम-सिंह-मुनि",
-    category: "द्रव्यानुयोग",
-    categoryHi: "द्रव्यानुयोग",
-    categoryEn: "Dravyanuyog",
-    categorySlug: "dravyanuyog",
-    shastraSlug: "pahuddoha",
-    categoryDirName: "01_द्रव्यानुयोग",
-    sourceShastraDirName: "16_पाहुड-दोहा--राम-सिंह-मुनि",
-    shastraDirName: "13_पाहुड-दोहा--राम-सिंह-मुनि",
-    cover: {
-      invocation: "!! श्रीसर्वज्ञवीतरागाय नम: !!",
-      authorPrefix: "श्रीमद्‌-राम-सिंह मुनि-प्रणीत",
-      title: "श्री पाहुड-दोहा",
-      subtitle: "मूल अपभ्रंश/प्राकृत दोहा एवं हिंदी अन्वयार्थ",
+      authorPrefix: "श्रीमद्-अमृतचंद्राचार्य-प्रणीत",
+      title: "श्री परम-अध्यात्म-तरंगिणी",
+      subtitle: "मूल संस्कृत श्लोक एवं हिंदी अन्वयार्थ",
       credits: ""
     }
   }
+  // To upload a new shastra in the future, simply add its config object here:
+  // e.g.
+  // {
+  //   id: "tattvajnanatarangini",
+  //   title: "तत्त्वज्ञान-तरंगिणी",
+  //   author: "भट्टारक-ज्ञानभूषण",
+  //   category: "द्रव्यानुयोग",
+  //   categoryHi: "द्रव्यानुयोग",
+  //   categoryEn: "Dravyanuyog",
+  //   categorySlug: "dravyanuyog",
+  //   shastraSlug: "tattvajnanatarangini",
+  //   categoryDirName: "01_द्रव्यानुयोग",
+  //   sourceShastraDirName: "18_तत्त्वज्ञान-तरंगिणी--भट्टारक-ज्ञानभूषण",
+  //   shastraDirName: "15_तत्त्वज्ञान-तरंगिणी--भट्टारक-ज्ञानभूषण"
+  // }
 ];
 
-function getActualGathaCount(chapters, configId) {
+function getActualGathaCount(chapters, configId, explicitCount) {
+  if (explicitCount) return explicitCount;
+  if (configId === 'paramadhyatmatarangini') return 112;
+
   let maxGatha = 0;
   let totalValidItems = 0;
   for (const chapter of chapters) {
@@ -1678,64 +1340,60 @@ function getActualGathaCount(chapters, configId) {
       
       totalValidItems++;
 
-      // Skip major-minor chapter-sutra patterns (like 01-01 or 1-002) when parsing range matches
-      const isChapterSutra = configId === 'tatvaarthsutra' || configId === 'paramatmaprakash';
-      if (!isChapterSutra) {
-        // Look for range like 222-227
-        const rangeMatch = numStr.match(/^(\d+)[-–](\d+)$/);
-        if (rangeMatch) {
-          const end = parseInt(rangeMatch[2], 10);
-          if (!isNaN(end) && end > maxGatha) {
-            maxGatha = end;
-          }
-          continue;
+      const rangeMatch = numStr.match(/^(\d+)[-–](\d+)$/);
+      if (rangeMatch) {
+        const end = parseInt(rangeMatch[2], 10);
+        if (!isNaN(end) && end > maxGatha) {
+          maxGatha = end;
         }
-        
-        // Single number like 012 or 439
-        const singleMatch = numStr.match(/^(\d+)/);
-        if (singleMatch) {
-          const val = parseInt(singleMatch[1], 10);
-          if (!isNaN(val) && val > maxGatha) {
-            maxGatha = val;
-          }
-          continue;
+        continue;
+      }
+      
+      const singleMatch = numStr.match(/^(\d+)/);
+      if (singleMatch) {
+        const val = parseInt(singleMatch[1], 10);
+        if (!isNaN(val) && val > maxGatha) {
+          maxGatha = val;
         }
+        continue;
       }
     }
-  }
-  if (configId === 'panchadhyayi') {
-    return 1545;
-  }
-  if (configId === 'pahuddoha') {
-    return 222;
-  }
-  if (configId === 'tatvaarthsutra' || configId === 'paramatmaprakash') {
-    return totalValidItems;
   }
   return maxGatha || totalValidItems;
 }
 
 function main() {
-  const globalManifest = [];
+  const manifestPath = path.join(outDir, 'manifest.json');
+  let globalManifest = [];
+
+  // Preserve existing manifest entries for already uploaded scriptures
+  if (fs.existsSync(manifestPath)) {
+    try {
+      globalManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+    } catch (e) {
+      console.error("Failed to parse existing manifest.json:", e);
+    }
+  }
+
   for (const config of configs) {
     const processedCount = convertShastra(config);
     if (processedCount > 0) {
       // Load chapters from newly generated index.json to calculate the actual gatha count
       const destShastraPath = path.join(outDir, config.categoryDirName, config.shastraDirName);
       const destIndexJsonPath = path.join(destShastraPath, 'index.json');
-      let gathaCount = processedCount;
-      if (fs.existsSync(destIndexJsonPath)) {
+      let gathaCount = config.gathaCount || processedCount;
+      if (!config.gathaCount && fs.existsSync(destIndexJsonPath)) {
         try {
           const indexJson = JSON.parse(fs.readFileSync(destIndexJsonPath, 'utf-8'));
           if (indexJson && indexJson.chapters) {
-            gathaCount = getActualGathaCount(indexJson.chapters, config.id);
+            gathaCount = getActualGathaCount(indexJson.chapters, config.id, config.gathaCount);
           }
         } catch (e) {
           console.error(`Failed to read index.json for ${config.title}:`, e);
         }
       }
 
-      globalManifest.push({
+      const entry = {
         id: config.id,
         title: config.title,
         author: config.author,
@@ -1745,11 +1403,22 @@ function main() {
         shastraSlug: config.shastraSlug,
         path: `${config.categoryDirName}/${config.shastraDirName}`,
         gathaCount: gathaCount
-      });
+      };
+
+      // Upsert: update existing entry or append new one
+      const existingIdx = globalManifest.findIndex(
+        m => m.id === config.id || m.shastraSlug === config.shastraSlug
+      );
+      if (existingIdx !== -1) {
+        globalManifest[existingIdx] = entry;
+      } else {
+        globalManifest.push(entry);
+      }
     }
   }
-  fs.writeFileSync(path.join(outDir, 'manifest.json'), JSON.stringify(globalManifest, null, 2), 'utf-8');
-  console.log(`Saved manifest.json.`);
+
+  fs.writeFileSync(manifestPath, JSON.stringify(globalManifest, null, 2), 'utf-8');
+  console.log(`Updated manifest.json (${globalManifest.length} scriptures in registry).`);
 }
 
 main();

@@ -65,7 +65,7 @@ const ShastraLanding = () => {
       <div className="min-h-screen bg-background flex flex-col">
         <Header />
         <div className="pt-28 pb-16 px-4 flex-1">
-          <div className="container mx-auto max-w-4xl">
+          <div className="container mx-auto">
             {/* Header */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -89,7 +89,7 @@ const ShastraLanding = () => {
             />
 
             {/* Categories Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {categoriesList.map((cat, index) => {
                 const migratedCount = shastras.filter(s => s.categorySlug === cat.slug).length;
 
