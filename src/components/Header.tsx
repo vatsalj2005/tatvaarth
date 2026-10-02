@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X, Settings, Globe } from 'lucide-react';
+import { Menu, X, Sun, Moon, Globe } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import SettingsPanel from './SettingsPanel';
 
 const navItems = [
   { path: '/', key: 'home' },
@@ -14,9 +13,8 @@ const navItems = [
 ] as const;
 
 const Header = () => {
-  const { t, language, setLanguage } = useApp();
+  const { t, language, setLanguage, theme, setTheme } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
     <>
@@ -52,10 +50,12 @@ const Header = () => {
             </button>
 
             <button
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               className="p-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-gold hover:text-primary-foreground transition-colors"
+              title={theme === 'dark' ? t('light') : t('dark')}
+              aria-label="Toggle theme"
             >
-              <Settings className="w-4 h-4" />
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
             <button
@@ -92,8 +92,6 @@ const Header = () => {
           )}
         </AnimatePresence>
       </header>
-
-      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </>
   );
 };

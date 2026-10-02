@@ -762,8 +762,9 @@ GathaVerseItem.displayName = 'GathaVerseItem';
 
 const ShastraReader = () => {
   const { categorySlug, shastraSlug } = useParams<{ categorySlug: string; shastraSlug: string }>();
-  const { t, language, fontSize, lineSpacing, useSerif, theme } = useApp();
-  const contentFontSize = fontSize + 4;
+  const { t, language, theme } = useApp();
+  const contentFontSize = 20;
+  const lineSpacing = 1.8;
   
   const [shastraIndex, setShastraIndex] = useState<ShastraIndex | null>(null);
   const [activeGathaNum, setActiveGathaNum] = useState<string>('');
@@ -1037,7 +1038,7 @@ const ShastraReader = () => {
     gathaRefs.current[num] = el;
   };
 
-  const readingClass = useSerif ? 'font-reading' : '';
+  const readingClass = '';
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -1361,7 +1362,7 @@ const ShastraReader = () => {
         author={shastraIndex.author}
         gathas={gathas}
         theme={theme}
-        useSerif={useSerif}
+        useSerif={false}
         fontSize={contentFontSize}
         lineSpacing={lineSpacing}
         isGenerating={isDownloadingPdf}

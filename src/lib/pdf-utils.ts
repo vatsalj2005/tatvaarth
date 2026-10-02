@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 
-export type PdfTheme = 'dark' | 'soft-dark' | 'light' | 'sepia';
+export type PdfTheme = 'dark' | 'light';
 
 export interface ThemePalette {
   bg: [number, number, number];
@@ -16,23 +16,11 @@ export const themeColors: Record<PdfTheme, ThemePalette> = {
     accent: [212, 168, 83],
     divider: [80, 75, 65],
   },
-  'soft-dark': {
-    bg: [38, 40, 48],
-    text: [215, 208, 195],
-    accent: [212, 168, 83],
-    divider: [90, 85, 75],
-  },
   light: {
     bg: [248, 244, 235],
     text: [30, 32, 45],
     accent: [160, 120, 50],
     divider: [200, 190, 170],
-  },
-  sepia: {
-    bg: [240, 228, 205],
-    text: [50, 40, 25],
-    accent: [140, 95, 40],
-    divider: [200, 185, 155],
   },
 };
 

@@ -1,43 +1,36 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import translations, { Language, TranslationKey } from '@/i18n/translations';
 
-type ThemeType = 'dark' | 'soft-dark' | 'light' | 'sepia';
+export type ThemeType = 'dark' | 'light';
 
 interface AppState {
   language: Language;
   theme: ThemeType;
-  fontSize: number;
-  lineSpacing: number;
-  useSerif: boolean;
 }
 
 interface AppContextType extends AppState {
   t: (key: TranslationKey) => string;
   setLanguage: (lang: Language) => void;
   setTheme: (theme: ThemeType) => void;
-  setFontSize: (size: number) => void;
-  setLineSpacing: (spacing: number) => void;
-  setUseSerif: (use: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
 
 const STORAGE_KEY = 'tatvo-ka-arth-settings';
 
-const themeClassMap: Record<ThemeType, string> = {
-  dark: '',
-  'soft-dark': 'theme-soft-dark',
-  light: 'theme-light',
-  sepia: 'theme-sepia',
-};
-
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AppState>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
+      const savedRaw = localStorage.getItem(STORAGE_KEY);
+      if (savedRaw) {
+        const saved = JSON.parse(savedRaw);
+        return {
+          language: saved.language === 'en' ? 'en' : 'hi',
+          theme: saved.theme === 'light' ? 'light' : 'dark',
+        };
+      }
     } catch {}
-    return { language: 'hi', theme: 'dark', fontSize: 16, lineSpacing: 1.8, useSerif: false };
+    return { language: 'hi', theme: 'dark' };
   });
 
   useEffect(() => {
@@ -46,14 +39,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     const root = document.documentElement;
-    Object.values(themeClassMap).forEach(cls => cls && root.classList.remove(cls));
+    root.classList.remove('theme-light', 'theme-soft-dark', 'theme-sepia');
     root.classList.remove('dark');
     
-    const cls = themeClassMap[state.theme];
-    if (cls) root.classList.add(cls);
-    
-    // Add Tailwind dark mode class for dark-based themes
-    if (state.theme === 'dark' || state.theme === 'soft-dark') {
+    if (state.theme === 'light') {
+      root.classList.add('theme-light');
+    } else {
       root.classList.add('dark');
     }
     
@@ -66,12 +57,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const setLanguage = (language: Language) => setState(s => ({ ...s, language }));
   const setTheme = (theme: ThemeType) => setState(s => ({ ...s, theme }));
-  const setFontSize = (fontSize: number) => setState(s => ({ ...s, fontSize }));
-  const setLineSpacing = (lineSpacing: number) => setState(s => ({ ...s, lineSpacing }));
-  const setUseSerif = (useSerif: boolean) => setState(s => ({ ...s, useSerif }));
 
   return (
-    <AppContext.Provider value={{ ...state, t, setLanguage, setTheme, setFontSize, setLineSpacing, setUseSerif }}>
+    <AppContext.Provider value={{ ...state, t, setLanguage, setTheme }}>
       {children}
     </AppContext.Provider>
   );

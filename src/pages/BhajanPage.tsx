@@ -10,7 +10,7 @@ import { Play, Copy, Check, VolumeX, Download, Music, Type } from 'lucide-react'
 
 const BhajanPage = () => {
   const { subdivisionId, bhajanId } = useParams<{ subdivisionId: string; bhajanId: string }>();
-  const { t, language, fontSize, lineSpacing, useSerif, theme } = useApp();
+  const { t, language, theme } = useApp();
   const [showRoman, setShowRoman] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -42,7 +42,124 @@ const BhajanPage = () => {
     });
   };
 
-  const readingClass = useSerif ? 'font-reading' : '';
+  const parseBhajanLyrics = (rawText: string) => {
+    if (!rawText) return [];
+    const stanzas = rawText.trim().split(/\n\s*\n+/);
+    
+    return stanzas.map((stanza, sIdx) => {
+      const rawLines = stanza.split('\n').map(l => l.trim()).filter(Boolean);
+      const isChorus = sIdx === 0;
+
+      const lines = rawLines.map(line => {
+        if (isChorus) {
+          return { type: 'chorus' as const, text: line };
+        }
+
+        // Check for verse marker: ॥[०-९0-9]+॥ or ||[०-९0-9]+|| or ॥\s*टेक\s*॥
+        const markerMatch = line.match(/(॥\s*[०-९0-9]+\s*॥|\|\|\s*[०-९0-9]+\s*\|\||॥\s*टेक\s*॥|\|\|\s*टेक\s*\|\|)/);
+        if (markerMatch && markerMatch.index !== undefined) {
+          const markerIdx = markerMatch.index;
+          const before = line.slice(0, markerIdx).trim();
+          const marker = markerMatch[0].trim();
+          const after = line.slice(markerIdx + markerMatch[0].length).trim();
+          return { type: 'verse_with_refrain' as const, before, marker, after };
+        }
+
+        // Check for danda refrain without number: e.g. "॥ मंगल थाल ..."
+        const dandaRefrainMatch = line.match(/(॥\s*[^॥\n]+\.\.\.|\|\|\s*[^\|\n]+\.\.\.)/);
+        if (dandaRefrainMatch && dandaRefrainMatch.index !== undefined) {
+          const markerIdx = dandaRefrainMatch.index;
+          const before = line.slice(0, markerIdx).trim();
+          const matchStr = dandaRefrainMatch[0];
+          const marker = matchStr.startsWith('||') ? '||' : '॥';
+          const after = matchStr.replace(/^(\|\||॥)\s*/, '').trim();
+          return { type: 'verse_with_refrain' as const, before, marker, after };
+        }
+
+        return { type: 'verse' as const, text: line };
+      });
+
+      return { isChorus, lines };
+    });
+  };
+
+  const renderLyricsBlock = (rawText: string, isRoman = false) => {
+    const parsed = parseBhajanLyrics(rawText);
+    if (!parsed.length) return null;
+
+    return (
+      <div className="w-full">
+        {parsed.map((stanza, sIdx) => {
+          if (stanza.isChorus) {
+            return (
+              <div 
+                key={`stanza-${sIdx}`}
+                className="mb-6 text-center space-y-1"
+              >
+                {stanza.lines.map((line, lIdx) => {
+                  const lineText = line.type === 'verse_with_refrain'
+                    ? `${line.before ? line.before + ' ' : ''}${line.marker ? line.marker + ' ' : ''}${line.after || ''}`
+                    : line.text;
+
+                  return (
+                    <p 
+                      key={lIdx}
+                      className="text-xl md:text-2xl font-semibold text-amber-700 dark:text-amber-400 leading-normal devanagari-safe drop-shadow-[0_1px_3px_rgba(212,175,55,0.25)]"
+                    >
+                      {lineText}
+                    </p>
+                  );
+                })}
+              </div>
+            );
+          }
+
+          return (
+            <div 
+              key={`stanza-${sIdx}`}
+              className="mb-6 text-center space-y-1"
+            >
+              {stanza.lines.map((line, lIdx) => {
+                if (line.type === 'verse_with_refrain') {
+                  return (
+                    <p 
+                      key={lIdx}
+                      className="text-lg md:text-xl leading-normal devanagari-safe"
+                    >
+                      {line.before && (
+                        <span className="text-teal-800 dark:text-teal-300">
+                          {line.before}{' '}
+                        </span>
+                      )}
+                      {line.marker && (
+                        <span className="inline-block mx-1 font-bold text-gold drop-shadow-sm select-none">
+                          {line.marker}
+                        </span>
+                      )}
+                      {line.after && (
+                        <span className="font-semibold text-amber-700 dark:text-amber-400 drop-shadow-[0_1px_3px_rgba(212,175,55,0.25)]">
+                          {' '}{line.after}
+                        </span>
+                      )}
+                    </p>
+                  );
+                }
+
+                return (
+                  <p 
+                    key={lIdx}
+                    className="text-lg md:text-xl text-teal-800 dark:text-teal-300 leading-normal devanagari-safe"
+                  >
+                    {line.text}
+                  </p>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -134,14 +251,13 @@ const BhajanPage = () => {
             className={`grid gap-6 ${showRoman ? 'md:grid-cols-2' : 'grid-cols-1'}`}
           >
             {/* Hindi lyrics */}
-            <div className={`p-6 md:p-8 rounded-2xl bg-card border border-border/50 ${!showRoman ? 'max-w-[700px] mx-auto w-full' : ''}`}>
-              <h3 className="text-sm font-medium text-gold mb-4 uppercase tracking-wider">{t('lyrics')}</h3>
-              <div
-                className={`whitespace-pre-line text-foreground/90 devanagari-safe ${readingClass}`}
-                style={{ fontSize: `${fontSize}px`, lineHeight: lineSpacing }}
-              >
-                {bhajan.lyrics}
+            <div className={`p-6 md:p-8 rounded-2xl bg-card border border-border/50 shadow-sm ${!showRoman ? 'max-w-[760px] mx-auto w-full' : ''}`}>
+              <div className="flex items-center justify-between border-b border-border/40 pb-4 mb-6">
+                <h3 className="text-sm font-semibold text-gold uppercase tracking-wider flex items-center gap-2">
+                  <Music className="w-4 h-4" /> {t('lyrics')}
+                </h3>
               </div>
+              {renderLyricsBlock(bhajan.lyrics, false)}
             </div>
 
             {/* Roman transliteration - Auto-generated */}
@@ -149,15 +265,14 @@ const BhajanPage = () => {
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="p-6 md:p-8 rounded-2xl bg-card border border-gold/20"
+                className="p-6 md:p-8 rounded-2xl bg-card border border-gold/20 shadow-sm"
               >
-                <h3 className="text-sm font-medium text-gold mb-4 uppercase tracking-wider">{t('transliteration')}</h3>
-                <div
-                  className="whitespace-pre-line text-foreground/80"
-                  style={{ fontSize: `${Math.max(fontSize - 1, 12)}px`, lineHeight: lineSpacing }}
-                >
-                  {romanizedLyrics}
+                <div className="flex items-center justify-between border-b border-border/40 pb-4 mb-6">
+                  <h3 className="text-sm font-semibold text-gold uppercase tracking-wider flex items-center gap-2">
+                    <Type className="w-4 h-4" /> {t('transliteration')}
+                  </h3>
                 </div>
+                {renderLyricsBlock(romanizedLyrics, true)}
               </motion.div>
             )}
           </motion.div>
