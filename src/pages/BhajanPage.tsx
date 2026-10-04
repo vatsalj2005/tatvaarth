@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useApp } from '@/contexts/AppContext';
@@ -8,44 +8,142 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Play, Copy, Check, VolumeX, Download, Music, Type } from 'lucide-react';
 
+/**
+ * Extracts all flattened line strings as rendered in the bhajan.
+ */
+const getAllRenderedLines = (parsedStanzas: { isChorus: boolean; lines: any[] }[]): string[] => {
+  const lineStrings: string[] = [];
+  for (const stanza of parsedStanzas) {
+    for (const line of stanza.lines) {
+      if (line.type === 'verse_with_refrain') {
+        const full = [line.before, line.marker, line.after].filter(Boolean).join(' ');
+        lineStrings.push(full);
+      } else if (line.text) {
+        lineStrings.push(line.text);
+      }
+    }
+  }
+  return lineStrings;
+};
+
+/**
+ * Custom hook: Computes the maximum uniform font size (capped at 25px)
+ * such that the longest line in the bhajan fits on a single line within the card's available width.
+ */
+function useDynamicBhajanFontSize(
+  lines: string[],
+  containerRef: React.RefObject<HTMLDivElement>
+): number {
+  const [fontSize, setFontSize] = useState<number>(18);
+
+  useEffect(() => {
+    if (!containerRef.current || lines.length === 0) return;
+
+    const measureAndFit = () => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      const availableWidth = container.clientWidth;
+      if (availableWidth <= 0) return;
+
+      const containerStyle = window.getComputedStyle(container);
+
+      // Create an off-screen ruler element to measure text widths accurately
+      const ruler = document.createElement('div');
+      ruler.style.position = 'fixed';
+      ruler.style.visibility = 'hidden';
+      ruler.style.pointerEvents = 'none';
+      ruler.style.left = '-9999px';
+      ruler.style.top = '-9999px';
+      ruler.style.whiteSpace = 'nowrap';
+      ruler.style.fontFamily = containerStyle.fontFamily || "'Noto Sans Devanagari', 'Inter', sans-serif";
+      ruler.style.fontWeight = '600'; // Measure with semibold for safety against bold refrains
+      ruler.style.fontSize = '16px';
+      document.body.appendChild(ruler);
+
+      // Find maximum line width at 16px
+      let maxLineWidth = 0;
+      let longestLine = '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        ruler.textContent = trimmed;
+        const width = ruler.getBoundingClientRect().width;
+        if (width > maxLineWidth) {
+          maxLineWidth = width;
+          longestLine = trimmed;
+        }
+      }
+
+      if (maxLineWidth > 0) {
+        // Target width with safe 4px buffer so text doesn't touch borders
+        const targetWidth = Math.max(availableWidth - 4, 60);
+        let calculatedSize = 16 * (targetWidth / maxLineWidth);
+
+        // Verification pass at calculatedSize
+        ruler.style.fontSize = `${calculatedSize}px`;
+        ruler.textContent = longestLine;
+        const actualWidth = ruler.getBoundingClientRect().width;
+        if (actualWidth > targetWidth) {
+          calculatedSize = calculatedSize * (targetWidth / actualWidth);
+        }
+
+        document.body.removeChild(ruler);
+
+        // Cap upper font size at 25px (desktop readability), floor at 11px
+        const finalSize = Math.max(11, Math.min(calculatedSize, 25));
+        setFontSize(Math.round(finalSize * 10) / 10);
+      } else {
+        document.body.removeChild(ruler);
+      }
+    };
+
+    measureAndFit();
+
+    if (document.fonts) {
+      document.fonts.ready.then(measureAndFit);
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      measureAndFit();
+    });
+    resizeObserver.observe(containerRef.current);
+
+    window.addEventListener('resize', measureAndFit);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', measureAndFit);
+    };
+  }, [lines, containerRef]);
+
+  return fontSize;
+}
+
 const BhajanPage = () => {
   const { subdivisionId, bhajanId } = useParams<{ subdivisionId: string; bhajanId: string }>();
   const { t, language, theme } = useApp();
   const [showRoman, setShowRoman] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const hindiContentRef = useRef<HTMLDivElement>(null);
+  const romanContentRef = useRef<HTMLDivElement>(null);
+
   const bhajan = getBhajanById(subdivisionId || '', bhajanId || '');
   if (!bhajan) return null;
 
   const subdivision = subdivisions.find(s => s.id === bhajan.subdivision);
   const related = getRelatedBhajans(bhajan, 4);
-  
+
   // Generate romanized text only when roman script is toggled on
   const romanizedLyrics = useMemo(() => {
     return showRoman ? transliterateText(bhajan.lyrics) : '';
   }, [showRoman, bhajan.lyrics]);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(bhajan.lyrics);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handlePdfDownload = async () => {
-    const { generateBhajanPdf } = await import('@/lib/pdf-generator');
-    await generateBhajanPdf({
-      title: bhajan.title,
-      slug: bhajan.slug,
-      singer: bhajan.singer,
-      lyrics: bhajan.lyrics,
-      theme,
-    });
-  };
-
   const parseBhajanLyrics = (rawText: string) => {
     if (!rawText) return [];
     const stanzas = rawText.trim().split(/\n\s*\n+/);
-    
+
     return stanzas.map((stanza, sIdx) => {
       const rawLines = stanza.split('\n').map(l => l.trim()).filter(Boolean);
       const isChorus = sIdx === 0;
@@ -83,8 +181,33 @@ const BhajanPage = () => {
     });
   };
 
-  const renderLyricsBlock = (rawText: string, isRoman = false) => {
-    const parsed = parseBhajanLyrics(rawText);
+  const parsedHindi = useMemo(() => parseBhajanLyrics(bhajan.lyrics), [bhajan.lyrics]);
+  const hindiLines = useMemo(() => getAllRenderedLines(parsedHindi), [parsedHindi]);
+  const hindiFontSize = useDynamicBhajanFontSize(hindiLines, hindiContentRef);
+
+  const parsedRoman = useMemo(() => (showRoman ? parseBhajanLyrics(romanizedLyrics) : []), [showRoman, romanizedLyrics]);
+  const romanLines = useMemo(() => getAllRenderedLines(parsedRoman), [parsedRoman]);
+  const romanFontSize = useDynamicBhajanFontSize(romanLines, romanContentRef);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(bhajan.lyrics);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handlePdfDownload = async () => {
+    const { generateBhajanPdf } = await import('@/lib/pdf-generator');
+    await generateBhajanPdf({
+      title: bhajan.title,
+      slug: bhajan.slug,
+      singer: bhajan.singer,
+      lyrics: bhajan.lyrics,
+      theme,
+    });
+  };
+
+  const renderLyricsBlock = (rawText: string, fontSize: number, isRoman = false) => {
+    const parsed = isRoman ? parsedRoman : parsedHindi;
     if (!parsed.length) return null;
 
     return (
@@ -94,7 +217,7 @@ const BhajanPage = () => {
             return (
               <div 
                 key={`stanza-${sIdx}`}
-                className="mb-6 text-center space-y-1"
+                className="mb-6 text-center space-y-1.5"
               >
                 {stanza.lines.map((line, lIdx) => {
                   const lineText = line.type === 'verse_with_refrain'
@@ -104,7 +227,8 @@ const BhajanPage = () => {
                   return (
                     <p 
                       key={lIdx}
-                      className="text-xl md:text-2xl font-semibold text-amber-700 dark:text-amber-400 leading-normal devanagari-safe drop-shadow-[0_1px_3px_rgba(212,175,55,0.25)]"
+                      className="font-semibold text-amber-700 dark:text-amber-400 leading-normal devanagari-safe drop-shadow-[0_1px_3px_rgba(212,175,55,0.25)] whitespace-nowrap"
+                      style={{ fontSize: `${fontSize}px` }}
                     >
                       {lineText}
                     </p>
@@ -117,14 +241,15 @@ const BhajanPage = () => {
           return (
             <div 
               key={`stanza-${sIdx}`}
-              className="mb-6 text-center space-y-1"
+              className="mb-6 text-center space-y-1.5"
             >
               {stanza.lines.map((line, lIdx) => {
                 if (line.type === 'verse_with_refrain') {
                   return (
                     <p 
                       key={lIdx}
-                      className="text-lg md:text-xl leading-normal devanagari-safe"
+                      className="leading-normal devanagari-safe whitespace-nowrap"
+                      style={{ fontSize: `${fontSize}px` }}
                     >
                       {line.before && (
                         <span className="text-teal-800 dark:text-teal-300">
@@ -148,7 +273,8 @@ const BhajanPage = () => {
                 return (
                   <p 
                     key={lIdx}
-                    className="text-lg md:text-xl text-teal-800 dark:text-teal-300 leading-normal devanagari-safe"
+                    className="text-teal-800 dark:text-teal-300 leading-normal devanagari-safe whitespace-nowrap"
+                    style={{ fontSize: `${fontSize}px` }}
                   >
                     {line.text}
                   </p>
@@ -164,10 +290,11 @@ const BhajanPage = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="pt-24 pb-16 px-4">
-        <div className="container mx-auto max-w-5xl">
+      <div className="pt-24 pb-16 w-full">
+        {/* 95% of phone screen width on mobile, 80% on wide screens / laptops */}
+        <div className="w-[95%] md:w-[80%] mx-auto flex flex-col items-center">
           {/* Breadcrumb */}
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6 flex-wrap devanagari-safe">
+          <div className="w-full flex items-center gap-2 text-sm text-muted-foreground mb-6 flex-wrap devanagari-safe">
             <Link to="/bhajan" className="hover:text-gold transition-colors">{t('bhajan')}</Link>
             <span>/</span>
             {subdivision && (
@@ -178,14 +305,14 @@ const BhajanPage = () => {
                 <span>/</span>
               </>
             )}
-            <span className="text-foreground/80">{bhajan.title}</span>
+            <span className="text-foreground/80 truncate">{bhajan.title}</span>
           </div>
 
           {/* Title Section - Centered */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-8 text-center"
+            className="w-full mb-8 text-center"
           >
             <h1 className="text-3xl md:text-4xl font-heading text-gradient-gold mb-3 devanagari-safe">
               {bhajan.title}
@@ -200,23 +327,23 @@ const BhajanPage = () => {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="flex flex-wrap gap-3 mb-8 justify-center"
+            className="w-full flex flex-wrap gap-2.5 sm:gap-3 mb-8 justify-center"
           >
             {bhajan.audioUrl ? (
-              <button className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gold text-primary-foreground font-medium hover:opacity-90 transition-opacity">
+              <button className="flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gold text-primary-foreground font-medium hover:opacity-90 transition-opacity text-sm">
                 <Play className="w-4 h-4" /> {language === 'hi' ? 'सुनें' : 'Listen'}
               </button>
             ) : (
-              <div className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-secondary text-muted-foreground">
-                <VolumeX className="w-4 h-4" />
-                <span className="text-sm">{t('audioUnavailable')}</span>
+              <div className="flex items-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-secondary text-muted-foreground">
+                <VolumeX className="w-4 h-4 flex-shrink-0" />
+                <span className="text-xs sm:text-sm">{t('audioUnavailable')}</span>
               </div>
             )}
 
             {/* Roman Script toggle */}
             <button
               onClick={() => setShowRoman(!showRoman)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium transition-all ${
+              className={`flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-medium transition-all text-xs sm:text-sm ${
                 showRoman
                   ? 'bg-gold text-primary-foreground'
                   : 'bg-secondary text-secondary-foreground hover:bg-gold/20'
@@ -228,36 +355,38 @@ const BhajanPage = () => {
 
             <button
               onClick={handleCopy}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-gold/20 transition-colors"
+              className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-gold/20 transition-colors text-xs sm:text-sm"
             >
               {copied ? <Check className="w-4 h-4 text-gold" /> : <Copy className="w-4 h-4" />}
-              <span className="text-sm">{copied ? t('copied') : t('copyVerse')}</span>
+              <span>{copied ? t('copied') : t('copyVerse')}</span>
             </button>
 
             <button
               onClick={handlePdfDownload}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-gold/20 transition-colors"
+              className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-gold/20 transition-colors text-xs sm:text-sm"
             >
               <Download className="w-4 h-4" />
-              <span className="text-sm">{t('downloadPdf')}</span>
+              <span>{t('downloadPdf')}</span>
             </button>
           </motion.div>
 
-          {/* Lyrics */}
+          {/* Lyrics: 95% on mobile, 80% on wide screens */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className={`grid gap-6 ${showRoman ? 'md:grid-cols-2' : 'grid-cols-1'}`}
+            className={`w-full grid gap-6 ${showRoman ? 'md:grid-cols-2' : 'grid-cols-1'}`}
           >
             {/* Hindi lyrics */}
-            <div className={`p-6 md:p-8 rounded-2xl bg-card border border-border/50 shadow-sm ${!showRoman ? 'max-w-[760px] mx-auto w-full' : ''}`}>
+            <div className="w-full px-3 py-6 sm:p-6 md:p-8 rounded-2xl bg-card border border-border/50 shadow-sm">
               <div className="flex items-center justify-between border-b border-border/40 pb-4 mb-6">
                 <h3 className="text-sm font-semibold text-gold uppercase tracking-wider flex items-center gap-2">
                   <Music className="w-4 h-4" /> {t('lyrics')}
                 </h3>
               </div>
-              {renderLyricsBlock(bhajan.lyrics, false)}
+              <div ref={hindiContentRef} className="w-full overflow-x-auto scrollbar-none">
+                {renderLyricsBlock(bhajan.lyrics, hindiFontSize, false)}
+              </div>
             </div>
 
             {/* Roman transliteration - Auto-generated */}
@@ -265,43 +394,45 @@ const BhajanPage = () => {
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="p-6 md:p-8 rounded-2xl bg-card border border-gold/20 shadow-sm"
+                className="w-full px-3 py-6 sm:p-6 md:p-8 rounded-2xl bg-card border border-gold/20 shadow-sm"
               >
                 <div className="flex items-center justify-between border-b border-border/40 pb-4 mb-6">
                   <h3 className="text-sm font-semibold text-gold uppercase tracking-wider flex items-center gap-2">
                     <Type className="w-4 h-4" /> {t('transliteration')}
                   </h3>
                 </div>
-                {renderLyricsBlock(romanizedLyrics, true)}
+                <div ref={romanContentRef} className="w-full overflow-x-auto scrollbar-none">
+                  {renderLyricsBlock(romanizedLyrics, romanFontSize, true)}
+                </div>
               </motion.div>
             )}
           </motion.div>
 
-          {/* Related Bhajans */}
+          {/* Related Bhajans: 95% on mobile, 80% on wide screens */}
           {related.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
-              className="mt-16"
+              className="mt-16 w-full"
             >
-              <h2 className="text-xl font-heading text-gradient-gold mb-6 devanagari-safe">
+              <h2 className="text-xl font-heading text-gradient-gold mb-6 devanagari-safe text-center sm:text-left">
                 {t('relatedBhajans')}
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {related.map(r => (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 w-full">
+                {related.map((r, rIdx) => (
                   <Link
                     key={r.id}
                     to={`/bhajan/${r.subdivision}/${r.slug}`}
-                    className="flex items-center gap-4 p-4 rounded-xl border border-border/50 bg-card hover:border-gold/30 hover:bg-secondary transition-all group"
+                    className="relative flex flex-col justify-between p-2.5 sm:p-4 rounded-xl border border-border/50 bg-card hover:border-gold/30 hover:bg-secondary transition-all group overflow-hidden min-h-[64px] sm:min-h-[76px]"
                   >
-                    <div className="w-10 h-10 rounded-lg bg-gold/10 flex items-center justify-center flex-shrink-0">
-                      <Music className="w-5 h-5 text-gold" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-foreground group-hover:text-gold transition-colors truncate devanagari-safe">
+                    <div className="flex-1 min-w-0 pr-4 sm:pr-6">
+                      <h3 className="font-medium text-sm sm:text-base text-foreground group-hover:text-gold transition-colors line-clamp-2 devanagari-safe leading-snug">
                         {r.title}
                       </h3>
+                    </div>
+                    <div className="absolute bottom-1 right-2 sm:bottom-2 sm:right-3 text-sm sm:text-xl font-heading font-black text-gold/20 group-hover:text-gold/45 transition-colors pointer-events-none select-none">
+                      #{rIdx + 1}
                     </div>
                   </Link>
                 ))}

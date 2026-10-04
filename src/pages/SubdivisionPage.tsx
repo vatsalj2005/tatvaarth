@@ -6,7 +6,7 @@ import { subdivisions, getBhajansBySubdivision } from '@/data/content-loader';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ScopedSearchBar from '@/components/ScopedSearchBar';
-import { ArrowLeft, Music } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 const SubdivisionPage = () => {
   const { subdivisionId } = useParams<{ subdivisionId: string }>();
@@ -26,7 +26,7 @@ const SubdivisionPage = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="pt-24 pb-16 px-4">
+      <div className="pt-24 pb-16 px-2.5 sm:px-4">
         <div className="container mx-auto">
           <Link
             to="/bhajan"
@@ -59,30 +59,29 @@ const SubdivisionPage = () => {
             className="mb-8 max-w-xl relative"
           />
 
-          {/* Responsive Multi-column Bhajan List (pure CSS newspaper columns) */}
-          <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 [column-fill:_balance]">
+          {/* Responsive 2-column on mobile, 3 on md, 4 on lg */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4">
             {bhajanList.map((bhajan, idx) => (
               <motion.div
                 key={bhajan.id}
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(idx * 0.015, 0.4) }}
-                className="break-inside-avoid mb-3"
               >
                 <Link
                   to={`/bhajan/${bhajan.subdivision}/${bhajan.slug}`}
-                  className="flex items-center gap-4 p-4 rounded-xl border border-border/50 bg-card hover:border-gold/30 hover:bg-secondary transition-all group"
+                  className="relative flex flex-col justify-between p-2.5 sm:p-4 rounded-xl border border-border/50 bg-card hover:border-gold/30 hover:bg-secondary transition-all group overflow-hidden min-h-[64px] sm:min-h-[76px] h-full"
                 >
-                  <div className="w-10 h-10 rounded-lg bg-gold/10 flex items-center justify-center flex-shrink-0">
-                    <Music className="w-5 h-5 text-gold" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-foreground group-hover:text-gold transition-colors truncate devanagari-safe">
+                  <div className="flex-1 min-w-0 pr-4 sm:pr-6">
+                    <h3 className="font-medium text-sm sm:text-base text-foreground group-hover:text-gold transition-colors line-clamp-2 devanagari-safe leading-snug">
                       {bhajan.title}
                     </h3>
                     {bhajan.singer && (
-                      <p className="text-xs text-gold/70 mt-0.5">🎤 {bhajan.singer}</p>
+                      <p className="text-[11px] sm:text-xs text-gold/70 mt-1 truncate">🎤 {bhajan.singer}</p>
                     )}
+                  </div>
+                  <div className="absolute bottom-1 right-2 sm:bottom-2 sm:right-3 text-sm sm:text-xl font-heading font-black text-gold/20 group-hover:text-gold/45 transition-colors pointer-events-none select-none">
+                    #{idx + 1}
                   </div>
                 </Link>
               </motion.div>

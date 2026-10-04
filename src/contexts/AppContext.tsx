@@ -49,6 +49,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     
     root.lang = state.language;
+    root.setAttribute('translate', 'no');
+    root.classList.add('notranslate');
   }, [state.theme, state.language]);
 
   const t = useCallback((key: TranslationKey) => {
