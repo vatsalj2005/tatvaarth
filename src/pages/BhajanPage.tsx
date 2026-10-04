@@ -34,7 +34,7 @@ function useDynamicBhajanFontSize(
   lines: string[],
   containerRef: React.RefObject<HTMLDivElement>
 ): number {
-  const [fontSize, setFontSize] = useState<number>(18);
+  const [fontSize, setFontSize] = useState<number>(16);
 
   useEffect(() => {
     if (!containerRef.current || lines.length === 0) return;
@@ -43,10 +43,18 @@ function useDynamicBhajanFontSize(
       const container = containerRef.current;
       if (!container) return;
 
-      const availableWidth = container.clientWidth;
-      if (availableWidth <= 0) return;
+      const parent = container.parentElement;
+      const parentWidth = parent ? parent.clientWidth : container.clientWidth;
+      const rawWidth = Math.min(
+        container.clientWidth || window.innerWidth,
+        parentWidth || window.innerWidth,
+        window.innerWidth - 24
+      );
+      if (rawWidth <= 0) return;
 
       const containerStyle = window.getComputedStyle(container);
+      const sampleText = lines.slice(0, 5).join(' ');
+      const hasDevanagari = /[\u0900-\u097F]/.test(sampleText);
 
       // Create an off-screen ruler element to measure text widths accurately
       const ruler = document.createElement('div');
@@ -56,8 +64,10 @@ function useDynamicBhajanFontSize(
       ruler.style.left = '-9999px';
       ruler.style.top = '-9999px';
       ruler.style.whiteSpace = 'nowrap';
-      ruler.style.fontFamily = containerStyle.fontFamily || "'Noto Sans Devanagari', 'Inter', sans-serif";
-      ruler.style.fontWeight = '600'; // Measure with semibold for safety against bold refrains
+      ruler.style.fontFamily = hasDevanagari
+        ? (containerStyle.fontFamily || "'Noto Sans Devanagari', sans-serif")
+        : "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
+      ruler.style.fontWeight = '600';
       ruler.style.fontSize = '16px';
       document.body.appendChild(ruler);
 
@@ -76,8 +86,8 @@ function useDynamicBhajanFontSize(
       }
 
       if (maxLineWidth > 0) {
-        // Target width with safe 4px buffer so text doesn't touch borders
-        const targetWidth = Math.max(availableWidth - 4, 60);
+        // Target width with safe buffer so text doesn't touch borders
+        const targetWidth = Math.max(rawWidth - 8, 100);
         let calculatedSize = 16 * (targetWidth / maxLineWidth);
 
         // Verification pass at calculatedSize
@@ -90,8 +100,8 @@ function useDynamicBhajanFontSize(
 
         document.body.removeChild(ruler);
 
-        // Cap upper font size at 25px (desktop readability), floor at 11px
-        const finalSize = Math.max(11, Math.min(calculatedSize, 25));
+        // Cap upper font size at 25px (desktop readability), floor at 10px
+        const finalSize = Math.max(10, Math.min(calculatedSize, 25));
         setFontSize(Math.round(finalSize * 10) / 10);
       } else {
         document.body.removeChild(ruler);
@@ -99,6 +109,8 @@ function useDynamicBhajanFontSize(
     };
 
     measureAndFit();
+    const rafId = requestAnimationFrame(measureAndFit);
+    const timeoutId = setTimeout(measureAndFit, 60);
 
     if (document.fonts) {
       document.fonts.ready.then(measureAndFit);
@@ -108,10 +120,15 @@ function useDynamicBhajanFontSize(
       measureAndFit();
     });
     resizeObserver.observe(containerRef.current);
+    if (containerRef.current.parentElement) {
+      resizeObserver.observe(containerRef.current.parentElement);
+    }
 
     window.addEventListener('resize', measureAndFit);
 
     return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timeoutId);
       resizeObserver.disconnect();
       window.removeEventListener('resize', measureAndFit);
     };
@@ -211,7 +228,7 @@ const BhajanPage = () => {
     if (!parsed.length) return null;
 
     return (
-      <div className="w-full">
+      <div className="w-full min-w-0 max-w-full">
         {parsed.map((stanza, sIdx) => {
           if (stanza.isChorus) {
             return (
@@ -227,7 +244,7 @@ const BhajanPage = () => {
                   return (
                     <p 
                       key={lIdx}
-                      className="font-semibold text-amber-700 dark:text-amber-400 leading-normal devanagari-safe drop-shadow-[0_1px_3px_rgba(212,175,55,0.25)] whitespace-nowrap"
+                      className="font-semibold text-amber-700 dark:text-amber-400 leading-normal devanagari-safe drop-shadow-[0_1px_3px_rgba(212,175,55,0.25)] break-words"
                       style={{ fontSize: `${fontSize}px` }}
                     >
                       {lineText}
@@ -248,7 +265,7 @@ const BhajanPage = () => {
                   return (
                     <p 
                       key={lIdx}
-                      className="leading-normal devanagari-safe whitespace-nowrap"
+                      className="leading-normal devanagari-safe break-words"
                       style={{ fontSize: `${fontSize}px` }}
                     >
                       {line.before && (
@@ -273,7 +290,7 @@ const BhajanPage = () => {
                 return (
                   <p 
                     key={lIdx}
-                    className="text-teal-800 dark:text-teal-300 leading-normal devanagari-safe whitespace-nowrap"
+                    className="text-teal-800 dark:text-teal-300 leading-normal devanagari-safe break-words"
                     style={{ fontSize: `${fontSize}px` }}
                   >
                     {line.text}
@@ -288,11 +305,11 @@ const BhajanPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       <Header />
-      <div className="pt-24 pb-16 w-full">
+      <div className="pt-24 pb-16 w-full overflow-x-hidden">
         {/* 95% of phone screen width on mobile, 80% on wide screens / laptops */}
-        <div className="w-[95%] md:w-[80%] mx-auto flex flex-col items-center">
+        <div className="w-[95%] md:w-[80%] max-w-5xl mx-auto flex flex-col items-center min-w-0">
           {/* Breadcrumb */}
           <div className="w-full flex items-center gap-2 text-sm text-muted-foreground mb-6 flex-wrap devanagari-safe">
             <Link to="/bhajan" className="hover:text-gold transition-colors">{t('bhajan')}</Link>
@@ -314,7 +331,7 @@ const BhajanPage = () => {
             animate={{ opacity: 1, y: 0 }}
             className="w-full mb-8 text-center"
           >
-            <h1 className="text-3xl md:text-4xl font-heading text-gradient-gold mb-3 devanagari-safe">
+            <h1 className="text-3xl md:text-4xl font-heading text-gradient-gold mb-3 devanagari-safe break-words">
               {bhajan.title}
             </h1>
             {bhajan.singer && (
@@ -375,16 +392,16 @@ const BhajanPage = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className={`w-full grid gap-6 ${showRoman ? 'md:grid-cols-2' : 'grid-cols-1'}`}
+            className={`w-full min-w-0 max-w-full grid gap-6 ${showRoman ? 'md:grid-cols-2' : 'grid-cols-1'}`}
           >
             {/* Hindi lyrics */}
-            <div className="w-full px-3 py-6 sm:p-6 md:p-8 rounded-2xl bg-card border border-border/50 shadow-sm">
+            <div className="w-full min-w-0 max-w-full px-3 py-6 sm:p-6 md:p-8 rounded-2xl bg-card border border-border/50 shadow-sm overflow-hidden">
               <div className="flex items-center justify-between border-b border-border/40 pb-4 mb-6">
                 <h3 className="text-sm font-semibold text-gold uppercase tracking-wider flex items-center gap-2">
                   <Music className="w-4 h-4" /> {t('lyrics')}
                 </h3>
               </div>
-              <div ref={hindiContentRef} className="w-full overflow-x-auto scrollbar-none">
+              <div ref={hindiContentRef} className="w-full min-w-0 max-w-full overflow-hidden">
                 {renderLyricsBlock(bhajan.lyrics, hindiFontSize, false)}
               </div>
             </div>
@@ -392,16 +409,16 @@ const BhajanPage = () => {
             {/* Roman transliteration - Auto-generated */}
             {showRoman && (
               <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="w-full px-3 py-6 sm:p-6 md:p-8 rounded-2xl bg-card border border-gold/20 shadow-sm"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="w-full min-w-0 max-w-full px-3 py-6 sm:p-6 md:p-8 rounded-2xl bg-card border border-gold/20 shadow-sm overflow-hidden"
               >
                 <div className="flex items-center justify-between border-b border-border/40 pb-4 mb-6">
                   <h3 className="text-sm font-semibold text-gold uppercase tracking-wider flex items-center gap-2">
                     <Type className="w-4 h-4" /> {t('transliteration')}
                   </h3>
                 </div>
-                <div ref={romanContentRef} className="w-full overflow-x-auto scrollbar-none">
+                <div ref={romanContentRef} className="w-full min-w-0 max-w-full overflow-hidden">
                   {renderLyricsBlock(romanizedLyrics, romanFontSize, true)}
                 </div>
               </motion.div>
