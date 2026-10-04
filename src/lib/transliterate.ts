@@ -28,8 +28,12 @@ const consonants: Record<string, string> = {
   'प': 'pa', 'फ': 'pha', 'ब': 'ba', 'भ': 'bha', 'म': 'ma',
   'य': 'ya', 'र': 'ra', 'ल': 'la', 'व': 'va', 'w': 'wa',
   'श': 'sha', 'ष': 'sha', 'स': 'sa', 'ह': 'ha',
-  'क़': 'qa', 'ख़': 'kha', 'ग़': 'gha', 'ज़': 'za',
+  'क़': 'qa', 'ख़': 'kha', 'ग़': 'ga', 'ज़': 'za',
   'ड़': 'da', 'ढ़': 'dha', 'फ़': 'fa',
+  '\u0958': 'qa', '\u0959': 'kha', '\u095a': 'ga', '\u095b': 'za',
+  '\u095c': 'da', '\u095d': 'dha', '\u095e': 'fa', '\u095f': 'ya',
+  '\u0915\u093c': 'qa', '\u0916\u093c': 'kha', '\u0917\u093c': 'ga', '\u091c\u093c': 'za',
+  '\u0921\u093c': 'da', '\u0922\u093c': 'dha', '\u092b\u093c': 'fa', '\u092f\u093c': 'ya',
   'ळ': 'la', 'क्ष': 'ksha', 'ज्ञ': 'gya',
 };
 
@@ -54,6 +58,12 @@ export function transliterateToRoman(text: string): string {
   while (i < text.length) {
     const char = text[i];
     
+    // Skip standalone nukta
+    if (char === '\u093c') {
+      i++;
+      continue;
+    }
+
     // Check if it's a number
     if (numbers[char]) {
       result += numbers[char];

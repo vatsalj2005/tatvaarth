@@ -11,50 +11,54 @@ import { Play, Copy, Check, VolumeX, Download, Music, Type } from 'lucide-react'
 /**
  * Extracts all flattened line strings as rendered in the bhajan.
  */
-const getAllRenderedLines = (parsedStanzas: { isChorus: boolean; lines: any[] }[]): string[] => {
-  const lineStrings: string[] = [];
-  for (const stanza of parsedStanzas) {
-    for (const line of stanza.lines) {
-      if (line.type === 'verse_with_refrain') {
-        const full = [line.before, line.marker, line.after].filter(Boolean).join(' ');
-        lineStrings.push(full);
-      } else if (line.text) {
-        lineStrings.push(line.text);
-      }
-    }
-  }
-  return lineStrings;
-};
+interface ParsedLine {
+  type: 'chorus' | 'verse' | 'verse_with_refrain';
+  text?: string;
+  before?: string;
+  marker?: string;
+  after?: string;
+}
+
+interface ParsedStanza {
+  isChorus: boolean;
+  lines: ParsedLine[];
+}
+
+interface DynamicBhajanResult {
+  fontSize: number;
+  shouldSplitRefrain: boolean;
+}
 
 /**
  * Custom hook: Computes the maximum uniform font size (capped at 25px)
  * such that the longest line in the bhajan fits on a single line within the card's available width.
+ * If keeping refrains combined would make the font size too small (< 17.5px) or overflow,
+ * it splits the refrain ("रंग दो ...") onto the next line.
  */
 function useDynamicBhajanFontSize(
-  lines: string[],
-  containerRef: React.RefObject<HTMLDivElement>
-): number {
-  const [fontSize, setFontSize] = useState<number>(16);
+  stanzas: ParsedStanza[],
+  containerEl: HTMLElement | null,
+  isRoman: boolean
+): DynamicBhajanResult {
+  const [result, setResult] = useState<DynamicBhajanResult>({
+    fontSize: 16,
+    shouldSplitRefrain: false,
+  });
 
   useEffect(() => {
-    if (!containerRef.current || lines.length === 0) return;
+    if (!containerEl || stanzas.length === 0) return;
 
     const measureAndFit = () => {
-      const container = containerRef.current;
-      if (!container) return;
+      if (!containerEl) return;
 
-      const parent = container.parentElement;
-      const parentWidth = parent ? parent.clientWidth : container.clientWidth;
+      const parent = containerEl.parentElement;
+      const parentWidth = parent ? parent.clientWidth : containerEl.clientWidth;
       const rawWidth = Math.min(
-        container.clientWidth || window.innerWidth,
+        containerEl.clientWidth || window.innerWidth,
         parentWidth || window.innerWidth,
-        window.innerWidth - 24
+        window.innerWidth - (window.innerWidth < 768 ? 24 : 48)
       );
       if (rawWidth <= 0) return;
-
-      const containerStyle = window.getComputedStyle(container);
-      const sampleText = lines.slice(0, 5).join(' ');
-      const hasDevanagari = /[\u0900-\u097F]/.test(sampleText);
 
       // Create an off-screen ruler element to measure text widths accurately
       const ruler = document.createElement('div');
@@ -64,48 +68,108 @@ function useDynamicBhajanFontSize(
       ruler.style.left = '-9999px';
       ruler.style.top = '-9999px';
       ruler.style.whiteSpace = 'nowrap';
-      ruler.style.fontFamily = hasDevanagari
-        ? (containerStyle.fontFamily || "'Noto Sans Devanagari', sans-serif")
-        : "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
-      ruler.style.fontWeight = '600';
+      ruler.style.fontFamily = isRoman
+        ? "'Inter', -apple-system, BlinkMacSystemFont, sans-serif"
+        : "'Noto Sans Devanagari', sans-serif";
+      ruler.style.fontWeight = '500';
       ruler.style.fontSize = '16px';
       document.body.appendChild(ruler);
 
-      // Find maximum line width at 16px
-      let maxLineWidth = 0;
-      let longestLine = '';
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        ruler.textContent = trimmed;
-        const width = ruler.getBoundingClientRect().width;
-        if (width > maxLineWidth) {
-          maxLineWidth = width;
-          longestLine = trimmed;
+      // Safe target width so text doesn't touch card borders
+      const targetWidth = Math.max(rawWidth - 12, 100);
+
+      // 1. Measure all lines with refrains combined on same line
+      let maxCombinedWidth = 0;
+      let longestCombinedLine = '';
+      let hasAnyRefrain = false;
+
+      // 2. Measure with refrains split onto the next line
+      let maxSplitWidth = 0;
+      let longestSplitLine = '';
+
+      for (const stanza of stanzas) {
+        for (const line of stanza.lines) {
+          if (line.type === 'verse_with_refrain' && line.after) {
+            hasAnyRefrain = true;
+            // Combined line: before + marker + after
+            const combinedText = [line.before, line.marker, line.after].filter(Boolean).join(' ').trim();
+            ruler.textContent = combinedText;
+            const combinedW = ruler.getBoundingClientRect().width;
+            if (combinedW > maxCombinedWidth) {
+              maxCombinedWidth = combinedW;
+              longestCombinedLine = combinedText;
+            }
+
+            // Split line 1: before + marker
+            const splitPart1 = [line.before, line.marker].filter(Boolean).join(' ').trim();
+            ruler.textContent = splitPart1;
+            const splitW1 = ruler.getBoundingClientRect().width;
+            if (splitW1 > maxSplitWidth) {
+              maxSplitWidth = splitW1;
+              longestSplitLine = splitPart1;
+            }
+
+            // Split line 2: after
+            const splitPart2 = (line.after || '').trim();
+            ruler.textContent = splitPart2;
+            const splitW2 = ruler.getBoundingClientRect().width;
+            if (splitW2 > maxSplitWidth) {
+              maxSplitWidth = splitW2;
+              longestSplitLine = splitPart2;
+            }
+          } else {
+            const text = (line.text || [line.before, line.marker].filter(Boolean).join(' ')).trim();
+            if (!text) continue;
+            ruler.textContent = text;
+            const w = ruler.getBoundingClientRect().width;
+            if (w > maxCombinedWidth) {
+              maxCombinedWidth = w;
+              longestCombinedLine = text;
+            }
+            if (w > maxSplitWidth) {
+              maxSplitWidth = w;
+              longestSplitLine = text;
+            }
+          }
         }
       }
 
-      if (maxLineWidth > 0) {
-        // Target width with safe buffer so text doesn't touch borders
-        const targetWidth = Math.max(rawWidth - 8, 100);
-        let calculatedSize = 16 * (targetWidth / maxLineWidth);
+      let shouldSplit = false;
+      let calculatedSize = 16;
+      let chosenLongestLine = '';
 
-        // Verification pass at calculatedSize
+      if (maxCombinedWidth > 0) {
+        const combinedSize = 16 * (targetWidth / maxCombinedWidth);
+        // If keeping refrain combined would force font size below 17.5px (or if combined width overflows targetWidth at 17.5px),
+        // split the refrain onto the next line so font size remains comfortably large and doesn't wrap awkwardly.
+        if (hasAnyRefrain && combinedSize < 17.5 && maxSplitWidth > 0) {
+          shouldSplit = true;
+          calculatedSize = 16 * (targetWidth / maxSplitWidth);
+          chosenLongestLine = longestSplitLine;
+        } else {
+          shouldSplit = false;
+          calculatedSize = combinedSize;
+          chosenLongestLine = longestCombinedLine;
+        }
+      }
+
+      // Verification pass at calculatedSize
+      if (chosenLongestLine && calculatedSize > 0) {
         ruler.style.fontSize = `${calculatedSize}px`;
-        ruler.textContent = longestLine;
+        ruler.textContent = chosenLongestLine;
         const actualWidth = ruler.getBoundingClientRect().width;
         if (actualWidth > targetWidth) {
           calculatedSize = calculatedSize * (targetWidth / actualWidth);
         }
-
-        document.body.removeChild(ruler);
-
-        // Cap upper font size at 25px (desktop readability), floor at 10px
-        const finalSize = Math.max(10, Math.min(calculatedSize, 25));
-        setFontSize(Math.round(finalSize * 10) / 10);
-      } else {
-        document.body.removeChild(ruler);
       }
+
+      document.body.removeChild(ruler);
+
+      const finalSize = Math.max(10, Math.min(calculatedSize, 25));
+      setResult({
+        fontSize: Math.round(finalSize * 10) / 10,
+        shouldSplitRefrain: shouldSplit,
+      });
     };
 
     measureAndFit();
@@ -119,9 +183,9 @@ function useDynamicBhajanFontSize(
     const resizeObserver = new ResizeObserver(() => {
       measureAndFit();
     });
-    resizeObserver.observe(containerRef.current);
-    if (containerRef.current.parentElement) {
-      resizeObserver.observe(containerRef.current.parentElement);
+    resizeObserver.observe(containerEl);
+    if (containerEl.parentElement) {
+      resizeObserver.observe(containerEl.parentElement);
     }
 
     window.addEventListener('resize', measureAndFit);
@@ -132,9 +196,9 @@ function useDynamicBhajanFontSize(
       resizeObserver.disconnect();
       window.removeEventListener('resize', measureAndFit);
     };
-  }, [lines, containerRef]);
+  }, [stanzas, containerEl, isRoman]);
 
-  return fontSize;
+  return result;
 }
 
 const BhajanPage = () => {
@@ -143,8 +207,8 @@ const BhajanPage = () => {
   const [showRoman, setShowRoman] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const hindiContentRef = useRef<HTMLDivElement>(null);
-  const romanContentRef = useRef<HTMLDivElement>(null);
+  const [hindiContainerEl, setHindiContainerEl] = useState<HTMLDivElement | null>(null);
+  const [romanContainerEl, setRomanContainerEl] = useState<HTMLDivElement | null>(null);
 
   const bhajan = getBhajanById(subdivisionId || '', bhajanId || '');
   if (!bhajan) return null;
@@ -157,7 +221,7 @@ const BhajanPage = () => {
     return showRoman ? transliterateText(bhajan.lyrics) : '';
   }, [showRoman, bhajan.lyrics]);
 
-  const parseBhajanLyrics = (rawText: string) => {
+  const parseBhajanLyrics = (rawText: string): ParsedStanza[] => {
     if (!rawText) return [];
     const stanzas = rawText.trim().split(/\n\s*\n+/);
 
@@ -199,12 +263,10 @@ const BhajanPage = () => {
   };
 
   const parsedHindi = useMemo(() => parseBhajanLyrics(bhajan.lyrics), [bhajan.lyrics]);
-  const hindiLines = useMemo(() => getAllRenderedLines(parsedHindi), [parsedHindi]);
-  const hindiFontSize = useDynamicBhajanFontSize(hindiLines, hindiContentRef);
+  const hindiSizing = useDynamicBhajanFontSize(parsedHindi, hindiContainerEl, false);
 
   const parsedRoman = useMemo(() => (showRoman ? parseBhajanLyrics(romanizedLyrics) : []), [showRoman, romanizedLyrics]);
-  const romanLines = useMemo(() => getAllRenderedLines(parsedRoman), [parsedRoman]);
-  const romanFontSize = useDynamicBhajanFontSize(romanLines, romanContentRef);
+  const romanSizing = useDynamicBhajanFontSize(parsedRoman, romanContainerEl, true);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(bhajan.lyrics);
@@ -223,8 +285,12 @@ const BhajanPage = () => {
     });
   };
 
-  const renderLyricsBlock = (rawText: string, fontSize: number, isRoman = false) => {
-    const parsed = isRoman ? parsedRoman : parsedHindi;
+  const renderLyricsBlock = (
+    parsed: ParsedStanza[],
+    fontSize: number,
+    shouldSplitRefrain: boolean,
+    isRoman = false
+  ) => {
     if (!parsed.length) return null;
 
     return (
@@ -262,6 +328,34 @@ const BhajanPage = () => {
             >
               {stanza.lines.map((line, lIdx) => {
                 if (line.type === 'verse_with_refrain') {
+                  if (shouldSplitRefrain && line.after) {
+                    return (
+                      <div key={lIdx} className="space-y-1">
+                        <p 
+                          className="leading-normal devanagari-safe break-words"
+                          style={{ fontSize: `${fontSize}px` }}
+                        >
+                          {line.before && (
+                            <span className="text-teal-800 dark:text-teal-300">
+                              {line.before}{' '}
+                            </span>
+                          )}
+                          {line.marker && (
+                            <span className="inline-block mx-1 font-bold text-gold drop-shadow-sm select-none">
+                              {line.marker}
+                            </span>
+                          )}
+                        </p>
+                        <p 
+                          className="font-semibold text-amber-700 dark:text-amber-400 drop-shadow-[0_1px_3px_rgba(212,175,55,0.25)] leading-normal devanagari-safe break-words"
+                          style={{ fontSize: `${fontSize}px` }}
+                        >
+                          {line.after}
+                        </p>
+                      </div>
+                    );
+                  }
+
                   return (
                     <p 
                       key={lIdx}
@@ -401,8 +495,8 @@ const BhajanPage = () => {
                   <Music className="w-4 h-4" /> {t('lyrics')}
                 </h3>
               </div>
-              <div ref={hindiContentRef} className="w-full min-w-0 max-w-full overflow-hidden">
-                {renderLyricsBlock(bhajan.lyrics, hindiFontSize, false)}
+              <div ref={setHindiContainerEl} className="w-full min-w-0 max-w-full overflow-hidden">
+                {renderLyricsBlock(parsedHindi, hindiSizing.fontSize, hindiSizing.shouldSplitRefrain, false)}
               </div>
             </div>
 
@@ -418,8 +512,8 @@ const BhajanPage = () => {
                     <Type className="w-4 h-4" /> {t('transliteration')}
                   </h3>
                 </div>
-                <div ref={romanContentRef} className="w-full min-w-0 max-w-full overflow-hidden">
-                  {renderLyricsBlock(romanizedLyrics, romanFontSize, true)}
+                <div ref={setRomanContainerEl} className="w-full min-w-0 max-w-full overflow-hidden">
+                  {renderLyricsBlock(parsedRoman, romanSizing.fontSize, romanSizing.shouldSplitRefrain, true)}
                 </div>
               </motion.div>
             )}
