@@ -19,7 +19,7 @@ const Header = () => {
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <img 
               src="/tatvaarth/favicon.ico" 
@@ -41,14 +41,16 @@ const Header = () => {
           </nav>
 
           <div className="flex items-center gap-2">
+            {/* Mobile menu toggle */}
             <button
-              onClick={() => setLanguage(language === 'hi' ? 'en' : 'hi')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary text-secondary-foreground text-sm hover:bg-gold hover:text-primary-foreground transition-colors"
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="md:hidden p-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-gold/20 transition-colors"
+              aria-label="Toggle menu"
             >
-              <Globe className="w-4 h-4" />
-              {language === 'hi' ? 'EN' : 'हि'}
+              {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
 
+            {/* Theme button - on the left of the language changing button */}
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               className="p-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-gold hover:text-primary-foreground transition-colors"
@@ -58,11 +60,14 @@ const Header = () => {
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
+            {/* Language changing button - far right */}
             <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="md:hidden p-2 rounded-lg bg-secondary text-secondary-foreground"
+              onClick={() => setLanguage(language === 'hi' ? 'en' : 'hi')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary text-secondary-foreground text-sm hover:bg-gold hover:text-primary-foreground transition-colors"
+              aria-label="Toggle language"
             >
-              {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              <Globe className="w-4 h-4" />
+              {language === 'hi' ? 'EN' : 'हि'}
             </button>
           </div>
         </div>
@@ -76,7 +81,7 @@ const Header = () => {
               exit={{ height: 0, opacity: 0 }}
               className="md:hidden overflow-hidden border-t border-border/50 bg-background/95 backdrop-blur-xl"
             >
-              <div className="container mx-auto px-4 py-4 flex flex-col gap-3">
+              <div className="w-full px-4 sm:px-6 py-4 flex flex-col gap-3">
                 {navItems.map(item => (
                   <Link
                     key={item.path}

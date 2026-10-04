@@ -16,6 +16,8 @@ import {
   cleanAnvayarthText,
   parseTextWithDiagrams,
   highlightBracketedTerms,
+  getDynamicVerseFontSize,
+  groupIntoDohas,
 } from '@/lib/shastra-parser';
 
 const formatGathaText = (text: string, isGadya: boolean = false) => {
@@ -62,9 +64,9 @@ const renderHighlightedAnvayarth = (text: string) => {
     
     const displayClasses = isStarLine
       ? "block mb-1 last:mb-0 text-gold-light font-medium leading-normal"
-      : "block mb-2 last:mb-0";
+      : "block mb-1.5 last:mb-0";
       
-    const displayStyle = isStarLine ? { fontSize: '0.55em', marginLeft: '2rem' } : undefined;
+    const displayStyle = isStarLine ? { fontSize: '0.85em', marginLeft: '2rem' } : undefined;
 
     return (
       <span key={lineIndex} className={displayClasses} style={displayStyle}>
@@ -76,7 +78,7 @@ const renderHighlightedAnvayarth = (text: string) => {
                 key={index} 
                 className={isStarLine 
                   ? "text-gold font-bold px-0.5"
-                  : "inline-block px-1 py-0.5 mx-0.5 rounded text-gold font-semibold bg-gold/10 border border-gold/10"
+                  : "inline px-1 py-0 mx-0.5 rounded text-gold font-semibold bg-gold/10 border border-gold/10 align-baseline"
                 }
               >
                 {boldMatch[1]}
@@ -102,7 +104,8 @@ const renderFormattedCommentary = (
   text: string, 
   colorClass: string = "text-foreground/90", 
   centerAlign: boolean = false,
-  activeGathaNum: string = ''
+  activeGathaNum: string = '',
+  availableContentWidth: number = 600
 ) => {
   if (!text) return null;
 
@@ -112,6 +115,47 @@ const renderFormattedCommentary = (
 
   const renderedElements: React.ReactNode[] = [];
   let currentTableRows: string[] = [];
+
+  interface VerseBufferItem {
+    key: number;
+    text: string;
+    type: 'green' | 'orange';
+  }
+  let currentVerseBlock: VerseBufferItem[] = [];
+
+  const flushVerseBlock = () => {
+    if (currentVerseBlock.length === 0) return;
+    const rawLines = currentVerseBlock.map(item => item.text);
+    const isGreen = currentVerseBlock[0].type === 'green';
+    const dynamicSize = getDynamicVerseFontSize(rawLines, availableContentWidth, {
+      minSize: 10,
+      maxSize: isGreen ? 28 : 26,
+      paddingBuffer: 12,
+    });
+
+    currentVerseBlock.forEach((item) => {
+      renderedElements.push(
+        <div
+          key={`verse-${item.key}`}
+          className={`text-center font-semibold !m-0 !leading-tight devanagari-safe break-words ${
+            item.type === 'green'
+              ? 'text-green-800 dark:text-green-600'
+              : 'text-orange-800 dark:text-orange-400'
+          }`}
+          style={{
+            fontSize: `${dynamicSize}px`,
+            lineHeight: 1.5,
+            wordBreak: 'break-word',
+            overflowWrap: 'anywhere'
+          }}
+        >
+          {highlightBracketedTerms(item.text)}
+        </div>
+      );
+    });
+
+    currentVerseBlock = [];
+  };
 
   const flushTable = (keyIndex: number) => {
     if (currentTableRows.length === 0) return;
@@ -279,6 +323,7 @@ const renderFormattedCommentary = (
     const clean = paragraph.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
 
     if (clean.startsWith('|')) {
+      flushVerseBlock();
       currentTableRows.push(clean);
       return;
     } else {
@@ -286,6 +331,7 @@ const renderFormattedCommentary = (
     }
 
     if (!clean) {
+      flushVerseBlock();
       inVerse = false;
       renderedElements.push(<div key={index} className="h-2" />);
       return;
@@ -296,6 +342,7 @@ const renderFormattedCommentary = (
     const isMeterHeader = /^[(（].*?[)）]$/.test(unwrapped) && unwrapped.length <= 50;
 
     if (isMeterHeader) {
+      flushVerseBlock();
       inVerse = true;
       wasLastLineWrapped = isWrapped;
       renderedElements.push(
@@ -324,6 +371,7 @@ const renderFormattedCommentary = (
 
     const isBoldTitle = unwrapped.startsWith('**') && unwrapped.endsWith('**') && !unwrapped.startsWith('**[');
     if (isBoldTitle) {
+      flushVerseBlock();
       const unwrappedTitle = unwrapped.slice(2, -2).trim();
       renderedElements.push(
         <div 
@@ -344,30 +392,16 @@ const renderFormattedCommentary = (
       unwrapped.startsWith("प्रधानं सर्वधर्माणां");
 
     if (inVerse || isGreenMangal) {
-      renderedElements.push(
-        <div 
-          key={index} 
-          className="text-center text-green-800 dark:text-green-600 font-semibold !m-0 !leading-tight devanagari-safe"
-          style={{ fontSize: "1.2em" }}
-        >
-          {unwrapped}
-        </div>
-      );
+      if (currentVerseBlock.length > 0 && currentVerseBlock[0].type !== 'green') {
+        flushVerseBlock();
+      }
+      currentVerseBlock.push({ key: index, text: unwrapped, type: 'green' });
+      const hasVerseEnd = /[॥|]+\s*[\d\u0966-\u096F]+\s*[॥|]+$/.test(unwrapped) || /॥$/.test(unwrapped);
+      if (hasVerseEnd) {
+        flushVerseBlock();
+      }
       return;
     }
-
-    const getIndentLevel = (line: string): number => {
-      const match = line.match(/^([ \t]+)/);
-      if (!match) return 0;
-      let spaces = 0;
-      for (const char of match[1]) {
-        if (char === '\t') spaces += 2;
-        else if (char === ' ') spaces += 1;
-      }
-      return Math.floor(spaces / 2);
-    };
-
-    const indentLevel = getIndentLevel(paragraph);
 
     const isMangalacharanOrange = [
       "॥ श्रीपरमगुरुवे नमः, परम्पराचार्यगुरुवे नमः ॥",
@@ -376,14 +410,6 @@ const renderFormattedCommentary = (
       "॥ श्रोतार: सावधानतया शृणवन्तु ॥",
       "॥ श्रोतारः सावधान-तया शृणवन्तु ॥",
       "॥ श्रोतार: सावधान-तया शृणवन्तु ॥"
-    ].includes(unwrapped);
-
-    const isSanskritColor = [
-      "(देव वंदना)",
-      "(शास्त्र वंदना)",
-      "(गुरु वंदना)",
-      "आर्हत भक्ति",
-      "पण्डित-जुगल-किशोर कृत"
     ].includes(unwrapped);
 
     const isOrangeColor = 
@@ -398,6 +424,44 @@ const renderFormattedCommentary = (
       unwrapped.startsWith("उज्जोवणमुज्जवणं") ||
       unwrapped.startsWith("दंसण-णाण-चरित्तं");
 
+    const isCenteredOrange = isWrapped && !isMeterHeader;
+
+    if (isCenteredOrange || isMangalacharanOrange || isOrangeColor) {
+      if (currentVerseBlock.length > 0 && currentVerseBlock[0].type !== 'orange') {
+        flushVerseBlock();
+      }
+      currentVerseBlock.push({ key: index, text: unwrapped, type: 'orange' });
+      const hasVerseEnd = /[॥|]+\s*[\d\u0966-\u096F]+\s*[॥|]+$/.test(unwrapped) || /॥$/.test(unwrapped);
+      if (hasVerseEnd || isMangalacharanOrange) {
+        flushVerseBlock();
+      }
+      return;
+    }
+
+    // Flush any pending verse lines before rendering standard prose
+    flushVerseBlock();
+
+    const getIndentLevel = (line: string): number => {
+      const match = line.match(/^([ \t]+)/);
+      if (!match) return 0;
+      let spaces = 0;
+      for (const char of match[1]) {
+        if (char === '\t') spaces += 2;
+        else if (char === ' ') spaces += 1;
+      }
+      return Math.floor(spaces / 2);
+    };
+
+    const indentLevel = getIndentLevel(paragraph);
+
+    const isSanskritColor = [
+      "(देव वंदना)",
+      "(शास्त्र वंदना)",
+      "(गुरु वंदना)",
+      "आर्हत भक्ति",
+      "पण्डित-जुगल-किशोर कृत"
+    ].includes(unwrapped);
+
     const isStarLine = 
       (unwrapped.startsWith('*') && !unwrapped.startsWith('**')) || 
       (unwrapped.includes(' = ') && !unwrapped.startsWith('|') && !unwrapped.startsWith('**')) ||
@@ -405,7 +469,6 @@ const renderFormattedCommentary = (
 
     const cleanPrefix = unwrapped.replace(/^[०-९0-9]+(?:-[०-९0-9]+)?\.\s*/, '');
     const isQuestion = cleanPrefix.startsWith('प्रश्न –') || cleanPrefix.startsWith('प्रश्न -') || cleanPrefix.startsWith('शंका –') || cleanPrefix.startsWith('शंका -');
-    const isCenteredOrange = isWrapped && !isMeterHeader;
     const isBullet = clean.startsWith('•');
     const isNumber = /^[०-९0-9]+(?:-[०-९0-9]+)?[.\s]/.test(clean);
     
@@ -414,10 +477,6 @@ const renderFormattedCommentary = (
       displayClasses = 'text-gold-light text-left font-medium leading-normal';
     } else if (isQuestion) {
       displayClasses = 'text-red-600 dark:text-red-400 font-semibold text-left';
-    } else if (isCenteredOrange) {
-      displayClasses = 'text-orange-800 dark:text-orange-400 font-semibold text-center !m-0 !leading-tight';
-    } else if (isMangalacharanOrange || isOrangeColor) {
-      displayClasses = `text-orange-800 dark:text-orange-400 font-semibold ${centerAlign ? 'text-center' : 'text-left'}`;
     } else if (isSanskritColor) {
       displayClasses = `text-pink-700 dark:text-pink-400 font-semibold ${centerAlign ? 'text-center' : 'text-left'}`;
     } else {
@@ -439,7 +498,7 @@ const renderFormattedCommentary = (
     let displayText = unwrapped;
     if (isBullet && indentLevel > 0) displayText = unwrapped.replace(/^•/, '◦');
 
-    const goldenHeadingMatch = !isStarLine && !isQuestion && !isCenteredOrange && !isBullet && !isNumber && !isMangalacharanOrange && !isSanskritColor && !isOrangeColor
+    const goldenHeadingMatch = !isStarLine && !isQuestion && !isBullet && !isNumber && !isSanskritColor
       ? unwrapped.match(/^([\u0900-\u097F\u200C\u200D]+(?:-[\u0900-\u097F\u200C\u200D]+)*)-(\ .*)$/)
       : null;
 
@@ -470,7 +529,7 @@ const renderFormattedCommentary = (
     renderedElements.push(
       <div 
         key={index} 
-        className={`${displayClasses} ${isStarLine ? 'my-0.5' : isCenteredOrange ? '' : (isBullet || isNumber) ? 'my-0.5' : 'my-2'} ${isCenteredOrange ? '' : 'leading-loose'} devanagari-safe`}
+        className={`${displayClasses} ${isStarLine ? 'my-0.5' : (isBullet || isNumber) ? 'my-0.5' : 'my-2'} leading-relaxed devanagari-safe`}
         style={displayStyle}
       >
         {renderedContent}
@@ -478,11 +537,17 @@ const renderFormattedCommentary = (
     );
   });
 
+  flushVerseBlock();
   flushTable(paragraphs.length);
   return renderedElements;
 };
 
-const renderCommentaryWithDiagrams = (text: string, colorClass?: string, activeGathaNum: string = '') => {
+const renderCommentaryWithDiagrams = (
+  text: string, 
+  colorClass?: string, 
+  activeGathaNum: string = '',
+  availableContentWidth: number = 600
+) => {
   return parseTextWithDiagrams(cleanAnvayarthText(text)).map((part, idx) => {
     if (part.type === 'diagram') {
       try {
@@ -499,7 +564,11 @@ const renderCommentaryWithDiagrams = (text: string, colorClass?: string, activeG
         return null;
       }
     }
-    return <Fragment key={`text-${idx}`}>{renderFormattedCommentary(part.content, colorClass, false, activeGathaNum)}</Fragment>;
+    return (
+      <Fragment key={`text-${idx}`}>
+        {renderFormattedCommentary(part.content, colorClass, false, activeGathaNum, availableContentWidth)}
+      </Fragment>
+    );
   });
 };
 
@@ -524,6 +593,7 @@ interface GathaVerseItemProps {
   isFirstOfChapter: boolean;
   contentFontSize: number;
   lineSpacing: number;
+  availableContentWidth: number;
   readingClass: string;
   activeTeekaTabs: Record<string, string>;
   setActiveTeekaTabs: React.Dispatch<React.SetStateAction<Record<string, string>>>;
@@ -541,6 +611,7 @@ const GathaVerseItem = memo(({
   isFirstOfChapter,
   contentFontSize,
   lineSpacing,
+  availableContentWidth,
   readingClass,
   activeTeekaTabs,
   setActiveTeekaTabs,
@@ -578,50 +649,116 @@ const GathaVerseItem = memo(({
         {/* Header title */}
         <h3 
           className="font-heading text-center font-black text-foreground drop-shadow-[0_4px_12px_rgba(212,175,55,0.8)] mb-6 devanagari-safe tracking-wide break-words" 
-          style={{ fontSize: `${contentFontSize * 1.6}px`, wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+          style={{ fontSize: `${Math.round(contentFontSize * 1.65)}px`, wordBreak: 'break-word', overflowWrap: 'anywhere' }}
         >
           {formatGathaText(content.title)}
         </h3>
 
         {/* Prakrit verse */}
         {chapterName !== 'परिशिष्ट' && content.gatha && (
-          <div className="p-6 md:p-8 rounded-2xl bg-gold/5 border border-gold/20 shadow-sm relative mb-6 overflow-hidden">
+          <div className="p-4 sm:p-6 md:p-8 rounded-2xl bg-gold/5 border border-gold/20 shadow-sm relative mb-6 overflow-hidden">
             <h4 className="text-xs uppercase tracking-wider text-gold font-medium mb-3">{t('prakrit')}</h4>
-            <p 
-              className={`text-center text-xl md:text-2xl font-semibold devanagari-safe leading-loose break-words ${readingClass} ${
-                content.gatha.includes('ओंकारं बिन्दुसंयुक्तं')
-                  ? 'text-gold drop-shadow-[0_0_15px_rgba(212,175,55,0.8)]'
-                  : 'text-orange-800 dark:text-orange-400 drop-shadow-[0_4px_12px_rgba(234,88,12,0.7)] dark:drop-shadow-[0_4px_12px_rgba(251,146,60,0.8)]'
-              }`}
-              style={{ fontSize: `${contentFontSize * 1.25}px`, lineHeight: lineSpacing, wordBreak: 'break-word', overflowWrap: 'anywhere' }}
-            >
-              {formatGathaText(content.gatha)}
-            </p>
+            {(() => {
+              const dohaGroups = groupIntoDohas(content.gatha);
+              const isSpecialGold = content.gatha.includes('ओंकारं बिन्दुसंयुक्तं');
+              const textColorClass = isSpecialGold
+                ? 'text-gold drop-shadow-[0_0_15px_rgba(212,175,55,0.8)]'
+                : 'text-orange-800 dark:text-orange-400 drop-shadow-[0_4px_12px_rgba(234,88,12,0.7)] dark:drop-shadow-[0_4px_12px_rgba(251,146,60,0.8)]';
+              const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+              const cardInnerWidth = Math.max(availableContentWidth - (isMobile ? 32 : 64), 100);
+
+              return dohaGroups.map((dohaLines, dIdx) => {
+                const dohaFontSize = getDynamicVerseFontSize(dohaLines, cardInnerWidth, {
+                  minSize: 10,
+                  maxSize: 32,
+                  paddingBuffer: 12,
+                });
+
+                return (
+                  <p
+                    key={dIdx}
+                    className={`text-center font-semibold devanagari-safe break-words ${readingClass} ${textColorClass} ${dIdx > 0 ? 'mt-4' : ''}`}
+                    style={{
+                      fontSize: `${dohaFontSize}px`,
+                      lineHeight: 1.5,
+                      wordBreak: 'break-word',
+                      overflowWrap: 'anywhere'
+                    }}
+                  >
+                    {formatGathaText(dohaLines.join('\n'))}
+                  </p>
+                );
+              });
+            })()}
           </div>
         )}
 
         {/* Sanskrit verse */}
         {content.gathaS && (
-          <div className="p-4 rounded-xl bg-secondary/30 border border-border/30 mb-6 overflow-hidden">
+          <div className="p-4 sm:p-5 rounded-xl bg-secondary/30 border border-border/30 mb-6 overflow-hidden">
             <h4 className="text-xs uppercase tracking-wider text-muted-foreground/80 font-medium mb-2">{t('sanskrit')}</h4>
-            <p 
-              className={`text-center text-base md:text-lg text-teal-700 dark:text-teal-400 devanagari-safe leading-loose break-words ${readingClass}`}
-              style={{ fontSize: `${contentFontSize * 0.8}px`, lineHeight: lineSpacing, wordBreak: 'break-word', overflowWrap: 'anywhere' }}
-            >
-              {formatGathaText(content.gathaS)}
-            </p>
+            {(() => {
+              const dohaGroups = groupIntoDohas(content.gathaS);
+              const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+              const cardInnerWidth = Math.max(availableContentWidth - (isMobile ? 32 : 40), 100);
+
+              return dohaGroups.map((dohaLines, dIdx) => {
+                const dohaFontSize = getDynamicVerseFontSize(dohaLines, cardInnerWidth, {
+                  minSize: 10,
+                  maxSize: 26,
+                  paddingBuffer: 12,
+                });
+
+                return (
+                  <p
+                    key={dIdx}
+                    className={`text-center text-teal-700 dark:text-teal-400 devanagari-safe break-words ${readingClass} ${dIdx > 0 ? 'mt-3' : ''}`}
+                    style={{
+                      fontSize: `${dohaFontSize}px`,
+                      lineHeight: 1.5,
+                      wordBreak: 'break-word',
+                      overflowWrap: 'anywhere'
+                    }}
+                  >
+                    {formatGathaText(dohaLines.join('\n'))}
+                  </p>
+                );
+              });
+            })()}
           </div>
         )}
 
         {/* Hindi Poetic Verse (Gadya) */}
         {content.gadya && chapterName !== 'परिशिष्ट' && (
-          <div className="text-center italic text-foreground/90 font-serif my-8 px-6 devanagari-safe border-l-2 border-r-2 border-gold/30 break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-            <p 
-              className="leading-relaxed break-words"
-              style={{ fontSize: `${contentFontSize * 0.8}px`, lineHeight: lineSpacing, wordBreak: 'break-word', overflowWrap: 'anywhere' }}
-            >
-              {formatGathaText(content.gadya, true)}
-            </p>
+          <div className="text-center italic text-foreground/90 font-serif my-8 px-4 md:px-6 devanagari-safe border-l-2 border-r-2 border-gold/30 break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+            {(() => {
+              const dohaGroups = groupIntoDohas(content.gadya);
+              const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+              const cardInnerWidth = Math.max(availableContentWidth - (isMobile ? 32 : 48), 100);
+
+              return dohaGroups.map((dohaLines, dIdx) => {
+                const dohaFontSize = getDynamicVerseFontSize(dohaLines, cardInnerWidth, {
+                  minSize: 10,
+                  maxSize: 26,
+                  paddingBuffer: 12,
+                });
+
+                return (
+                  <div
+                    key={dIdx}
+                    className={`leading-relaxed break-words ${dIdx > 0 ? 'mt-3' : ''}`}
+                    style={{
+                      fontSize: `${dohaFontSize}px`,
+                      lineHeight: 1.5,
+                      wordBreak: 'break-word',
+                      overflowWrap: 'anywhere'
+                    }}
+                  >
+                    {formatGathaText(dohaLines.join('\n'), true)}
+                  </div>
+                );
+              });
+            })()}
           </div>
         )}
 
@@ -632,7 +769,7 @@ const GathaVerseItem = memo(({
               🔍 {t('anvayarth')}
             </h4>
             <div 
-              className="text-foreground/95 devanagari-safe leading-loose"
+              className="text-foreground/95 devanagari-safe leading-relaxed"
               style={{ fontSize: `${contentFontSize}px`, lineHeight: lineSpacing }}
             >
               {parseTextWithDiagrams(cleanAnvayarthText(content.anvayarth)).map((part, pIdx) => {
@@ -661,10 +798,10 @@ const GathaVerseItem = memo(({
         {content.bhavarth && (
           <div className="my-8 p-6 rounded-2xl bg-amber-900/5 dark:bg-amber-900/10 border border-gold/10 shadow-inner">
             <div 
-              className="devanagari-safe leading-loose"
-              style={{ fontSize: `${contentFontSize * 1.1}px`, lineHeight: lineSpacing }}
+              className="devanagari-safe leading-relaxed"
+              style={{ fontSize: `${contentFontSize}px`, lineHeight: lineSpacing }}
             >
-              {renderFormattedCommentary(content.bhavarth, 'text-foreground/90', true, activeGathaNum)}
+              {renderFormattedCommentary(content.bhavarth, 'text-foreground/90', true, activeGathaNum, Math.max(availableContentWidth - 48, 100))}
             </div>
           </div>
         )}
@@ -729,20 +866,20 @@ const GathaVerseItem = memo(({
                     <motion.div
                       initial={{ opacity: 0, y: -5 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="p-4 rounded-xl bg-gold/5 border border-gold/10 mb-4 text-foreground/80 devanagari-safe leading-loose space-y-2"
+                      className="p-4 rounded-xl bg-gold/5 border border-gold/10 mb-4 text-foreground/80 devanagari-safe leading-relaxed space-y-2"
                       style={{ fontSize: `${contentFontSize}px`, lineHeight: lineSpacing }}
                     >
                       <h5 className="text-xs uppercase text-gold font-semibold mb-2">{t('sanskrit')}</h5>
-                      {renderCommentaryWithDiagrams(activeTeeka.sanskrit, "text-teal-700 dark:text-teal-400", activeGathaNum)}
+                      {renderCommentaryWithDiagrams(activeTeeka.sanskrit, "text-teal-700 dark:text-teal-400", activeGathaNum, Math.max(availableContentWidth - 48, 100))}
                     </motion.div>
                   )}
 
                   {/* Hindi commentary text */}
                   <div 
-                    className="text-foreground/90 devanagari-safe leading-loose space-y-2"
+                    className="text-foreground/90 devanagari-safe leading-relaxed space-y-2"
                     style={{ fontSize: `${contentFontSize}px`, lineHeight: lineSpacing }}
                   >
-                    {renderCommentaryWithDiagrams(activeTeeka.hindi, undefined, activeGathaNum)}
+                    {renderCommentaryWithDiagrams(activeTeeka.hindi, undefined, activeGathaNum, Math.max(availableContentWidth - 48, 100))}
                   </div>
                 </div>
               )}
@@ -763,8 +900,8 @@ GathaVerseItem.displayName = 'GathaVerseItem';
 const ShastraReader = () => {
   const { categorySlug, shastraSlug } = useParams<{ categorySlug: string; shastraSlug: string }>();
   const { t, language, theme } = useApp();
-  const contentFontSize = 20;
-  const lineSpacing = 1.8;
+  const contentFontSize = 17;
+  const lineSpacing = 1.6;
   
   const [shastraIndex, setShastraIndex] = useState<ShastraIndex | null>(null);
   const [activeGathaNum, setActiveGathaNum] = useState<string>('');
@@ -775,6 +912,60 @@ const ShastraReader = () => {
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [gathas, setGathas] = useState<Array<{ item: GathaItem; content: GathaContent; chapterName: string }>>([]);
   const [isLoadingGathas, setIsLoadingGathas] = useState(true);
+  const [areControlsVisible, setAreControlsVisible] = useState(true);
+
+  const mainRef = useRef<HTMLDivElement>(null);
+  const [contentWidth, setContentWidth] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const isMobile = window.innerWidth < 768;
+      const targetPercent = isMobile ? 0.95 : 0.8;
+      const horizontalPadding = isMobile ? 16 : 48;
+      return Math.floor(window.innerWidth * targetPercent - horizontalPadding);
+    }
+    return 600;
+  });
+
+  useEffect(() => {
+    if (!mainRef.current) return;
+    const updateWidth = () => {
+      if (mainRef.current) {
+        const computed = window.getComputedStyle(mainRef.current);
+        const pl = parseFloat(computed.paddingLeft) || 16;
+        const pr = parseFloat(computed.paddingRight) || 16;
+        const innerW = mainRef.current.clientWidth - pl - pr;
+        if (innerW > 0) {
+          setContentWidth(Math.floor(innerW));
+        }
+      }
+    };
+    updateWidth();
+    const ro = new ResizeObserver(updateWidth);
+    ro.observe(mainRef.current);
+    window.addEventListener('resize', updateWidth);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', updateWidth);
+    };
+  }, [isSidebarOpen]);
+
+  // Controls fade away on screen tap only when sidebar is NOT active
+  useEffect(() => {
+    const handleTap = (e: MouseEvent) => {
+      // If the sidebar is active, clicking the screen shouldn't fade the buttons away
+      if (isSidebarOpen) {
+        return;
+      }
+
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('button, a, input, select, textarea, [role="button"], #sidebar-scroll-container, aside, th, td')) {
+        return;
+      }
+      setAreControlsVisible(prev => !prev);
+    };
+
+    window.addEventListener('click', handleTap);
+    return () => window.removeEventListener('click', handleTap);
+  }, [isSidebarOpen]);
 
   const uniqueCommentators = useMemo(() => {
     const set = new Set<string>();
@@ -969,6 +1160,9 @@ const ShastraReader = () => {
       isProgrammaticScrollRef.current = false;
     }, 1000);
 
+    if (newState) {
+      setAreControlsVisible(true);
+    }
     setIsSidebarOpen(newState);
   };
 
@@ -1041,14 +1235,18 @@ const ShastraReader = () => {
   const readingClass = '';
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col overflow-x-hidden w-full max-w-full">
       <Header />
 
       {/* Unified PDF Download Button */}
       <button
         onClick={handleFullPdfDownload}
         disabled={isDownloadingPdf}
-        className="fixed z-40 top-[76px] right-4 md:right-8 flex items-center justify-center gap-1.5 w-9 h-9 md:w-auto md:h-auto md:px-3 md:py-1.5 rounded-lg bg-gold hover:opacity-90 text-primary-foreground shadow-lg backdrop-blur-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs font-semibold devanagari-safe"
+        className={`fixed z-40 top-[76px] right-4 md:right-8 flex items-center justify-center gap-1.5 w-9 h-9 md:w-auto md:h-auto md:px-3 md:py-1.5 rounded-lg bg-gold hover:opacity-90 text-primary-foreground shadow-lg backdrop-blur-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-semibold devanagari-safe ${
+          areControlsVisible
+            ? 'opacity-100 translate-y-0 pointer-events-auto'
+            : 'opacity-0 -translate-y-2 pointer-events-none'
+        }`}
         title={t('downloadFullPdf')}
       >
         {isDownloadingPdf ? (
@@ -1069,7 +1267,11 @@ const ShastraReader = () => {
         {!isLoadingGathas && (
           <button
             onClick={() => handleSidebarToggle(!isSidebarOpen)}
-            className="fixed z-50 bottom-6 left-6 p-3 rounded-full bg-gold text-primary-foreground shadow-lg hover:opacity-90 transition-all flex items-center justify-center"
+            className={`fixed z-50 bottom-6 left-6 p-3 rounded-full bg-gold text-primary-foreground shadow-lg hover:opacity-90 transition-all duration-300 flex items-center justify-center ${
+              areControlsVisible
+                ? 'opacity-100 translate-y-0 pointer-events-auto'
+                : 'opacity-0 translate-y-2 pointer-events-none'
+            }`}
             title="Toggle Navigation Menu"
           >
             <ListCollapse className="w-5 h-5" />
@@ -1147,7 +1349,7 @@ const ShastraReader = () => {
 
                 <div 
                   id="sidebar-scroll-container"
-                  className="flex-1 overflow-y-auto p-3 scrollbar-thin"
+                  className="flex-1 overflow-y-auto p-3 pb-12 scrollbar-thin"
                   onScroll={handleSidebarScroll}
                 >
                   {/* Shastra Cover Page Link */}
@@ -1232,14 +1434,20 @@ const ShastraReader = () => {
                       </li>
                     </ul>
                   </div>
+
+                  {/* Extra bottom buffer space (2+ entries worth) */}
+                  <div className="h-24 w-full" aria-hidden="true" />
                 </div>
               </motion.aside>
             </>
           )}
         </AnimatePresence>
 
-        {/* 2. Main Content Area */}
-        <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-32">
+        {/* 2. Main Content Area: 95% on mobile, 80% on wide screens */}
+        <main 
+          ref={mainRef}
+          className="flex-1 w-[95%] md:w-[80%] mx-auto px-2 sm:px-6 lg:px-8 pb-32 min-w-0 overflow-x-hidden"
+        >
           {/* Shastra Cover Page */}
           {!isLoadingGathas && shastraIndex?.cover && (
             <div
@@ -1270,13 +1478,13 @@ const ShastraReader = () => {
               )}
               
               {shastraIndex.cover.subtitle && (
-                <p className="text-lg md:text-xl font-bold text-gold/90 max-w-4xl leading-relaxed mt-16 px-4 drop-shadow-sm">
+                <p className="text-lg md:text-xl font-bold text-gold/90 max-w-5xl leading-relaxed mt-16 px-4 drop-shadow-sm">
                   {shastraIndex.cover.subtitle}
                 </p>
               )}
               
               {shastraIndex.cover.credits && (
-                <p className="text-sm md:text-base font-bold text-muted-foreground max-w-4xl leading-relaxed mt-16">
+                <p className="text-sm md:text-base font-bold text-muted-foreground max-w-5xl leading-relaxed mt-16">
                   {shastraIndex.cover.credits}
                 </p>
               )}
@@ -1314,6 +1522,7 @@ const ShastraReader = () => {
                     isFirstOfChapter={isFirstOfChapter}
                     contentFontSize={contentFontSize}
                     lineSpacing={lineSpacing}
+                    availableContentWidth={contentWidth}
                     readingClass={readingClass}
                     activeTeekaTabs={activeTeekaTabs}
                     setActiveTeekaTabs={setActiveTeekaTabs}

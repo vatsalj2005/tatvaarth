@@ -5,6 +5,106 @@ import React from 'react';
  * used across ShastraReader and ShastraPrintTemplate.
  */
 
+let _measureCanvas: HTMLCanvasElement | null = null;
+let _measureCtx: CanvasRenderingContext2D | null = null;
+
+export const measureTextWidth = (text: string, font: string = '600 16px "Noto Sans Devanagari", sans-serif'): number => {
+  if (typeof document === 'undefined') return text.length * 9.5;
+  if (!_measureCanvas) {
+    _measureCanvas = document.createElement('canvas');
+    _measureCtx = _measureCanvas.getContext('2d');
+  }
+  if (!_measureCtx) return text.length * 9.5;
+  _measureCtx.font = font;
+  return _measureCtx.measureText(text).width;
+};
+
+export interface DynamicVerseFontOptions {
+  minSize?: number;
+  maxSize?: number;
+  baseSize?: number;
+  paddingBuffer?: number;
+  fontFamily?: string;
+}
+
+export const getDynamicVerseFontSize = (
+  lines: string[],
+  availableWidth: number,
+  options?: DynamicVerseFontOptions
+): number => {
+  const minSize = options?.minSize ?? 10;
+  const maxSize = options?.maxSize ?? 32;
+  const baseSize = options?.baseSize ?? 16;
+  const paddingBuffer = options?.paddingBuffer ?? 12;
+  const fontFamily = options?.fontFamily ?? '"Noto Sans Devanagari", "Noto Serif Devanagari", sans-serif';
+
+  if (!lines || lines.length === 0 || availableWidth <= 0) return minSize;
+
+  const font = `600 ${baseSize}px ${fontFamily}`;
+  let maxLineWidth = 0;
+  let longestLine = '';
+  for (const line of lines) {
+    const trimmed = line.replace(/^[!*]+\s*|\s*[!*]+$/g, '').trim();
+    if (!trimmed) continue;
+    const w = measureTextWidth(trimmed, font);
+    if (w > maxLineWidth) {
+      maxLineWidth = w;
+      longestLine = trimmed;
+    }
+  }
+
+  if (maxLineWidth <= 0) return baseSize;
+
+  const targetWidth = Math.max(availableWidth - paddingBuffer, 80);
+  let calculatedSize = baseSize * (targetWidth / maxLineWidth);
+
+  // Verification pass at calculatedSize to guarantee zero overflow even with non-linear font scaling / ligatures
+  if (_measureCtx && longestLine) {
+    _measureCtx.font = `600 ${calculatedSize}px ${fontFamily}`;
+    const actualWidth = _measureCtx.measureText(longestLine).width;
+    if (actualWidth > targetWidth) {
+      calculatedSize = calculatedSize * (targetWidth / actualWidth);
+    }
+  }
+
+  return Math.round(Math.max(minSize, Math.min(calculatedSize, maxSize)) * 10) / 10;
+};
+
+export const groupIntoDohas = (text: string): string[][] => {
+  if (!text) return [];
+  const lines = text.split('\n');
+  const dohas: string[][] = [];
+  let currentDoha: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const trimmed = rawLine.trim();
+
+    if (!trimmed) {
+      if (currentDoha.length > 0) {
+        dohas.push(currentDoha);
+        currentDoha = [];
+      }
+      continue;
+    }
+
+    currentDoha.push(rawLine);
+
+    // If this line ends with a doha/verse number marker like ॥1॥ or ॥५६॥ or ||1||
+    const hasVerseEnd = /[॥|]+\s*[\d\u0966-\u096F]+\s*[॥|]+$/.test(trimmed);
+    if (hasVerseEnd) {
+      dohas.push(currentDoha);
+      currentDoha = [];
+    }
+  }
+
+  if (currentDoha.length > 0) {
+    dohas.push(currentDoha);
+  }
+
+  return dohas;
+};
+
 export const devanagariToEnglish = (str: string): string => {
   const map: Record<string, string> = {
     '०': '0', '१': '1', '२': '2', '३': '3', '४': '4',
@@ -131,7 +231,7 @@ export const highlightBracketedTerms = (text: string): React.ReactNode => {
     return (
       <span>
         {specialPrefixMatch[1] || ""}
-        <span className="px-1 py-0.5 mr-1 rounded text-gold font-semibold bg-gold/10 border border-gold/10">
+        <span className="inline px-1 py-0 mr-1 rounded text-gold font-semibold bg-gold/10 border border-gold/10 align-baseline">
           {specialPrefixMatch[2].trim()}
         </span>
         {processText(specialPrefixMatch[3])}
@@ -151,7 +251,7 @@ export const highlightBracketedTerms = (text: string): React.ReactNode => {
       return (
         <span>
           {prefixMatch[1]}
-          <span className="px-1 py-0.5 mr-1 rounded text-gold font-semibold bg-gold/10 border border-gold/10">
+          <span className="inline px-1 py-0 mr-1 rounded text-gold font-semibold bg-gold/10 border border-gold/10 align-baseline">
             {prefixMatch[2].trim()}
           </span>
           {processText(prefixMatch[3])}

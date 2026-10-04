@@ -309,7 +309,7 @@ const BhajanPage = () => {
       <Header />
       <div className="pt-24 pb-16 w-full overflow-x-hidden">
         {/* 95% of phone screen width on mobile, 80% on wide screens / laptops */}
-        <div className="w-[95%] md:w-[80%] max-w-5xl mx-auto flex flex-col items-center min-w-0">
+        <div className="w-[95%] md:w-[80%] mx-auto flex flex-col items-center min-w-0">
           {/* Breadcrumb */}
           <div className="w-full flex items-center gap-2 text-sm text-muted-foreground mb-6 flex-wrap devanagari-safe">
             <Link to="/bhajan" className="hover:text-gold transition-colors">{t('bhajan')}</Link>
