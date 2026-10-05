@@ -112,14 +112,16 @@ const getLevelStyle = (level: number): React.CSSProperties => {
 // Recursive horizontal branch renderer
 const HorizontalBranch: React.FC<{ node: TreeNode }> = ({ node }) => {
   const nodeStyle = getLevelStyle(node.level ?? 0);
+  const isRoot = !node.level || node.level === 0;
   
+  const boxClass = isRoot
+    ? "px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl text-base sm:text-lg font-bold border text-white min-w-[64px] max-w-[240px] text-center devanagari-safe transition-all duration-300 hover:scale-105 hover:brightness-110 leading-snug shadow-md"
+    : "px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-sm sm:text-base font-semibold border text-white min-w-[52px] max-w-[220px] text-center devanagari-safe transition-all duration-300 hover:scale-105 hover:brightness-110 leading-snug shadow-sm";
+
   if (node.children.length === 0) {
     return (
       <div className="flex items-center">
-        <div 
-          className="px-3 py-2 rounded-xl text-xs font-semibold border text-white min-w-[100px] max-w-[150px] text-center devanagari-safe transition-all duration-300 hover:scale-105 hover:brightness-110"
-          style={nodeStyle}
-        >
+        <div className={boxClass} style={nodeStyle}>
           {node.topic}
         </div>
       </div>
@@ -129,34 +131,31 @@ const HorizontalBranch: React.FC<{ node: TreeNode }> = ({ node }) => {
   return (
     <div className="flex items-center">
       {/* Node Box */}
-      <div 
-        className="px-3 py-2 rounded-xl text-xs font-semibold border text-white min-w-[100px] max-w-[150px] text-center devanagari-safe shrink-0 transition-all duration-300 hover:scale-105 hover:brightness-110"
-        style={nodeStyle}
-      >
+      <div className={`${boxClass} shrink-0`} style={nodeStyle}>
         {node.topic}
       </div>
 
       {/* Connecting line to the children column */}
-      <div className="w-4 h-[2px] bg-foreground shrink-0" />
+      <div className="w-5 h-[2px] bg-foreground shrink-0" />
 
       {/* Children Column */}
-      <div className="flex flex-col relative pl-4 py-1">
+      <div className="flex flex-col relative pl-5 py-0.5">
         {node.children.map((child, idx) => {
           const isFirst = idx === 0;
           const isLast = idx === node.children.length - 1;
           
           return (
-            <div key={child.id} className="relative flex items-center py-1">
+            <div key={child.id} className="relative flex items-center py-1.5">
               {node.children.length === 1 ? (
-                <div className="absolute -left-4 top-1/2 w-4 h-[2px] bg-foreground -translate-y-1/2" />
+                <div className="absolute -left-5 top-1/2 w-5 h-[2px] bg-foreground -translate-y-1/2" />
               ) : isFirst ? (
-                <div className="absolute -left-4 top-1/2 bottom-0 w-4 border-t-2 border-l-2 border-foreground rounded-tl-[8px]" />
+                <div className="absolute -left-5 top-1/2 bottom-0 w-5 border-t-2 border-l-2 border-foreground rounded-tl-[6px]" />
               ) : isLast ? (
-                <div className="absolute -left-4 top-0 bottom-1/2 w-4 border-b-2 border-l-2 border-foreground rounded-bl-[8px]" />
+                <div className="absolute -left-5 top-0 bottom-1/2 w-5 border-b-2 border-l-2 border-foreground rounded-bl-[6px]" />
               ) : (
                 <>
-                  <div className="absolute -left-4 top-0 bottom-0 w-[2px] bg-foreground" />
-                  <div className="absolute -left-4 top-1/2 w-4 h-[2px] bg-foreground -translate-y-1/2" />
+                  <div className="absolute -left-5 top-0 bottom-0 w-[2px] bg-foreground" />
+                  <div className="absolute -left-5 top-1/2 w-5 h-[2px] bg-foreground -translate-y-1/2" />
                 </>
               )}
               <HorizontalBranch node={child} />
@@ -171,14 +170,16 @@ const HorizontalBranch: React.FC<{ node: TreeNode }> = ({ node }) => {
 // Recursive vertical branch renderer
 const VerticalBranch: React.FC<{ node: TreeNode }> = ({ node }) => {
   const nodeStyle = getLevelStyle(node.level ?? 0);
+  const isRoot = !node.level || node.level === 0;
+
+  const boxClass = isRoot
+    ? "px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl text-base sm:text-lg font-bold border text-white min-w-[64px] max-w-[240px] text-center devanagari-safe transition-all duration-300 hover:scale-105 hover:brightness-110 leading-snug shadow-md"
+    : "px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-sm sm:text-base font-semibold border text-white min-w-[52px] max-w-[220px] text-center devanagari-safe transition-all duration-300 hover:scale-105 hover:brightness-110 leading-snug shadow-sm";
 
   if (node.children.length === 0) {
     return (
       <div className="flex flex-col items-center">
-        <div 
-          className="px-3 py-2 rounded-xl text-xs font-semibold border text-white min-w-[100px] max-w-[150px] text-center devanagari-safe transition-all duration-300 hover:scale-105 hover:brightness-110"
-          style={nodeStyle}
-        >
+        <div className={boxClass} style={nodeStyle}>
           {node.topic}
         </div>
       </div>
@@ -188,10 +189,7 @@ const VerticalBranch: React.FC<{ node: TreeNode }> = ({ node }) => {
   return (
     <div className="flex flex-col items-center">
       {/* Node Box */}
-      <div 
-        className="px-3 py-2 rounded-xl text-xs font-semibold border text-white min-w-[100px] max-w-[150px] text-center devanagari-safe transition-all duration-300 hover:scale-105 hover:brightness-110"
-        style={nodeStyle}
-      >
+      <div className={boxClass} style={nodeStyle}>
         {node.topic}
       </div>
 
@@ -209,9 +207,9 @@ const VerticalBranch: React.FC<{ node: TreeNode }> = ({ node }) => {
               {node.children.length === 1 ? (
                 <div className="absolute top-0 left-1/2 h-4 w-[2px] -translate-y-full -translate-x-1/2 bg-foreground" />
               ) : isFirst ? (
-                <div className="absolute right-0 top-0 h-4 w-1/2 -translate-y-full border-t-2 border-l-2 border-foreground rounded-tl-[8px]" />
+                <div className="absolute right-0 top-0 h-4 w-1/2 -translate-y-full border-t-2 border-l-2 border-foreground rounded-tl-[6px]" />
               ) : isLast ? (
-                <div className="absolute left-0 top-0 h-4 w-1/2 -translate-y-full border-t-2 border-r-2 border-foreground rounded-tr-[8px]" />
+                <div className="absolute left-0 top-0 h-4 w-1/2 -translate-y-full border-t-2 border-r-2 border-foreground rounded-tr-[6px]" />
               ) : (
                 <>
                   <div className="absolute top-0 left-0 right-0 h-[2px] bg-foreground -translate-y-[16px]" />
@@ -236,6 +234,22 @@ export const DiagramRenderer: React.FC<DiagramRendererProps> = ({ type, nodes })
     return r;
   }, [nodesStr]);
 
+  // Check if diagram should be rendered horizontally (either requested, or having many children under any parent)
+  const isWide = React.useMemo(() => {
+    if (!root) return false;
+    let maxChildren = 0;
+    let leafCount = 0;
+    const check = (node: TreeNode) => {
+      if (node.children.length > maxChildren) maxChildren = node.children.length;
+      if (node.children.length === 0) leafCount++;
+      node.children.forEach(check);
+    };
+    check(root);
+    return maxChildren > 4 || leafCount > 5;
+  }, [root]);
+
+  const effectiveType = type === 'horizontal' || isWide ? 'horizontal' : 'vertical';
+
   const containerRef = React.useRef<HTMLDivElement>(null);
   const contentRef = React.useRef<HTMLDivElement>(null);
   const [scale, setScale] = React.useState(1);
@@ -252,19 +266,32 @@ export const DiagramRenderer: React.FC<DiagramRendererProps> = ({ type, nodes })
         contentRef.current.style.position = 'static';
         
         const containerWidth = Math.max(0, containerRef.current.clientWidth); 
-        const contentWidth = contentRef.current.scrollWidth;
-        const contentHeight = contentRef.current.scrollHeight;
+        const rect = contentRef.current.getBoundingClientRect();
+        const contentWidth = Math.ceil(rect.width || contentRef.current.scrollWidth);
+        const contentHeight = Math.ceil(rect.height || contentRef.current.scrollHeight);
 
         contentRef.current.style.transform = prevTransform;
         contentRef.current.style.position = prevPosition;
 
         let newScale = 1;
-        if (contentWidth > containerWidth && containerWidth > 0) {
-          // Add 16px safety buffer (8px on each side) so it doesn't touch screen edges
-          const targetWidth = Math.max(0, containerWidth - 16);
-          newScale = targetWidth / contentWidth;
-          if (newScale < 0.75) {
-            newScale = 0.75; // cap minimum scale to keep text readable
+        if (contentWidth > 0 && containerWidth > 0) {
+          const isSmallDevice = containerWidth < 768 || (typeof window !== 'undefined' && window.innerWidth < 768);
+          
+          if (isSmallDevice) {
+            // For small devices: stay within width of the screen AND take as much space as possible
+            const targetWidth = Math.max(0, containerWidth - 8);
+            newScale = targetWidth / contentWidth;
+            // Cap scale at 1.5x so very small diagrams don't blow up excessively
+            newScale = Math.min(newScale, 1.5);
+          } else {
+            // On larger screens: increase base size by 150% (1.5x), scaling down only if it exceeds available width
+            const targetWidth = Math.max(0, containerWidth - 24);
+            const desiredScale = 1.5;
+            if (contentWidth * desiredScale > targetWidth) {
+              newScale = Math.max(1.0, targetWidth / contentWidth);
+            } else {
+              newScale = desiredScale;
+            }
           }
         }
         
@@ -292,7 +319,7 @@ export const DiagramRenderer: React.FC<DiagramRendererProps> = ({ type, nodes })
         resizeObserver.disconnect();
       }
     };
-  }, [nodesStr, type]);
+  }, [nodesStr, effectiveType]);
 
   if (!root) {
     return (
@@ -305,7 +332,7 @@ export const DiagramRenderer: React.FC<DiagramRendererProps> = ({ type, nodes })
   return (
     <div 
       ref={containerRef}
-      className="w-full overflow-x-auto my-6 py-4 bg-transparent scrollbar-thin"
+      className="w-full overflow-x-auto my-4 py-2 bg-transparent scrollbar-thin"
     >
       <div 
         style={{
@@ -317,7 +344,7 @@ export const DiagramRenderer: React.FC<DiagramRendererProps> = ({ type, nodes })
       >
         <div 
           ref={contentRef}
-          className="inline-block py-2 shrink-0"
+          className="inline-block py-1 shrink-0"
           style={{ 
             width: 'max-content',
             transform: `scale(${scale})`, 
@@ -327,7 +354,7 @@ export const DiagramRenderer: React.FC<DiagramRendererProps> = ({ type, nodes })
             top: 0,
           }}
         >
-          {type === 'horizontal' ? (
+          {effectiveType === 'horizontal' ? (
             <HorizontalBranch node={root} />
           ) : (
             <VerticalBranch node={root} />

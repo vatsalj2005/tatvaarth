@@ -18,6 +18,7 @@ import {
   highlightBracketedTerms,
   getDynamicVerseFontSize,
   groupIntoDohas,
+  renderShastraTable,
 } from '@/lib/shastra-parser';
 
 const formatGathaText = (text: string, isGadya: boolean = false) => {
@@ -52,9 +53,29 @@ const formatGathaText = (text: string, isGadya: boolean = false) => {
   });
 };
 
-const renderHighlightedAnvayarth = (text: string) => {
-  return text.split('\n').map((line, lineIndex) => {
+const renderHighlightedAnvayarth = (text: string, activeGathaNum?: string) => {
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+  let currentTableLines: string[] = [];
+
+  const flushTableLines = (key: string | number) => {
+    if (currentTableLines.length === 0) return;
+    const tableElem = renderShastraTable(currentTableLines, `anvayarth-${key}`, activeGathaNum);
+    if (tableElem) {
+      elements.push(tableElem);
+    }
+    currentTableLines = [];
+  };
+
+  lines.forEach((line, lineIndex) => {
     const trimmed = line.trim();
+    if (trimmed.startsWith('|')) {
+      currentTableLines.push(trimmed);
+      return;
+    } else if (currentTableLines.length > 0) {
+      flushTableLines(lineIndex);
+    }
+
     const isStarLine = 
       (trimmed.startsWith('*') && !trimmed.startsWith('**')) || 
       (trimmed.includes(' = ') && !trimmed.startsWith('|') && !trimmed.startsWith('**')) ||
@@ -68,7 +89,7 @@ const renderHighlightedAnvayarth = (text: string) => {
       
     const displayStyle = isStarLine ? { fontSize: '0.85em', marginLeft: '2rem' } : undefined;
 
-    return (
+    elements.push(
       <span key={lineIndex} className={displayClasses} style={displayStyle}>
         {parts.map((part, index) => {
           const boldMatch = part.match(/\*\*\[([^\]]+)\]\*\*/);
@@ -98,6 +119,9 @@ const renderHighlightedAnvayarth = (text: string) => {
       </span>
     );
   });
+
+  flushTableLines('end');
+  return elements;
 };
 
 const renderFormattedCommentary = (
@@ -159,164 +183,11 @@ const renderFormattedCommentary = (
 
   const flushTable = (keyIndex: number) => {
     if (currentTableRows.length === 0) return;
-
-    const tableData: string[][] = [];
-    currentTableRows.forEach(row => {
-      const cells = row.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
-      if (!cells.every(c => /^---+$/.test(c) || c === '')) {
-        tableData.push(cells);
-      }
-    });
-
-    currentTableRows = [];
-    if (tableData.length === 0) return;
-
-    const headerRow = tableData[0];
-    const bodyRows = tableData.slice(1);
-
-    const resolvedSubGroups: string[] = [];
-    let currentSubGroupText = "";
-    bodyRows.forEach((row) => {
-      const col1Text = row[1] || "";
-      const col0Text = row[0] || "";
-      if (col1Text) currentSubGroupText = col1Text;
-      else if (col0Text && !col1Text) currentSubGroupText = col0Text;
-      resolvedSubGroups.push(currentSubGroupText);
-    });
-
-    const numRows = bodyRows.length;
-    const numCols = headerRow.length;
-    const spans: { rowSpan: number; skip: boolean }[][] = Array.from(
-      { length: numRows }, 
-      () => Array(numCols).fill({ rowSpan: 1, skip: false })
-    );
-
-    for (let colIdx = 0; colIdx < numCols; colIdx++) {
-      let rowIdx = 0;
-      while (rowIdx < numRows) {
-        const cellVal = bodyRows[rowIdx][colIdx] || "";
-        const isCurrentTotal = rowIdx === numRows - 1 && 
-                               bodyRows[rowIdx][0] === '' && 
-                               bodyRows[rowIdx].some(c => c.includes('अधिकार') || c.includes('कुल') || c.includes('योग') || c.includes('जोड़') || c.includes('Total') || c.includes('Sum'));
-
-        if (isCurrentTotal) {
-          spans[rowIdx][colIdx] = { rowSpan: 1, skip: false };
-          rowIdx++;
-          continue;
-        }
-
-        if (cellVal !== "") {
-          let nextRowIdx = rowIdx + 1;
-          while (nextRowIdx < numRows) {
-            const isNextTotal = nextRowIdx === numRows - 1 && 
-                                bodyRows[nextRowIdx][0] === '' && 
-                                bodyRows[nextRowIdx].some(c => c.includes('अधिकार') || c.includes('कुल') || c.includes('योग') || c.includes('जोड़') || c.includes('Total') || c.includes('Sum'));
-            if (isNextTotal || bodyRows[nextRowIdx][colIdx] !== "") break;
-            nextRowIdx++;
-          }
-          const spanCount = nextRowIdx - rowIdx;
-          spans[rowIdx][colIdx] = { rowSpan: spanCount, skip: false };
-          for (let r = rowIdx + 1; r < nextRowIdx; r++) {
-            spans[r][colIdx] = { rowSpan: 1, skip: true };
-          }
-          rowIdx = nextRowIdx;
-        } else {
-          spans[rowIdx][colIdx] = { rowSpan: 1, skip: false };
-          rowIdx++;
-        }
-      }
+    const tableElem = renderShastraTable(currentTableRows, keyIndex, activeGathaNum);
+    if (tableElem) {
+      renderedElements.push(tableElem);
     }
-
-    const activeGathaVal = activeGathaNum ? parseInt(devanagariToEnglish(activeGathaNum), 10) : NaN;
-
-    const isRowActive = (row: string[], resolvedSubGroupText: string) => {
-      if (isNaN(activeGathaVal)) return false;
-      const sgRange = getRowRange(resolvedSubGroupText);
-      if (sgRange && activeGathaVal >= sgRange.start && activeGathaVal <= sgRange.end) return true;
-      for (const cell of row) {
-        const range = getRowRange(cell);
-        if (range && activeGathaVal >= range.start && activeGathaVal <= range.end) return true;
-      }
-      return false;
-    };
-
-    const isSubGroupActive = resolvedSubGroups.map((sgText, rowIdx) => isRowActive(bodyRows[rowIdx], sgText));
-
-    const isCellActive = (cellText: string, rowActive: boolean) => {
-      if (isNaN(activeGathaVal)) return false;
-      const range = getRowRange(cellText);
-      if (range) return activeGathaVal >= range.start && activeGathaVal <= range.end;
-      return rowActive;
-    };
-
-    renderedElements.push(
-      <div key={`table-${keyIndex}`} className="w-full flex justify-center my-6">
-        <div className="inline-block max-w-full overflow-x-auto rounded-xl shadow-md bg-card/25 p-0.5">
-          <table 
-            className="text-sm devanagari-safe font-heading"
-            style={{ borderCollapse: 'separate', borderSpacing: '3px' }}
-          >
-            <thead>
-              <tr>
-                {headerRow.map((cell, cellIdx) => (
-                  <th 
-                    key={cellIdx} 
-                    className="px-4 py-3 text-center font-bold text-amber-950 dark:text-amber-200 border-2 border-amber-600/30 dark:border-gold/30 bg-[#FFE699] dark:bg-amber-950/50 rounded"
-                  >
-                    {highlightBracketedTerms(cell)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {bodyRows.map((row, rowIdx) => {
-                const isTotalRow = rowIdx === bodyRows.length - 1 && 
-                                   row[0] === '' && 
-                                   row.some(c => c.includes('अधिकार') || c.includes('कुल') || c.includes('योग') || c.includes('जोड़') || c.includes('Total') || c.includes('Sum'));
-
-                const isActive = isSubGroupActive[rowIdx];
-
-                return (
-                  <tr key={rowIdx}>
-                    {row.map((cell, cellIdx) => {
-                      const cellSpan = spans[rowIdx]?.[cellIdx];
-                      if (cellSpan?.skip) return null;
-
-                      const isSpanned = cellSpan && cellSpan.rowSpan > 1;
-                      const cellActive = !isTotalRow && (isSpanned ? isCellActive(cell, false) : isActive);
-
-                      let cellBgClass = "";
-                      let cellBorderClass = "border-amber-600/30 dark:border-gold/30";
-
-                      if (isTotalRow) {
-                        cellBgClass = "bg-[#FFE699] dark:bg-amber-950/50 text-amber-950 dark:text-amber-100 font-bold";
-                      } else if (cellActive) {
-                        cellBgClass = "bg-[#A9F531] dark:bg-lime-600/70 text-black dark:text-white font-semibold";
-                        cellBorderClass = "border-emerald-600/40 dark:border-emerald-500/50";
-                      } else if (rowIdx % 2 === 0) {
-                        cellBgClass = "bg-[#DDEBF7] dark:bg-sky-950/40 text-sky-950 dark:text-sky-100";
-                      } else {
-                        cellBgClass = "bg-[#E2EFDA] dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-100";
-                      }
-
-                      return (
-                        <td 
-                          key={cellIdx} 
-                          rowSpan={cellSpan?.rowSpan || 1}
-                          className={`px-4 py-2.5 text-center border-2 rounded ${cellBorderClass} ${cellBgClass}`}
-                        >
-                          {cell === '-' ? '' : highlightBracketedTerms(cell)}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
+    currentTableRows = [];
   };
 
   paragraphs.forEach((paragraph, index) => {
@@ -788,7 +659,7 @@ const GathaVerseItem = memo(({
                     return null;
                   }
                 }
-                return renderHighlightedAnvayarth(part.content);
+                return renderHighlightedAnvayarth(part.content, activeGathaNum);
               })}
             </div>
           </div>

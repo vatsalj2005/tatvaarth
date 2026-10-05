@@ -59,8 +59,11 @@ export interface GathaContent {
 // 1. Eagerly load all index.json metadata files for the shastras
 const shastraIndices = import.meta.glob('../content/granth/**/index.json', { eager: true }) as Record<string, any>;
 
-// 2. Lazily load gatha text files on-demand for the active scripture
+// 2. Lazily load gatha text files on-demand for the active scripture (fallback)
 const gathaTextLoaders = import.meta.glob('../content/granth/**/*.txt', { query: '?raw', import: 'default' }) as Record<string, () => Promise<string>>;
+
+// 3. Lazily load pre-compiled gatha bundles (one per scripture for instant single-request loading)
+const shastraGathaBundles = import.meta.glob('../content/granth/**/gathas.json') as Record<string, () => Promise<{ default: Record<string, GathaContent> }>>;
 
 // Pre-indexed scripture metadata map for O(1) slug lookups
 const shastrasList = globalManifest as ShastraMetadata[];
@@ -154,6 +157,34 @@ export async function loadGathasForShastra(
 ): Promise<{ item: GathaItem; content: GathaContent; chapterName: string }[]> {
   const shastra = shastraBySlug.get(shastraSlug);
   if (!shastra) return [];
+
+  // 1. Try loading from pre-compiled gathas.json bundle (single fast HTTP request)
+  const bundleKey = `../content/granth/${shastra.path}/gathas.json`;
+  const bundleLoader = shastraGathaBundles[bundleKey];
+
+  if (bundleLoader) {
+    try {
+      const bundleMod = await bundleLoader();
+      const bundle = bundleMod.default || bundleMod;
+      const results: { item: GathaItem; content: GathaContent; chapterName: string }[] = [];
+
+      for (const chapter of chapters) {
+        for (const item of chapter.items) {
+          const cacheKey = `${shastraSlug}/${item.file}`;
+          let content = gathaParsedCache.get(cacheKey) || bundle[item.file];
+          if (content) {
+            gathaParsedCache.set(cacheKey, content);
+            results.push({ item, content, chapterName: chapter.name });
+          }
+        }
+      }
+      return results;
+    } catch (err) {
+      console.warn(`Failed to load bundle ${bundleKey}, falling back to individual loaders:`, err);
+    }
+  }
+
+  // 2. Fallback to individual text files if bundle is unavailable
 
   const itemsToLoad: { item: GathaItem; chapterName: string; key: string; cacheKey: string }[] = [];
   for (const chapter of chapters) {

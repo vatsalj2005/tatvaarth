@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "bundle:shastras": "node scripts/bundle-shastras.js",
+    "prebuild": "node scripts/bundle-shastras.js",
     "build": "vite build",
     "preview": "vite preview"
   },

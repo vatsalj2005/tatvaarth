@@ -13,84 +13,8 @@
 === Anvayarth ===
 क्षायोपशमिक भाव के अठारह भेद हैं - चार ज्ञान, तीन अज्ञान, तीन दर्शन, पाँच दानादि लब्धियाँ, सम्‍यक्‍त्‍व, चारित्र और संयमासंयम ॥५॥
 
-• 
-        3 अज्ञान
-        
-          
-  • 
-            कुमतिज्ञान
-          
-          
-  • 
-            कुश्रुतज्ञान
-          
-          
-  • 
-            विभंगावधिज्ञान
-          
-        
-
-      
-      
-• 
-        3 दर्शन
-        
-          
-  • 
-            चक्षुदर्शन
-          
-          
-  • 
-            अचक्षुदर्शन
-          
-          
-  • 
-            अवधिदर्शन
-          
-        
-
-      
-      
-• 
-        5 लब्धि
-        
-          
-  • 
-            दान
-          
-          
-  • 
-            लाभ
-          
-          
-  • 
-            भोग
-          
-          
-  • 
-            उपभोग
-          
-          
-  • 
-            वीर्य
-          
-        
-
-      
-      
-• 
-        सम्यक्त्व
-      
-      
-• 
-        चारित्र
-      
-      
-• 
-        संयमासंयम
-
 [DIAGRAM]
-{"type":"vertical","nodes":[{"id":"root","isroot":true,"topic":"क्षायोपशमिक भाव"},{"id":"sub2","parentid":"root","topic":"4 ज्ञान"},{"id":"sub3","parentid":"sub2","topic":"मतिज्ञान"},{"id":"sub4","parentid":"sub2","topic":"श्रुतज्ञान"},{"id":"sub5","parentid":"sub2","topic":"अवधिज्ञान"},{"id":"sub6","parentid":"sub2","topic":"मन:पर्ययज्ञान"}]}
+{"type":"horizontal","nodes":[{"id":"root","isroot":true,"topic":"क्षायोपशमिक भाव"},{"id":"sub2","parentid":"root","topic":"4 ज्ञान"},{"id":"sub3","parentid":"sub2","topic":"मतिज्ञान"},{"id":"sub4","parentid":"sub2","topic":"श्रुतज्ञान"},{"id":"sub5","parentid":"sub2","topic":"अवधिज्ञान"},{"id":"sub6","parentid":"sub2","topic":"मन:पर्ययज्ञान"},{"id":"sub7","parentid":"root","topic":"3 अज्ञान"},{"id":"sub8","parentid":"sub7","topic":"कुमतिज्ञान"},{"id":"sub9","parentid":"sub7","topic":"कुश्रुतज्ञान"},{"id":"sub10","parentid":"sub7","topic":"विभंगावधिज्ञान"},{"id":"sub11","parentid":"root","topic":"3 दर्शन"},{"id":"sub12","parentid":"sub11","topic":"चक्षुदर्शन"},{"id":"sub13","parentid":"sub11","topic":"अचक्षुदर्शन"},{"id":"sub14","parentid":"sub11","topic":"अवधिदर्शन"},{"id":"sub15","parentid":"root","topic":"5 लब्धि"},{"id":"sub16","parentid":"sub15","topic":"दान"},{"id":"sub17","parentid":"sub15","topic":"लाभ"},{"id":"sub18","parentid":"sub15","topic":"भोग"},{"id":"sub19","parentid":"sub15","topic":"उपभोग"},{"id":"sub20","parentid":"sub15","topic":"वीर्य"},{"id":"sub21","parentid":"root","topic":"सम्यक्त्व"},{"id":"sub22","parentid":"root","topic":"चारित्र"},{"id":"sub23","parentid":"root","topic":"संयमासंयम"}]}
 [/DIAGRAM]
 
 === English ===

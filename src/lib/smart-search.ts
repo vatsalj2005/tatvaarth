@@ -273,6 +273,7 @@ function getShastraSearchIndex(): ShastraIndexEntry[] {
 
 interface DirectoryIndexEntry {
   dir: SiteDirectoryItem;
+  primaryNames: string[];
   allAliases: string[];
   aliasesNorm: string[];
   aliasesPhonetic: string[];
@@ -284,13 +285,17 @@ function getDirectorySearchIndex(): DirectoryIndexEntry[] {
   if (_dirIndex) return _dirIndex;
 
   _dirIndex = siteDirectories.map(dir => {
-    const allAliases = [
+    const primaryNames = [
       dir.nameEn.toLowerCase(),
-      dir.nameHi.toLowerCase(),
+      dir.nameHi.toLowerCase()
+    ];
+    const allAliases = [
+      ...primaryNames,
       ...dir.aliases.map(a => a.toLowerCase())
     ];
     return {
       dir,
+      primaryNames,
       allAliases,
       aliasesNorm: allAliases.map(a => normalizeVowelLength(a)),
       aliasesPhonetic: allAliases.map(a => phoneticNormalize(a)),
@@ -322,17 +327,17 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
     }
   }
 
-  // 1. DIRECTORIES & CATEGORIES (Top Priority when matched)
-  for (const { dir, allAliases, aliasesNorm, aliasesPhonetic } of getDirectorySearchIndex()) {
-    // Priority 1: Exact Absolute String Match
-    if (allAliases.includes(queryLower) || allAliases.includes(romanQuery)) {
+  // 1. DIRECTORIES & CATEGORIES (Standardized Scoring, No Special Inflation)
+  for (const { dir, primaryNames, allAliases, aliasesNorm, aliasesPhonetic } of getDirectorySearchIndex()) {
+    // Priority 1: Exact String Match on Primary Directory Name
+    if (primaryNames.includes(queryLower) || primaryNames.includes(romanQuery)) {
       addResult({
         id: `dir-${dir.id}`,
         title: `${dir.nameHi} (${dir.nameEn})`,
         subtitle: `📂 ${dir.descHi}`,
         type: 'directory',
         url: dir.url,
-        score: 1.15,
+        score: 1.00,
         badge: dir.type === 'hub' ? 'Directory' : 'Category',
         icon: dir.icon,
         matchedAs: 'exact'
@@ -340,7 +345,59 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       continue;
     }
 
-    // Priority 2: Closest Absolute / Phonetic Match (requires >= 3 chars)
+    // Exact Match on Secondary Alias
+    if (allAliases.includes(queryLower) || allAliases.includes(romanQuery)) {
+      addResult({
+        id: `dir-${dir.id}`,
+        title: `${dir.nameHi} (${dir.nameEn})`,
+        subtitle: `📂 ${dir.descHi}`,
+        type: 'directory',
+        url: dir.url,
+        score: 0.94,
+        badge: dir.type === 'hub' ? 'Directory' : 'Category',
+        icon: dir.icon,
+        matchedAs: 'exact'
+      });
+      continue;
+    }
+
+    // Priority 2: Direct Prefix on Primary Name (e.g. "bha" -> "Bhajan Directory")
+    const isPrimaryPrefix = primaryNames.some(p => p.startsWith(queryLower) || p.startsWith(romanQuery));
+    if (isPrimaryPrefix) {
+      addResult({
+        id: `dir-${dir.id}`,
+        title: `${dir.nameHi} (${dir.nameEn})`,
+        subtitle: `📂 ${dir.descHi}`,
+        type: 'directory',
+        url: dir.url,
+        score: 0.92,
+        badge: dir.type === 'hub' ? 'Directory' : 'Category',
+        icon: dir.icon,
+        matchedAs: 'category'
+      });
+      continue;
+    }
+
+    // Priority 3: Word-Initial Match on Primary Name (e.g. "bhajan" matching "Shastra Bhajan")
+    const isPrimaryWordMatch = primaryNames.some(p =>
+      p.split(/[\s\-_/]+/).some(w => w.startsWith(queryLower) || w.startsWith(romanQuery))
+    );
+    if (isPrimaryWordMatch) {
+      addResult({
+        id: `dir-${dir.id}`,
+        title: `${dir.nameHi} (${dir.nameEn})`,
+        subtitle: `📂 ${dir.descHi}`,
+        type: 'directory',
+        url: dir.url,
+        score: 0.86,
+        badge: dir.type === 'hub' ? 'Directory' : 'Category',
+        icon: dir.icon,
+        matchedAs: 'category'
+      });
+      continue;
+    }
+
+    // Priority 4: Closest Absolute / Phonetic Match on aliases (requires >= 3 chars)
     const isPhonetic = (queryNorm.length >= 3 && (aliasesNorm.includes(queryNorm) || aliasesNorm.includes(romanQueryNorm))) ||
                        (queryPhonetic.length >= 3 && aliasesPhonetic.includes(queryPhonetic));
     if (isPhonetic) {
@@ -350,7 +407,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
         subtitle: `📂 ${dir.descHi}`,
         type: 'directory',
         url: dir.url,
-        score: 1.05,
+        score: 0.84,
         badge: dir.type === 'hub' ? 'Directory' : 'Category',
         icon: dir.icon,
         matchedAs: 'phonetic'
@@ -358,16 +415,13 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       continue;
     }
 
-    // Priority 3: Directory / Category Prefix or Word-Initial Match
-    const isPrefixOrWord = allAliases.some((a, idx) => {
-      // Direct prefix
+    // Priority 5: Word-Initial Match on Secondary Aliases (e.g. "tat" matching "tattva bhajan" alias)
+    const isAliasWordMatch = allAliases.some((a, idx) => {
       if (a.startsWith(queryLower) || a.startsWith(romanQuery)) return true;
       if (queryLower.length >= 3) {
         const aNorm = aliasesNorm[idx];
         if (aNorm.startsWith(queryNorm) || aNorm.startsWith(romanQueryNorm)) return true;
       }
-
-      // Word-initial match
       const words = a.split(/[\s\-_/]+/);
       if (words.some(w => w.startsWith(queryLower) || w.startsWith(romanQuery))) return true;
       if (queryLower.length >= 3) {
@@ -377,14 +431,14 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       return false;
     });
 
-    if (isPrefixOrWord) {
+    if (isAliasWordMatch) {
       addResult({
         id: `dir-${dir.id}`,
         title: `${dir.nameHi} (${dir.nameEn})`,
         subtitle: `📂 ${dir.descHi}`,
         type: 'directory',
         url: dir.url,
-        score: 0.95,
+        score: 0.78,
         badge: dir.type === 'hub' ? 'Directory' : 'Category',
         icon: dir.icon,
         matchedAs: 'category'
@@ -392,7 +446,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       continue;
     }
 
-    // Priority 4: Typo / Levenshtein Distance (requires >= 4 chars to prevent false positives)
+    // Priority 6: Typo / Levenshtein Distance (requires >= 4 chars to prevent false positives)
     if (queryLower.length >= 4) {
       let minLev = Infinity;
       for (const aNorm of aliasesNorm) {
@@ -407,7 +461,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
           subtitle: `📂 ${dir.descHi}`,
           type: 'directory',
           url: dir.url,
-          score: 0.86,
+          score: 0.75,
           badge: dir.type === 'hub' ? 'Directory' : 'Category',
           icon: dir.icon,
           matchedAs: 'typo'
@@ -434,34 +488,52 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       continue;
     }
 
-    // Priority 2: Closest Absolute String (Phonetic / Vowel Normalized) - min 3 chars
-    if ((queryNorm.length >= 3 && (s.romanTitleNorm === queryNorm || s.romanTitleNorm === romanQueryNorm)) ||
-        (queryPhonetic.length >= 3 && s.romanTitlePhonetic === queryPhonetic)) {
+    // Priority 2: Direct Title Prefix Match (The scripture title STARTS with query - HIGHEST priority)
+    const isDirectTitlePrefix =
+      s.titleLower.startsWith(queryLower) ||
+      s.romanTitle.startsWith(queryLower) ||
+      (romanQuery && s.romanTitle.startsWith(romanQuery)) ||
+      s.slugLower.startsWith(queryLower) ||
+      s.idLower.startsWith(queryLower);
+
+    if (isDirectTitlePrefix) {
       addResult({
         id: `shastra-${s.shastra.id}`,
         title: s.shastra.title,
         subtitle: s.subtitle,
         type: 'shastra',
         url: s.url,
-        score: 0.95,
+        score: 0.96,
         badge: 'Shastra',
         icon: '📚',
-        matchedAs: 'phonetic'
+        matchedAs: 'exact'
       });
       continue;
     }
 
-    // Priority 3: Title Prefix or Word-Initial Match (Top priority for queries like "sa", "samay", "pravachan")
-    const isTitlePrefix =
-      s.titleLower.startsWith(queryLower) ||
-      s.romanTitle.startsWith(queryLower) ||
-      (romanQuery && s.romanTitle.startsWith(romanQuery)) ||
-      s.slugLower.startsWith(queryLower) ||
-      s.idLower.startsWith(queryLower) ||
+    // Priority 3: Title Word-Initial Match (any subsequent word starts with query)
+    const isTitleWordMatch =
       s.titleWords.some(w => w.startsWith(queryLower)) ||
       s.romanWords.some(w => w.startsWith(queryLower) || (romanQuery && w.startsWith(romanQuery)));
 
-    if (isTitlePrefix) {
+    if (isTitleWordMatch) {
+      addResult({
+        id: `shastra-${s.shastra.id}`,
+        title: s.shastra.title,
+        subtitle: s.subtitle,
+        type: 'shastra',
+        url: s.url,
+        score: 0.90,
+        badge: 'Shastra',
+        icon: '📚',
+        matchedAs: 'exact'
+      });
+      continue;
+    }
+
+    // Priority 4: Closest Absolute String (Phonetic / Vowel Normalized) - min 3 chars
+    if ((queryNorm.length >= 3 && (s.romanTitleNorm === queryNorm || s.romanTitleNorm === romanQueryNorm)) ||
+        (queryPhonetic.length >= 3 && s.romanTitlePhonetic === queryPhonetic)) {
       addResult({
         id: `shastra-${s.shastra.id}`,
         title: s.shastra.title,
@@ -471,7 +543,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
         score: 0.88,
         badge: 'Shastra',
         icon: '📚',
-        matchedAs: 'exact'
+        matchedAs: 'phonetic'
       });
       continue;
     }
@@ -484,7 +556,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
         subtitle: s.subtitle,
         type: 'shastra',
         url: s.url,
-        score: 0.90,
+        score: 0.85,
         badge: 'Author Match',
         icon: '✍️',
         matchedAs: 'exact'
@@ -506,7 +578,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
         subtitle: s.subtitle,
         type: 'shastra',
         url: s.url,
-        score: 0.82,
+        score: 0.80,
         badge: 'Author Match',
         icon: '✍️',
         matchedAs: 'exact'
@@ -514,7 +586,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       continue;
     }
 
-    // Priority 4: Typo / Levenshtein Distance (requires >= 4 chars to prevent false positives)
+    // Priority 5: Typo / Levenshtein Distance (requires >= 4 chars to prevent false positives)
     if (queryLower.length >= 4) {
       const dTitle = levenshtein(queryNorm, s.romanTitleNorm);
       if (dTitle <= 2 || dTitle / Math.max(queryNorm.length, s.romanTitleNorm.length) <= 0.3) {
@@ -524,7 +596,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
           subtitle: s.subtitle,
           type: 'shastra',
           url: s.url,
-          score: 0.83,
+          score: 0.78,
           badge: 'Shastra',
           icon: '📚',
           matchedAs: 'typo'
@@ -540,7 +612,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
           subtitle: s.subtitle,
           type: 'shastra',
           url: s.url,
-          score: 0.80,
+          score: 0.75,
           badge: 'Author Match',
           icon: '✍️',
           matchedAs: 'typo'
@@ -549,7 +621,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       }
     }
 
-    // Priority 5: Partial Substring Match (ONLY for queries >= 3 characters)
+    // Priority 6: Partial Substring Match (ONLY for queries >= 3 characters)
     if (queryLower.length >= 3) {
       if (s.titleLower.includes(queryLower) || s.romanTitle.includes(queryLower) || (romanQuery && s.romanTitle.includes(romanQuery))) {
         addResult({
@@ -558,7 +630,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
           subtitle: s.subtitle,
           type: 'shastra',
           url: s.url,
-          score: 0.74,
+          score: 0.70,
           badge: 'Shastra',
           icon: '📚',
           matchedAs: 'partial'
@@ -573,7 +645,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
           subtitle: s.subtitle,
           type: 'shastra',
           url: s.url,
-          score: 0.70,
+          score: 0.68,
           badge: 'Author Match',
           icon: '✍️',
           matchedAs: 'partial'
@@ -599,7 +671,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
         subtitle,
         type: 'bhajan',
         url,
-        score: 0.98,
+        score: 1.00,
         badge: 'Bhajan',
         icon: '🎵',
         matchedAs: 'exact'
@@ -607,7 +679,48 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       continue;
     }
 
-    // Priority 2: Closest Absolute String in Title Words (min 3 chars)
+    // Priority 2: Direct Title Prefix Match (Bhajan title STARTS with query - HIGHEST priority)
+    const isDirectBhajanPrefix =
+      entry.titleLower.startsWith(queryLower) ||
+      entry.romanTitle.startsWith(queryLower) ||
+      (romanQuery && entry.romanTitle.startsWith(romanQuery));
+
+    if (isDirectBhajanPrefix) {
+      addResult({
+        id: `bhajan-${b.id}`,
+        title: b.title,
+        subtitle,
+        type: 'bhajan',
+        url,
+        score: 0.95,
+        badge: 'Bhajan',
+        icon: '🎵',
+        matchedAs: 'exact'
+      });
+      continue;
+    }
+
+    // Priority 3: Title Word-Initial Match (any subsequent word starts with query)
+    const isBhajanWordMatch =
+      entry.titleWords.some(w => w.startsWith(queryLower)) ||
+      entry.romanWords.some(w => w.startsWith(queryLower) || (romanQuery && w.startsWith(romanQuery)));
+
+    if (isBhajanWordMatch) {
+      addResult({
+        id: `bhajan-${b.id}`,
+        title: b.title,
+        subtitle,
+        type: 'bhajan',
+        url,
+        score: 0.89,
+        badge: 'Bhajan',
+        icon: '🎵',
+        matchedAs: 'exact'
+      });
+      continue;
+    }
+
+    // Priority 4: Closest Absolute String in Title Words (min 3 chars) / Phonetic
     if (queryNorm.length >= 3) {
       const isWordMatch = entry.titleWordsNorm.some((wNorm, idx) => {
         if (wNorm === queryNorm || (romanQueryNorm && wNorm === romanQueryNorm)) return true;
@@ -621,7 +734,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
           subtitle,
           type: 'bhajan',
           url,
-          score: 0.93,
+          score: 0.88,
           badge: 'Bhajan',
           icon: '🎵',
           matchedAs: 'phonetic'
@@ -630,30 +743,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       }
     }
 
-    // Priority 3: Bhajan Title Prefix or Word-Initial Match
-    const isBhajanPrefix =
-      entry.titleLower.startsWith(queryLower) ||
-      entry.romanTitle.startsWith(queryLower) ||
-      (romanQuery && entry.romanTitle.startsWith(romanQuery)) ||
-      entry.titleWords.some(w => w.startsWith(queryLower)) ||
-      entry.romanWords.some(w => w.startsWith(queryLower) || (romanQuery && w.startsWith(romanQuery)));
-
-    if (isBhajanPrefix) {
-      addResult({
-        id: `bhajan-${b.id}`,
-        title: b.title,
-        subtitle,
-        type: 'bhajan',
-        url,
-        score: 0.85,
-        badge: 'Bhajan',
-        icon: '🎵',
-        matchedAs: 'exact'
-      });
-      continue;
-    }
-
-    // Priority 4: Typo / Levenshtein Distance (min 4 chars)
+    // Priority 5: Typo / Levenshtein Distance (min 4 chars)
     if (queryLower.length >= 4) {
       let isTypo = false;
       for (const wNorm of entry.titleWordsNorm) {
@@ -671,7 +761,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
           subtitle,
           type: 'bhajan',
           url,
-          score: 0.81,
+          score: 0.78,
           badge: 'Bhajan',
           icon: '🎵',
           matchedAs: 'typo'
@@ -750,7 +840,10 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
   }
 
   return Array.from(results.values())
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.title.length - b.title.length;
+    })
     .slice(0, limit);
 }
 

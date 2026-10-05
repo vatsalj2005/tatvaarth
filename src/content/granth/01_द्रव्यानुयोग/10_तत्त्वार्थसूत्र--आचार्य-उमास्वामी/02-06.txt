@@ -11,95 +11,10 @@
 
 
 === Anvayarth ===
-औदयिक भाव के इक्‍कीस भेद हैं - चार गति, चार कषाय, तीन लिंग, एक मिथ्‍यादर्शन, एक अज्ञान, एक असंयम, एक असिद्ध भाव और छह लेश्‍याएँ ॥६॥
-
-• 
-        4 कषाय
-        
-          
-  • 
-            क्रोध
-          
-          
-  • 
-            मान
-          
-          
-  • 
-            माया
-          
-          
-  • 
-            लोभ
-          
-        
-
-      
-      
-• 
-        3 लिंग
-        
-          
-  • 
-            स्त्री
-          
-          
-  • 
-            पुरुष
-          
-          
-  • 
-            नपुंसक
-          
-        
-
-      
-      
-• 
-        मिथ्यादर्शन
-      
-      
-• 
-        अज्ञान
-      
-      
-• 
-        असंयम
-      
-      
-• 
-        असिद्धत्व
-      
-      
-• 
-        6 लेश्या
-        
-          
-  • 
-            कृष्ण
-          
-          
-  • 
-            नील
-          
-          
-  • 
-            कापोत
-          
-          
-  • 
-            पीत
-          
-          
-  • 
-            पद्म
-          
-          
-  • 
-            शुक्ल
+औदयिक भाव के इक्‍कीस भेद हैं - चार गति, चार कषाय, तीन लिंग, एक मिथ्‍‍यादर्शन, एक अज्ञान, एक असंयम, एक असिद्ध भाव और छह लेश्‍‍याएँ ॥६॥
 
 [DIAGRAM]
-{"type":"vertical","nodes":[{"id":"root","isroot":true,"topic":"औदयिक भाव"},{"id":"sub2","parentid":"root","topic":"4 गति"},{"id":"sub3","parentid":"sub2","topic":"नरक"},{"id":"sub4","parentid":"sub2","topic":"तिर्यञ्च"},{"id":"sub5","parentid":"sub2","topic":"मनुष्य"},{"id":"sub6","parentid":"sub2","topic":"देव"}]}
+{"type":"horizontal","nodes":[{"id":"root","isroot":true,"topic":"औदयिक भाव"},{"id":"sub2","parentid":"root","topic":"4 गति"},{"id":"sub3","parentid":"sub2","topic":"नरक"},{"id":"sub4","parentid":"sub2","topic":"तिर्यञ्च"},{"id":"sub5","parentid":"sub2","topic":"मनुष्य"},{"id":"sub6","parentid":"sub2","topic":"देव"},{"id":"sub7","parentid":"root","topic":"4 कषाय"},{"id":"sub8","parentid":"sub7","topic":"क्रोध"},{"id":"sub9","parentid":"sub7","topic":"मान"},{"id":"sub10","parentid":"sub7","topic":"माया"},{"id":"sub11","parentid":"sub7","topic":"लोभ"},{"id":"sub12","parentid":"root","topic":"3 लिंग"},{"id":"sub13","parentid":"sub12","topic":"स्त्री"},{"id":"sub14","parentid":"sub12","topic":"पुरुष"},{"id":"sub15","parentid":"sub12","topic":"नपुंसक"},{"id":"sub16","parentid":"root","topic":"मिथ्यादर्शन"},{"id":"sub17","parentid":"root","topic":"अज्ञान"},{"id":"sub18","parentid":"root","topic":"असंयम"},{"id":"sub19","parentid":"root","topic":"असिद्धत्व"},{"id":"sub20","parentid":"root","topic":"6 लेश्या"},{"id":"sub21","parentid":"sub20","topic":"कृष्ण"},{"id":"sub22","parentid":"sub20","topic":"नील"},{"id":"sub23","parentid":"sub20","topic":"कापोत"},{"id":"sub24","parentid":"sub20","topic":"पीत"},{"id":"sub25","parentid":"sub20","topic":"पद्म"},{"id":"sub26","parentid":"sub20","topic":"शुक्ल"}]}
 [/DIAGRAM]
 
 === English ===

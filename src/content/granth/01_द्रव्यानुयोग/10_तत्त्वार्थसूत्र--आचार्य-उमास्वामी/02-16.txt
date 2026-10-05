@@ -13,19 +13,8 @@
 === Anvayarth ===
 वे प्रत्‍येक दो-दो प्रकार की हैं ॥१६॥
 
-• 
-        भाव
-        
-          
-  • 
-            लब्धि
-          
-          
-  • 
-            उपयोग
-
 [DIAGRAM]
-{"type":"vertical","nodes":[{"id":"root","isroot":true,"topic":"इंद्रियाँ"},{"id":"sub2","parentid":"root","topic":"द्रव्य"},{"id":"sub3","parentid":"sub2","topic":"निर्वृत्ति"},{"id":"sub4","parentid":"sub2","topic":"उपकरण"}]}
+{"type":"vertical","nodes":[{"id":"root","isroot":true,"topic":"इन्द्रियाँ"},{"id":"sub1","parentid":"root","topic":"द्रव्य"},{"id":"sub1_1","parentid":"sub1","topic":"निर्वृत्ति"},{"id":"sub1_2","parentid":"sub1","topic":"उपकरण"},{"id":"sub2","parentid":"root","topic":"भाव"},{"id":"sub2_1","parentid":"sub2","topic":"लब्धि"},{"id":"sub2_2","parentid":"sub2","topic":"उपयोग"}]}
 [/DIAGRAM]
 
 === English ===

@@ -13,27 +13,8 @@
 === Anvayarth ===
 वह उपयोग दो प्रकार का है - ज्ञानोपयोग और दर्शनोपयोग। ज्ञानोपयोग आठ प्रकार का है ओर दर्शनोपयोग चार प्रकार का है ॥९॥
 
-• 
-        दर्शनोपयोग
-        
-          
-  • 
-            चक्षु
-          
-          
-  • 
-            अचक्षु
-          
-          
-  • 
-            अवधि
-          
-          
-  • 
-            केवल
-
 [DIAGRAM]
-{"type":"vertical","nodes":[{"id":"root","isroot":true,"topic":"उपयोग"},{"id":"sub2","parentid":"root","topic":"ज्ञानोपयोग"},{"id":"sub3","parentid":"sub2","topic":"मति"},{"id":"sub4","parentid":"sub2","topic":"श्रुत"},{"id":"sub5","parentid":"sub2","topic":"अवधि"},{"id":"sub6","parentid":"sub2","topic":"मन:पर्यय"},{"id":"sub7","parentid":"sub2","topic":"केवल"},{"id":"sub8","parentid":"sub2","topic":"कुमति"},{"id":"sub9","parentid":"sub2","topic":"कुश्रुत"},{"id":"sub10","parentid":"sub2","topic":"विभंगावधि"}]}
+{"type":"horizontal","nodes":[{"id":"root","isroot":true,"topic":"उपयोग"},{"id":"sub1","parentid":"root","topic":"ज्ञानोपयोग"},{"id":"sub1_1","parentid":"sub1","topic":"मति"},{"id":"sub1_2","parentid":"sub1","topic":"श्रुत"},{"id":"sub1_3","parentid":"sub1","topic":"अवधि"},{"id":"sub1_4","parentid":"sub1","topic":"मन:पर्यय"},{"id":"sub1_5","parentid":"sub1","topic":"केवल"},{"id":"sub1_6","parentid":"sub1","topic":"कुमति"},{"id":"sub1_7","parentid":"sub1","topic":"कुश्रुत"},{"id":"sub1_8","parentid":"sub1","topic":"विभंगावधि"},{"id":"sub2","parentid":"root","topic":"दर्शनोपयोग"},{"id":"sub2_1","parentid":"sub2","topic":"चक्षु"},{"id":"sub2_2","parentid":"sub2","topic":"अचक्षु"},{"id":"sub2_3","parentid":"sub2","topic":"अवधि"},{"id":"sub2_4","parentid":"sub2","topic":"केवल"}]}
 [/DIAGRAM]
 
 === English ===

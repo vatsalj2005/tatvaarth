@@ -262,3 +262,276 @@ export const highlightBracketedTerms = (text: string): React.ReactNode => {
 
   return processText(text);
 };
+
+export const renderShastraTable = (
+  tableRows: string[] | string,
+  keyIndex: string | number,
+  activeGathaNum?: string,
+  isPrint: boolean = false
+): React.ReactNode => {
+  const rawRows: string[] = Array.isArray(tableRows) ? tableRows : tableRows.split('\n');
+  const tableData: string[][] = [];
+
+  rawRows.forEach(row => {
+    const trimmed = row.trim();
+    if (!trimmed.startsWith('|')) return;
+    const cells = trimmed.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+    if (!cells.every(c => /^---+$/.test(c) || c === '')) {
+      tableData.push(cells);
+    }
+  });
+
+  if (tableData.length === 0) return null;
+
+  // Determine if this is a 2-tier header table (e.g. Tatvaarthsutra 3-6)
+  let isTwoTier = false;
+  if (tableData.length >= 2) {
+    const row0 = tableData[0];
+    const row1 = tableData[1];
+    const hasSubheaderKeywords = row1.some(c => c === 'जघन्य' || c === 'उत्कृष्ट' || c.includes('जघन्य') || c.includes('उत्कृष्ट'));
+    const hasRepeatedSuperHeaders = row0.some((h, i) => i > 0 && h !== '' && h === row0[i - 1]);
+    if (hasSubheaderKeywords || hasRepeatedSuperHeaders) {
+      isTwoTier = true;
+    }
+  }
+
+  const headerRow = tableData[0];
+  const subHeaderRow = isTwoTier ? tableData[1] : null;
+  const bodyRows = isTwoTier ? tableData.slice(2) : tableData.slice(1);
+
+  if (bodyRows.length === 0 && !subHeaderRow) return null;
+
+  // Structure super headers with colSpan / rowSpan
+  interface SuperHeaderItem {
+    text: string;
+    colSpan: number;
+    rowSpan: number;
+  }
+  const superHeaders: SuperHeaderItem[] = [];
+  if (isTwoTier && subHeaderRow) {
+    let colIdx = 0;
+    while (colIdx < headerRow.length) {
+      const text = headerRow[colIdx];
+      if (colIdx === 0 && (!subHeaderRow[0] || subHeaderRow[0] === '')) {
+        superHeaders.push({ text, colSpan: 1, rowSpan: 2 });
+        colIdx++;
+        continue;
+      }
+      let nextCol = colIdx + 1;
+      while (nextCol < headerRow.length && headerRow[nextCol] === text && text !== '') {
+        nextCol++;
+      }
+      superHeaders.push({
+        text,
+        colSpan: nextCol - colIdx,
+        rowSpan: 1
+      });
+      colIdx = nextCol;
+    }
+  }
+
+  // Row spans for body cells
+  const numRows = bodyRows.length;
+  const numCols = headerRow.length;
+  const spans: { rowSpan: number; skip: boolean }[][] = Array.from(
+    { length: numRows }, 
+    () => Array(numCols).fill({ rowSpan: 1, skip: false })
+  );
+
+  for (let colIdx = 0; colIdx < numCols; colIdx++) {
+    let rowIdx = 0;
+    while (rowIdx < numRows) {
+      const cellVal = bodyRows[rowIdx][colIdx] || "";
+      const isCurrentTotal = rowIdx === numRows - 1 && 
+                             bodyRows[rowIdx][0] === '' && 
+                             bodyRows[rowIdx].some(c => c.includes('अधिकार') || c.includes('कुल') || c.includes('योग') || c.includes('जोड़') || c.includes('Total') || c.includes('Sum'));
+
+      if (isCurrentTotal) {
+        spans[rowIdx][colIdx] = { rowSpan: 1, skip: false };
+        rowIdx++;
+        continue;
+      }
+
+      if (cellVal !== "") {
+        let nextRowIdx = rowIdx + 1;
+        while (nextRowIdx < numRows) {
+          const isNextTotal = nextRowIdx === numRows - 1 && 
+                              bodyRows[nextRowIdx][0] === '' && 
+                              bodyRows[nextRowIdx].some(c => c.includes('अधिकार') || c.includes('कुल') || c.includes('योग') || c.includes('जोड़') || c.includes('Total') || c.includes('Sum'));
+          if (isNextTotal || bodyRows[nextRowIdx][colIdx] !== "") break;
+          nextRowIdx++;
+        }
+        const spanCount = nextRowIdx - rowIdx;
+        spans[rowIdx][colIdx] = { rowSpan: spanCount, skip: false };
+        for (let r = rowIdx + 1; r < nextRowIdx; r++) {
+          spans[r][colIdx] = { rowSpan: 1, skip: true };
+        }
+        rowIdx = nextRowIdx;
+      } else {
+        spans[rowIdx][colIdx] = { rowSpan: 1, skip: false };
+        rowIdx++;
+      }
+    }
+  }
+
+  const activeGathaVal = activeGathaNum ? parseInt(devanagariToEnglish(activeGathaNum), 10) : NaN;
+
+  const resolvedSubGroups: string[] = [];
+  let currentSubGroupText = "";
+  bodyRows.forEach((row) => {
+    const col1Text = row[1] || "";
+    const col0Text = row[0] || "";
+    if (col1Text) currentSubGroupText = col1Text;
+    else if (col0Text && !col1Text) currentSubGroupText = col0Text;
+    resolvedSubGroups.push(currentSubGroupText);
+  });
+
+  const isRowActive = (row: string[], resolvedSubGroupText: string) => {
+    if (isNaN(activeGathaVal)) return false;
+    const sgRange = getRowRange(resolvedSubGroupText);
+    if (sgRange && activeGathaVal >= sgRange.start && activeGathaVal <= sgRange.end) return true;
+    for (const cell of row) {
+      const range = getRowRange(cell);
+      if (range && activeGathaVal >= range.start && activeGathaVal <= range.end) return true;
+    }
+    return false;
+  };
+
+  const isSubGroupActive = resolvedSubGroups.map((sgText, rowIdx) => isRowActive(bodyRows[rowIdx], sgText));
+
+  const isCellActive = (cellText: string, rowActive: boolean) => {
+    if (isNaN(activeGathaVal)) return false;
+    const range = getRowRange(cellText);
+    if (range) return activeGathaVal >= range.start && activeGathaVal <= range.end;
+    return rowActive;
+  };
+
+  // Significantly increased table sizing for optimal legibility:
+  // Headers: text-base sm:text-lg md:text-xl font-bold
+  // Body cells: text-base sm:text-lg font-medium
+  // Padding: generous cell spacing
+  // Sizing: Compact cell padding while preserving generous font sizes for optimal readability
+  const headerCellClass = isPrint
+    ? "px-3 py-2 text-center font-bold text-xs text-amber-950 border border-amber-800/40 bg-[#FFE699]"
+    : "px-3.5 py-1.5 sm:px-4 sm:py-2 text-center font-bold text-base sm:text-lg md:text-xl text-amber-950 dark:text-amber-200 border border-amber-600/35 dark:border-gold/35 bg-[#FFE699] dark:bg-amber-950/60 rounded-md shadow-sm whitespace-nowrap";
+
+  const subHeaderCellClass = isPrint
+    ? "px-2 py-1.5 text-center font-semibold text-[11px] text-amber-900 border border-amber-800/40 bg-[#FFF2CC]"
+    : "px-2.5 py-1 sm:px-3 sm:py-1.5 text-center font-bold text-sm sm:text-base md:text-lg text-amber-900 dark:text-amber-300 border border-amber-600/30 dark:border-gold/30 bg-[#FFF2CC] dark:bg-amber-900/40 rounded-md whitespace-nowrap";
+
+  const tableBaseClass = isPrint
+    ? "w-full text-xs devanagari-safe font-heading border-collapse"
+    : "text-base sm:text-lg md:text-[18px] devanagari-safe font-heading";
+
+  const containerClass = isPrint
+    ? "w-full my-3 overflow-hidden"
+    : "w-full flex justify-center my-5 overflow-hidden";
+
+  const innerWrapperClass = isPrint
+    ? "w-full overflow-x-auto"
+    : "inline-block max-w-full overflow-x-auto rounded-xl shadow-lg border border-gold/30 bg-card/60 p-1 sm:p-1.5";
+
+  return (
+    <div key={`table-${keyIndex}`} className={containerClass}>
+      <div className={innerWrapperClass}>
+        <table 
+          className={tableBaseClass}
+          style={{ borderCollapse: 'separate', borderSpacing: isPrint ? '1px' : '2px' }}
+        >
+          <thead>
+            {isTwoTier && subHeaderRow ? (
+              <>
+                <tr>
+                  {superHeaders.map((grp, idx) => (
+                    <th
+                      key={idx}
+                      colSpan={grp.colSpan}
+                      rowSpan={grp.rowSpan}
+                      className={headerCellClass}
+                    >
+                      {highlightBracketedTerms(grp.text)}
+                    </th>
+                  ))}
+                </tr>
+                <tr>
+                  {subHeaderRow.map((sub, sIdx) => {
+                    if (sIdx === 0 && (!sub || sub === '')) return null;
+                    return (
+                      <th
+                        key={sIdx}
+                        className={subHeaderCellClass}
+                      >
+                        {highlightBracketedTerms(sub)}
+                      </th>
+                    );
+                  })}
+                </tr>
+              </>
+            ) : (
+              <tr>
+                {headerRow.map((cell, cellIdx) => (
+                  <th 
+                    key={cellIdx} 
+                    className={headerCellClass}
+                  >
+                    {highlightBracketedTerms(cell)}
+                  </th>
+                ))}
+              </tr>
+            )}
+          </thead>
+          <tbody>
+            {bodyRows.map((row, rowIdx) => {
+              const isTotalRow = rowIdx === bodyRows.length - 1 && 
+                                 row[0] === '' && 
+                                 row.some(c => c.includes('अधिकार') || c.includes('कुल') || c.includes('योग') || c.includes('जोड़') || c.includes('Total') || c.includes('Sum'));
+
+              const isActive = isSubGroupActive[rowIdx];
+
+              return (
+                <tr key={rowIdx}>
+                  {row.map((cell, cellIdx) => {
+                    const cellSpan = spans[rowIdx]?.[cellIdx];
+                    if (cellSpan?.skip) return null;
+
+                    const isSpanned = cellSpan && cellSpan.rowSpan > 1;
+                    const cellActive = !isTotalRow && (isSpanned ? isCellActive(cell, false) : isActive);
+
+                    let cellBgClass = "";
+                    let cellBorderClass = isPrint ? "border border-amber-800/30" : "border border-amber-600/30 dark:border-gold/30";
+
+                    if (isTotalRow) {
+                      cellBgClass = "bg-[#FFE699] dark:bg-amber-950/50 text-amber-950 dark:text-amber-100 font-bold";
+                    } else if (cellActive) {
+                      cellBgClass = "bg-[#A9F531] dark:bg-lime-600/70 text-black dark:text-white font-semibold";
+                      cellBorderClass = isPrint ? "border border-emerald-600/60" : "border border-emerald-600/50 dark:border-emerald-500/50";
+                    } else if (rowIdx % 2 === 0) {
+                      cellBgClass = "bg-[#DDEBF7] dark:bg-sky-950/40 text-sky-950 dark:text-sky-100";
+                    } else {
+                      cellBgClass = "bg-[#E2EFDA] dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-100";
+                    }
+
+                    const cellPaddingClass = isPrint
+                      ? "px-2 py-1.5 text-xs text-center rounded"
+                      : "px-3 py-1.5 sm:px-3.5 sm:py-2 text-center font-medium rounded-md whitespace-nowrap";
+
+                    return (
+                      <td 
+                        key={cellIdx} 
+                        rowSpan={cellSpan?.rowSpan || 1}
+                        className={`${cellPaddingClass} ${cellBorderClass} ${cellBgClass}`}
+                      >
+                        {cell === '-' ? '—' : highlightBracketedTerms(cell)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+

@@ -40,129 +40,8 @@ import {
   cleanAnvayarthText,
   parseTextWithDiagrams,
   highlightBracketedTerms,
+  renderShastraTable,
 } from '@/lib/shastra-parser';
-
-const renderTableBlockHelper = (id: string, rows: string[]) => {
-  const tableData: string[][] = [];
-  rows.forEach(row => {
-    const cells = row.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
-    if (cells.every(c => c.match(/^---+$/) || c === '')) {
-      // Skip separator
-    } else {
-      tableData.push(cells);
-    }
-  });
-
-  if (tableData.length === 0) return null;
-
-  const headerRow = tableData[0];
-  const bodyRows = tableData.slice(1);
-
-  // 1. Precalculate spans
-  const numRows = bodyRows.length;
-  const numCols = headerRow.length;
-  const spans: { rowSpan: number; skip: boolean }[][] = Array.from(
-    { length: numRows }, 
-    () => Array(numCols).fill({ rowSpan: 1, skip: false })
-  );
-
-  for (let colIdx = 0; colIdx < numCols; colIdx++) {
-    let rowIdx = 0;
-    while (rowIdx < numRows) {
-      const cellVal = bodyRows[rowIdx][colIdx] || "";
-      
-      const isCurrentTotal = rowIdx === numRows - 1 && 
-                             bodyRows[rowIdx][0] === '' && 
-                             bodyRows[rowIdx].some(c => c.includes('अधिकार') || c.includes('कुल') || c.includes('योग') || c.includes('जोड़') || c.includes('Total') || c.includes('Sum'));
-
-      if (isCurrentTotal) {
-        spans[rowIdx][colIdx] = { rowSpan: 1, skip: false };
-        rowIdx++;
-        continue;
-      }
-
-      if (cellVal !== "") {
-        let nextRowIdx = rowIdx + 1;
-        while (nextRowIdx < numRows) {
-          const isNextTotal = nextRowIdx === numRows - 1 && 
-                              bodyRows[nextRowIdx][0] === '' && 
-                              bodyRows[nextRowIdx].some(c => c.includes('अधिकार') || c.includes('कुल') || c.includes('योग') || c.includes('जोड़') || c.includes('Total') || c.includes('Sum'));
-          if (isNextTotal) break;
-          if (bodyRows[nextRowIdx][colIdx] !== "") break;
-          nextRowIdx++;
-        }
-        const spanCount = nextRowIdx - rowIdx;
-        spans[rowIdx][colIdx] = { rowSpan: spanCount, skip: false };
-        for (let r = rowIdx + 1; r < nextRowIdx; r++) {
-          spans[r][colIdx] = { rowSpan: 1, skip: true };
-        }
-        rowIdx = nextRowIdx;
-      } else {
-        spans[rowIdx][colIdx] = { rowSpan: 1, skip: false };
-        rowIdx++;
-      }
-    }
-  }
-
-  return (
-    <div key={id} data-block-id={id} className="w-full flex justify-center my-4">
-      <div className="inline-block max-w-full overflow-x-auto rounded-xl shadow-md bg-card/25 p-0.5">
-        <table 
-          className="text-xs devanagari-safe font-heading"
-          style={{ borderCollapse: 'separate', borderSpacing: '3px' }}
-        >
-          <thead>
-            <tr>
-              {headerRow.map((cell, cellIdx) => (
-                <th 
-                  key={cellIdx} 
-                  className="px-3 py-2 text-center font-bold text-amber-950 dark:text-amber-200 border-2 border-amber-600/30 dark:border-gold/30 bg-[#FFE699] dark:bg-amber-950/50 rounded"
-                >
-                  {highlightBracketedTerms(cell)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {bodyRows.map((row, rowIdx) => {
-              const isTotalRow = rowIdx === bodyRows.length - 1 && 
-                                 row[0] === '' && 
-                                 row.some(c => c.includes('अधिकार') || c.includes('कुल') || c.includes('योग') || c.includes('जोड़') || c.includes('Total') || c.includes('Sum'));
-
-              let rowBgClass = "";
-              if (isTotalRow) {
-                rowBgClass = "bg-[#FFE699] dark:bg-amber-950/50 text-amber-950 dark:text-amber-100 font-bold";
-              } else if (rowIdx % 2 === 0) {
-                rowBgClass = "bg-[#DDEBF7] dark:bg-sky-950/40 text-sky-950 dark:text-sky-100";
-              } else {
-                rowBgClass = "bg-[#E2EFDA] dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-100";
-              }
-
-              return (
-                <tr key={rowIdx}>
-                  {row.map((cell, cellIdx) => {
-                    const cellSpan = spans[rowIdx]?.[cellIdx];
-                    if (cellSpan?.skip) return null;
-
-                    return (
-                      <td 
-                        key={cellIdx} 
-                        rowSpan={cellSpan?.rowSpan || 1}
-                        className={`px-3 py-1.5 text-center border-2 border-amber-600/30 dark:border-gold/30 rounded ${rowBgClass}`}
-                      >
-                        {cell === '-' ? '' : highlightBracketedTerms(cell)}
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
 
 const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
   title,
@@ -268,13 +147,49 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
               data: part.content
             });
           } else {
-            list.push({
-              id: `gatha-${gathaNum}-anvayarth-text-${partIdx}`,
-              type: 'anvayarth',
-              gathaNum,
-              chapterName,
-              data: part.content
+            const lines = part.content.split('\n');
+            let currentTextLines: string[] = [];
+            let currentTableRows: string[] = [];
+            let pIdx = 0;
+
+            const flushTextBlock = () => {
+              if (currentTextLines.length > 0) {
+                list.push({
+                  id: `gatha-${gathaNum}-anvayarth-text-${partIdx}-${pIdx++}`,
+                  type: 'anvayarth',
+                  gathaNum,
+                  chapterName,
+                  data: currentTextLines.join('\n')
+                });
+                currentTextLines = [];
+              }
+            };
+
+            const flushTableBlock = () => {
+              if (currentTableRows.length > 0) {
+                list.push({
+                  id: `gatha-${gathaNum}-anvayarth-table-${partIdx}-${pIdx++}`,
+                  type: 'table',
+                  gathaNum,
+                  chapterName,
+                  data: [...currentTableRows]
+                });
+                currentTableRows = [];
+              }
+            };
+
+            lines.forEach((line) => {
+              const clean = line.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+              if (clean.startsWith('|')) {
+                flushTextBlock();
+                currentTableRows.push(clean);
+              } else {
+                flushTableBlock();
+                currentTextLines.push(line);
+              }
             });
+            flushTextBlock();
+            flushTableBlock();
           }
         });
       }
@@ -985,6 +900,14 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                 }
               }
 
+              case 'table': {
+                return (
+                  <div key={block.id} data-block-id={block.id} className="w-full">
+                    {renderShastraTable(block.data, block.id, undefined, true)}
+                  </div>
+                );
+              }
+
               case 'english':
                 return (
                   <div key={block.id} data-block-id={block.id} className="my-4 p-4 rounded-xl bg-card border border-border/30 text-xs text-foreground/80 font-sans leading-relaxed">
@@ -1064,7 +987,11 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
               }
 
               case 'table':
-                return renderTableBlockHelper(block.id, block.data);
+                return (
+                  <div key={block.id} data-block-id={block.id} className="w-full">
+                    {renderShastraTable(block.data, block.id, undefined, true)}
+                  </div>
+                );
 
               default:
                 return null;
@@ -1226,6 +1153,14 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                             }
                           }
 
+                          case 'table': {
+                            return (
+                              <div key={block.id} className="w-full">
+                                {renderShastraTable(block.data, block.id, undefined, true)}
+                              </div>
+                            );
+                          }
+
                           case 'english':
                             return (
                               <div key={block.id} className="my-2 p-4 rounded-xl bg-card border border-border/30 text-xs text-foreground/80 font-sans leading-relaxed">
@@ -1287,7 +1222,11 @@ const ShastraPrintTemplate: React.FC<ShastraPrintTemplateProps> = ({
                           }
 
                            case 'table':
-                             return renderTableBlockHelper(block.id, block.data);
+                             return (
+                               <div key={block.id} className="w-full">
+                                 {renderShastraTable(block.data, block.id, undefined, true)}
+                               </div>
+                             );
 
                            default:
                              return null;
