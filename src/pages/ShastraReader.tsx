@@ -856,6 +856,8 @@ const ShastraReader = () => {
   const visibleGathasRef = useRef<Set<string>>(new Set());
   const activeGathaNumRef = useRef(activeGathaNum);
   activeGathaNumRef.current = activeGathaNum;
+  const sidebarScrollTopRef = useRef<number>(0);
+  const prevSidebarOpenRef = useRef<boolean>(isSidebarOpen);
 
   const handleScrollOccupancy = () => {
     if (isManualScrollingRef.current || visibleGathasRef.current.size === 0) return;
@@ -912,6 +914,11 @@ const ShastraReader = () => {
         setActiveGathaNum(idx.chapters[0].items[0].gathaNum);
       }
       gathaRefs.current = {};
+      sidebarScrollTopRef.current = 0;
+      const container = document.getElementById('sidebar-scroll-container');
+      if (container) {
+        container.scrollTop = 0;
+      }
     }
   }, [shastraSlug]);
 
@@ -982,6 +989,14 @@ const ShastraReader = () => {
 
   // 4. Auto-follow sidebar scroll
   useEffect(() => {
+    const wasClosed = !prevSidebarOpenRef.current;
+    prevSidebarOpenRef.current = isSidebarOpen;
+
+    // If sidebar just opened, do not auto-scroll - open exactly where user closed it last
+    if (wasClosed && isSidebarOpen) {
+      return;
+    }
+
     if (isAutoFollow && activeGathaNum && isSidebarOpen) {
       isProgrammaticScrollRef.current = true;
       
@@ -1023,6 +1038,23 @@ const ShastraReader = () => {
       }
     }
     
+    // Save current sidebar scroll position when closing
+    if (!newState) {
+      const container = document.getElementById('sidebar-scroll-container');
+      if (container) {
+        sidebarScrollTopRef.current = container.scrollTop;
+      }
+    } else {
+      setAreControlsVisible(true);
+      // Restore sidebar scroll position exactly where it was closed
+      requestAnimationFrame(() => {
+        const container = document.getElementById('sidebar-scroll-container');
+        if (container && container.scrollTop !== sidebarScrollTopRef.current) {
+          container.scrollTop = sidebarScrollTopRef.current;
+        }
+      });
+    }
+
     isProgrammaticScrollRef.current = true;
     if (programmaticScrollTimeoutRef.current) {
       clearTimeout(programmaticScrollTimeoutRef.current);
@@ -1031,9 +1063,6 @@ const ShastraReader = () => {
       isProgrammaticScrollRef.current = false;
     }, 1000);
 
-    if (newState) {
-      setAreControlsVisible(true);
-    }
     setIsSidebarOpen(newState);
   };
 
@@ -1072,7 +1101,7 @@ const ShastraReader = () => {
       setIsAutoFollow(true);
       
       if (window.innerWidth < 768) {
-        setIsSidebarOpen(false);
+        handleSidebarToggle(false);
       }
       
       isProgrammaticScrollRef.current = true;
@@ -1089,7 +1118,8 @@ const ShastraReader = () => {
     }
   };
 
-  const handleSidebarScroll = () => {
+  const handleSidebarScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    sidebarScrollTopRef.current = e.currentTarget.scrollTop;
     if (isProgrammaticScrollRef.current) return;
     setIsAutoFollow(false);
   };
@@ -1152,24 +1182,33 @@ const ShastraReader = () => {
         {/* 1. Sidebar Navigation Panel & Mobile Overlay */}
         <AnimatePresence>
           {isSidebarOpen && !isLoadingGathas && (
-            <>
-              {/* Mobile Overlay */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                onClick={() => handleSidebarToggle(false)}
-                className="md:hidden fixed inset-0 z-30 bg-background/60 backdrop-blur-sm top-16"
-              />
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => handleSidebarToggle(false)}
+              className="md:hidden fixed inset-0 z-30 bg-background/60 backdrop-blur-sm top-16"
+            />
+          )}
+        </AnimatePresence>
 
-              <motion.aside
-                initial={{ x: "-100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: "-100%" }}
-                transition={{ type: "tween", duration: 0.3 }}
-                className="fixed left-0 top-16 bottom-0 w-[80vw] max-w-[300px] md:w-[280px] bg-card border-r border-border/40 z-40 flex flex-col shadow-2xl md:shadow-none overflow-hidden"
-              >
+        {!isLoadingGathas && (
+          <motion.aside
+            initial={false}
+            animate={{
+              x: isSidebarOpen ? 0 : "-100%",
+              visibility: isSidebarOpen ? "visible" : "hidden",
+            }}
+            transition={{
+              x: { type: "tween", duration: 0.3 },
+              visibility: { delay: isSidebarOpen ? 0 : 0.3 },
+            }}
+            aria-hidden={!isSidebarOpen}
+            className={`fixed left-0 top-16 bottom-0 w-[80vw] max-w-[300px] md:w-[280px] bg-card border-r border-border/40 z-40 flex flex-col shadow-2xl md:shadow-none overflow-hidden ${
+              !isSidebarOpen ? 'pointer-events-none' : ''
+            }`}
+          >
                 <div className="p-4 border-b border-border/40 flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <h2 className="font-heading text-lg text-gradient-gold font-semibold devanagari-safe">
@@ -1310,9 +1349,7 @@ const ShastraReader = () => {
                   <div className="h-24 w-full" aria-hidden="true" />
                 </div>
               </motion.aside>
-            </>
-          )}
-        </AnimatePresence>
+            )}
 
         {/* 2. Main Content Area: 95% on mobile, 80% on wide screens */}
         <main 
