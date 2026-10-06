@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useMemo, useRef, memo, Fragment } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef, memo, Fragment } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '@/contexts/AppContext';
@@ -457,6 +457,37 @@ const ChapterDivider = ({ title }: { title: string }) => (
 /*                         MEMOIZED VERSE ITEM VIEW                           */
 /* -------------------------------------------------------------------------- */
 
+interface SidebarItemProps {
+  item: GathaItem;
+  isActive: boolean;
+  onSelect: (num: string) => void;
+}
+
+const SidebarItem = memo(({ item, isActive, onSelect }: SidebarItemProps) => {
+  return (
+    <li id={`sidebar-link-${item.gathaNum}`} className="relative">
+      <div className={`absolute left-[11px] top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full z-10 ${
+        isActive ? 'bg-gold shadow-[0_0_8px_rgba(234,179,8,0.8)]' : 'bg-gold/40'
+      }`} />
+      <button
+        onClick={() => onSelect(item.gathaNum)}
+        className={`w-full text-left pl-7 pr-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between devanagari-safe ${
+          isActive
+            ? 'bg-gold/15 text-gold font-semibold shadow-sm'
+            : 'text-foreground/80 hover:bg-secondary hover:text-foreground'
+        }`}
+      >
+        <span className="truncate pr-2">
+          {item.gathaNum === '000_मंगलाचरण' ? '000' : item.gathaNum.replace('-parishisht', '')} — {item.title}
+        </span>
+        <ChevronRight className="w-3.5 h-3.5 opacity-50 flex-shrink-0" />
+      </button>
+    </li>
+  );
+});
+
+SidebarItem.displayName = 'SidebarItem';
+
 interface GathaVerseItemProps {
   item: GathaItem;
   content: GathaContent;
@@ -466,14 +497,34 @@ interface GathaVerseItemProps {
   lineSpacing: number;
   availableContentWidth: number;
   readingClass: string;
-  activeTeekaTabs: Record<string, string>;
-  setActiveTeekaTabs: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  showSanskritTeeka: Record<string, boolean>;
-  setShowSanskritTeeka: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   activeGathaNum: string;
   t: (key: string) => string;
   onRegisterRef: (num: string, el: HTMLDivElement | null) => void;
 }
+
+const areGathaPropsEqual = (prevProps: GathaVerseItemProps, nextProps: GathaVerseItemProps) => {
+  if (prevProps.item.gathaNum !== nextProps.item.gathaNum) return false;
+  if (prevProps.availableContentWidth !== nextProps.availableContentWidth) return false;
+  if (prevProps.contentFontSize !== nextProps.contentFontSize) return false;
+  if (prevProps.lineSpacing !== nextProps.lineSpacing) return false;
+  if (prevProps.isFirstOfChapter !== nextProps.isFirstOfChapter) return false;
+  if (prevProps.chapterName !== nextProps.chapterName) return false;
+  if (prevProps.content !== nextProps.content) return false;
+  if (prevProps.t !== nextProps.t) return false;
+  if (prevProps.readingClass !== nextProps.readingClass) return false;
+
+  const hasTable = (
+    (prevProps.content.anvayarth && prevProps.content.anvayarth.includes('|')) ||
+    (prevProps.content.bhavarth && prevProps.content.bhavarth.includes('|')) ||
+    prevProps.content.teekas.some(tk => (tk.hindi && tk.hindi.includes('|')) || (tk.sanskrit && tk.sanskrit.includes('|')))
+  );
+
+  if (hasTable && prevProps.activeGathaNum !== nextProps.activeGathaNum) {
+    return false;
+  }
+
+  return true;
+};
 
 const GathaVerseItem = memo(({
   item,
@@ -484,18 +535,15 @@ const GathaVerseItem = memo(({
   lineSpacing,
   availableContentWidth,
   readingClass,
-  activeTeekaTabs,
-  setActiveTeekaTabs,
-  showSanskritTeeka,
-  setShowSanskritTeeka,
   activeGathaNum,
   t,
   onRegisterRef,
 }: GathaVerseItemProps) => {
   const gathaNum = item.gathaNum;
-  const currentComm = activeTeekaTabs[gathaNum] || (content.teekas[0]?.commentator);
+  const [selectedComm, setSelectedComm] = useState<string>(() => content.teekas[0]?.commentator || '');
+  const [showSanskrit, setShowSanskrit] = useState<boolean>(false);
+  const currentComm = selectedComm || (content.teekas[0]?.commentator || '');
   const activeTeeka = content.teekas.find(tk => tk.commentator === currentComm);
-  const showSanskrit = showSanskritTeeka[`${gathaNum}_${currentComm}`] || false;
 
   return (
     <Fragment>
@@ -700,7 +748,7 @@ const GathaVerseItem = memo(({
               {content.teekas.map(tk => (
                 <button
                   key={tk.commentator}
-                  onClick={() => setActiveTeekaTabs(prev => ({ ...prev, [gathaNum]: tk.commentator }))}
+                  onClick={() => setSelectedComm(tk.commentator)}
                   className={`px-5 py-3 text-sm font-heading font-medium transition-colors flex-shrink-0 devanagari-safe ${
                     currentComm === tk.commentator
                       ? 'bg-card text-gold border-t-2 border-gold font-semibold'
@@ -720,10 +768,7 @@ const GathaVerseItem = memo(({
                   {activeTeeka.sanskrit && (
                     <div className="flex justify-end mb-2">
                       <button
-                        onClick={() => setShowSanskritTeeka(prev => ({
-                          ...prev,
-                          [`${gathaNum}_${currentComm}`]: !showSanskrit
-                        }))}
+                        onClick={() => setShowSanskrit(prev => !prev)}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary text-xs text-secondary-foreground hover:bg-gold/10 transition-colors"
                       >
                         {showSanskrit ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -760,7 +805,7 @@ const GathaVerseItem = memo(({
       </div>
     </Fragment>
   );
-});
+}, areGathaPropsEqual);
 
 GathaVerseItem.displayName = 'GathaVerseItem';
 
@@ -777,8 +822,6 @@ const ShastraReader = () => {
   const [shastraIndex, setShastraIndex] = useState<ShastraIndex | null>(null);
   const [activeGathaNum, setActiveGathaNum] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [activeTeekaTabs, setActiveTeekaTabs] = useState<Record<string, string>>({});
-  const [showSanskritTeeka, setShowSanskritTeeka] = useState<Record<string, boolean>>({});
   const [isAutoFollow, setIsAutoFollow] = useState(true);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [gathas, setGathas] = useState<Array<{ item: GathaItem; content: GathaContent; chapterName: string }>>([]);
@@ -805,7 +848,8 @@ const ShastraReader = () => {
         const pr = parseFloat(computed.paddingRight) || 16;
         const innerW = mainRef.current.clientWidth - pl - pr;
         if (innerW > 0) {
-          setContentWidth(Math.floor(innerW));
+          const nextW = Math.floor(innerW);
+          setContentWidth(prev => (Math.abs(prev - nextW) > 2 ? nextW : prev));
         }
       }
     };
@@ -890,7 +934,16 @@ const ShastraReader = () => {
   };
 
   useEffect(() => {
-    const onScroll = () => handleScrollOccupancy();
+    let ticking = false;
+    const onScroll = () => {
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(() => {
+          handleScrollOccupancy();
+          ticking = false;
+        });
+      }
+    };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
@@ -945,19 +998,6 @@ const ShastraReader = () => {
       isActive = false;
     };
   }, [shastraIndex, shastraSlug]);
-
-  // Initialize commentator tabs when gathas load
-  useEffect(() => {
-    if (gathas.length > 0) {
-      const initialTabs: Record<string, string> = {};
-      gathas.forEach(g => {
-        if (g.content.teekas.length > 0) {
-          initialTabs[g.item.gathaNum] = g.content.teekas[0].commentator;
-        }
-      });
-      setActiveTeekaTabs(prev => ({ ...initialTabs, ...prev }));
-    }
-  }, [gathas]);
 
   // 3. Setup IntersectionObserver to track visible gathas
   useEffect(() => {
@@ -1080,19 +1120,7 @@ const ShastraReader = () => {
     }
   }, [isSidebarOpen, activeGathaNum]);
 
-  if (!shastraIndex) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <Header />
-        <div className="flex-1 flex items-center justify-center pt-24">
-          <p className="text-muted-foreground">{t('noResults')}</p>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
-
-  const scrollToGatha = (gathaNum: string) => {
+  const scrollToGatha = useCallback((gathaNum: string) => {
     const el = document.getElementById(`gatha-${gathaNum}`);
     if (el) {
       isManualScrollingRef.current = true;
@@ -1116,7 +1144,7 @@ const ShastraReader = () => {
         isManualScrollingRef.current = false;
       }, 1000);
     }
-  };
+  }, []);
 
   const handleSidebarScroll = (e: React.UIEvent<HTMLDivElement>) => {
     sidebarScrollTopRef.current = e.currentTarget.scrollTop;
@@ -1129,11 +1157,23 @@ const ShastraReader = () => {
     setIsDownloadingPdf(true);
   };
 
-  const registerGathaRef = (num: string, el: HTMLDivElement | null) => {
+  const registerGathaRef = useCallback((num: string, el: HTMLDivElement | null) => {
     gathaRefs.current[num] = el;
-  };
+  }, []);
 
   const readingClass = '';
+
+  if (!shastraIndex) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <Header />
+        <div className="flex-1 flex items-center justify-center pt-24">
+          <p className="text-muted-foreground">{t('noResults')}</p>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col overflow-x-hidden w-full max-w-full">
@@ -1259,7 +1299,7 @@ const ShastraReader = () => {
 
                 <div 
                   id="sidebar-scroll-container"
-                  className="flex-1 overflow-y-auto p-3 pb-12 scrollbar-thin"
+                  className="flex-1 overflow-y-auto p-3 pb-12 scrollbar-thin [contain:content]"
                   onScroll={handleSidebarScroll}
                 >
                   {/* Shastra Cover Page Link */}
@@ -1295,24 +1335,12 @@ const ShastraReader = () => {
                       </div>
                       <ul className="space-y-1 relative before:absolute before:inset-y-0 before:left-3 before:w-[1px] before:bg-gold/20 ml-1">
                         {chapter.items.map((item) => (
-                          <li key={item.gathaNum} id={`sidebar-link-${item.gathaNum}`} className="relative">
-                            <div className={`absolute left-[11px] top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full z-10 ${
-                              activeGathaNum === item.gathaNum ? 'bg-gold shadow-[0_0_8px_rgba(234,179,8,0.8)]' : 'bg-gold/40'
-                            }`} />
-                            <button
-                              onClick={() => scrollToGatha(item.gathaNum)}
-                              className={`w-full text-left pl-7 pr-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between devanagari-safe ${
-                                activeGathaNum === item.gathaNum
-                                  ? 'bg-gold/15 text-gold font-semibold shadow-sm'
-                                  : 'text-foreground/80 hover:bg-secondary hover:text-foreground'
-                              }`}
-                            >
-                              <span className="truncate pr-2">
-                                {item.gathaNum === '000_मंगलाचरण' ? '000' : item.gathaNum.replace('-parishisht', '')} — {item.title}
-                              </span>
-                              <ChevronRight className="w-3.5 h-3.5 opacity-50 flex-shrink-0" />
-                            </button>
-                          </li>
+                          <SidebarItem
+                            key={item.gathaNum}
+                            item={item}
+                            isActive={activeGathaNum === item.gathaNum}
+                            onSelect={scrollToGatha}
+                          />
                         ))}
                       </ul>
                     </div>
@@ -1432,10 +1460,6 @@ const ShastraReader = () => {
                     lineSpacing={lineSpacing}
                     availableContentWidth={contentWidth}
                     readingClass={readingClass}
-                    activeTeekaTabs={activeTeekaTabs}
-                    setActiveTeekaTabs={setActiveTeekaTabs}
-                    showSanskritTeeka={showSanskritTeeka}
-                    setShowSanskritTeeka={setShowSanskritTeeka}
                     activeGathaNum={activeGathaNum}
                     t={t}
                     onRegisterRef={registerGathaRef}

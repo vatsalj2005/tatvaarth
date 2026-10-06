@@ -8,15 +8,23 @@ import React from 'react';
 let _measureCanvas: HTMLCanvasElement | null = null;
 let _measureCtx: CanvasRenderingContext2D | null = null;
 
+const _measureCache = new Map<string, number>();
+
 export const measureTextWidth = (text: string, font: string = '600 16px "Noto Sans Devanagari", sans-serif'): number => {
   if (typeof document === 'undefined') return text.length * 9.5;
+  const cacheKey = `${font}__${text}`;
+  const cached = _measureCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
   if (!_measureCanvas) {
     _measureCanvas = document.createElement('canvas');
     _measureCtx = _measureCanvas.getContext('2d');
   }
   if (!_measureCtx) return text.length * 9.5;
   _measureCtx.font = font;
-  return _measureCtx.measureText(text).width;
+  const width = _measureCtx.measureText(text).width;
+  _measureCache.set(cacheKey, width);
+  return width;
 };
 
 export interface DynamicVerseFontOptions {
@@ -26,6 +34,8 @@ export interface DynamicVerseFontOptions {
   paddingBuffer?: number;
   fontFamily?: string;
 }
+
+const _dynamicFontSizeCache = new Map<string, number>();
 
 export const getDynamicVerseFontSize = (
   lines: string[],
@@ -39,6 +49,10 @@ export const getDynamicVerseFontSize = (
   const fontFamily = options?.fontFamily ?? '"Noto Sans Devanagari", "Noto Serif Devanagari", sans-serif';
 
   if (!lines || lines.length === 0 || availableWidth <= 0) return minSize;
+
+  const cacheKey = `${lines.join('\n')}__${availableWidth}__${minSize}__${maxSize}__${baseSize}`;
+  const cached = _dynamicFontSizeCache.get(cacheKey);
+  if (cached !== undefined) return cached;
 
   const font = `600 ${baseSize}px ${fontFamily}`;
   let maxLineWidth = 0;
@@ -67,11 +81,18 @@ export const getDynamicVerseFontSize = (
     }
   }
 
-  return Math.round(Math.max(minSize, Math.min(calculatedSize, maxSize)) * 10) / 10;
+  const result = Math.round(Math.max(minSize, Math.min(calculatedSize, maxSize)) * 10) / 10;
+  _dynamicFontSizeCache.set(cacheKey, result);
+  return result;
 };
+
+const _dohaCache = new Map<string, string[][]>();
 
 export const groupIntoDohas = (text: string): string[][] => {
   if (!text) return [];
+  const cached = _dohaCache.get(text);
+  if (cached) return cached;
+
   const lines = text.split('\n');
   const dohas: string[][] = [];
   let currentDoha: string[] = [];
@@ -102,6 +123,7 @@ export const groupIntoDohas = (text: string): string[][] => {
     dohas.push(currentDoha);
   }
 
+  _dohaCache.set(text, dohas);
   return dohas;
 };
 
@@ -135,9 +157,14 @@ export const getRowRange = (text: string): { start: number; end: number } | null
   return null;
 };
 
+const _cleanAnvayarthCache = new Map<string, string>();
+
 export const cleanAnvayarthText = (text: string): string => {
   if (!text) return '';
-  return text
+  const cached = _cleanAnvayarthCache.get(text);
+  if (cached !== undefined) return cached;
+
+  const result = text
     .split('\n')
     .filter(line => {
       const trimmed = line.trim();
@@ -151,6 +178,9 @@ export const cleanAnvayarthText = (text: string): string => {
       );
     })
     .join('\n');
+
+  _cleanAnvayarthCache.set(text, result);
+  return result;
 };
 
 export const parseTextWithDiagrams = (text: string): { type: 'text' | 'diagram'; content: string }[] => {
