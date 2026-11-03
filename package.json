@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "bundle:shastras": "node scripts/bundle-shastras.js",
-    "prebuild": "node scripts/bundle-shastras.js",
+    "prebuild": "node -e \"import('fs').then(fs => fs.existsSync('scripts/bundle-shastras.js') && import('child_process').then(cp => cp.execSync('node scripts/bundle-shastras.js', { stdio: 'inherit' })))\"",
     "build": "vite build",
     "preview": "vite preview"
   },

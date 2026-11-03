@@ -46,11 +46,24 @@ const numbers: Record<string, string> = {
   '५': '5', '६': '6', '७': '7', '८': '8', '९': '9'
 };
 
+// Custom word overrides for traditional/preferred romanizations
+const wordOverrides: Record<string, string> = {
+  'संयम': 'saiyama',
+  'संयमी': 'saiyami',
+  'संयमों': 'saiyamon',
+  'संयममय': 'saiyammay',
+  'असंयम': 'asaiyama',
+  'असंयमी': 'asaiyami',
+};
+
 /**
  * Transliterate Hindi/Devanagari text to Roman script (simple ASCII)
  */
 export function transliterateToRoman(text: string): string {
   if (!text) return '';
+  if (wordOverrides[text]) {
+    return wordOverrides[text];
+  }
   
   let result = '';
   let i = 0;

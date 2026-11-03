@@ -71,12 +71,12 @@ function useDynamicBhajanFontSize(
       ruler.style.fontFamily = isRoman
         ? "'Inter', -apple-system, BlinkMacSystemFont, sans-serif"
         : "'Noto Sans Devanagari', sans-serif";
-      ruler.style.fontWeight = '500';
+      ruler.style.fontWeight = '600';
       ruler.style.fontSize = '16px';
       document.body.appendChild(ruler);
 
-      // Safe target width so text doesn't touch card borders
-      const targetWidth = Math.max(rawWidth - 12, 100);
+      // Safe target width so text doesn't touch card borders or get clipped
+      const targetWidth = Math.max(rawWidth - 28, 100);
 
       // 1. Measure all lines with refrains combined on same line
       let maxCombinedWidth = 0;
@@ -140,9 +140,9 @@ function useDynamicBhajanFontSize(
 
       if (maxCombinedWidth > 0) {
         const combinedSize = 16 * (targetWidth / maxCombinedWidth);
-        // If keeping refrain combined would force font size below 17.5px (or if combined width overflows targetWidth at 17.5px),
+        // If keeping refrain combined would force font size below 18.5px (or if combined width overflows targetWidth at 18.5px),
         // split the refrain onto the next line so font size remains comfortably large and doesn't wrap awkwardly.
-        if (hasAnyRefrain && combinedSize < 17.5 && maxSplitWidth > 0) {
+        if (hasAnyRefrain && combinedSize < 18.5 && maxSplitWidth > 0) {
           shouldSplit = true;
           calculatedSize = 16 * (targetWidth / maxSplitWidth);
           chosenLongestLine = longestSplitLine;
@@ -358,7 +358,7 @@ const BhajanPage = () => {
             return (
               <div 
                 key={`stanza-${sIdx}`}
-                className="mb-6 text-center space-y-1.5"
+                className="mb-6 last:mb-0 text-center space-y-1"
               >
                 {stanza.lines.map((line, lIdx) => {
                   const lineText = line.type === 'verse_with_refrain'
@@ -382,13 +382,13 @@ const BhajanPage = () => {
           return (
             <div 
               key={`stanza-${sIdx}`}
-              className="mb-6 text-center space-y-1.5"
+              className="mb-6 last:mb-0 text-center space-y-1"
             >
               {stanza.lines.map((line, lIdx) => {
                 if (line.type === 'verse_with_refrain') {
                   if (shouldSplitRefrain && line.after) {
                     return (
-                      <div key={lIdx} className="space-y-1">
+                      <div key={lIdx} className="space-y-0.5">
                         <p 
                           className="leading-normal devanagari-safe break-words"
                           style={{ fontSize: `${fontSize}px` }}
