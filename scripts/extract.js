@@ -5,8 +5,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const devDir = path.join(__dirname, 'New_bhajans');
-const outDir = path.join(__dirname, 'src', 'content', 'bhajans', 'dev');
+const devDir = path.join(__dirname, '..', 'New_bhajans');
+const outDir = path.join(__dirname, '..', 'src', 'content', 'bhajans', 'dev', 'Dev_Bhajan');
 
 /**
  * Processes text into the user's preferred bhajan format.

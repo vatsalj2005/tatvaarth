@@ -6,7 +6,7 @@ import { getBhajanById, getRelatedBhajans, subdivisions } from '@/data/content-l
 import { transliterateText } from '@/lib/transliterate';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { Play, Copy, Check, VolumeX, Download, Music, Type } from 'lucide-react';
+import { Play, Pause, Copy, Check, VolumeX, Download, Music, Type, Mic } from 'lucide-react';
 
 /**
  * Extracts all flattened line strings as rendered in the bhajan.
@@ -213,8 +213,38 @@ const BhajanPage = () => {
   const bhajan = getBhajanById(subdivisionId || '', bhajanId || '');
   if (!bhajan) return null;
 
+  const [activeAudioMode, setActiveAudioMode] = useState<'bhajan' | 'karaoke' | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   const subdivision = subdivisions.find(s => s.id === bhajan.subdivision);
   const related = getRelatedBhajans(bhajan, 4);
+
+  const currentAudioSource = activeAudioMode === 'karaoke' ? bhajan.karaokeUrl : bhajan.audioUrl;
+
+  const handleToggleAudio = (mode: 'bhajan' | 'karaoke') => {
+    const targetUrl = mode === 'karaoke' ? bhajan.karaokeUrl : bhajan.audioUrl;
+    if (!targetUrl) return;
+
+    if (activeAudioMode === mode) {
+      if (isPlaying) {
+        audioRef.current?.pause();
+        setIsPlaying(false);
+      } else {
+        audioRef.current?.play().catch(console.error);
+        setIsPlaying(true);
+      }
+    } else {
+      setActiveAudioMode(mode);
+      setIsPlaying(true);
+      setTimeout(() => {
+        if (audioRef.current) {
+          audioRef.current.load();
+          audioRef.current.play().catch(console.error);
+        }
+      }, 50);
+    }
+  };
 
   // Generate romanized text only when roman script is toggled on
   const romanizedLyrics = useMemo(() => {
@@ -438,47 +468,107 @@ const BhajanPage = () => {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="w-full flex flex-wrap gap-2.5 sm:gap-3 mb-8 justify-center"
+            className="w-full flex flex-col items-center mb-8"
           >
-            {bhajan.audioUrl ? (
-              <button className="flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gold text-primary-foreground font-medium hover:opacity-90 transition-opacity text-sm">
-                <Play className="w-4 h-4" /> {language === 'hi' ? 'सुनें' : 'Listen'}
+            <div className="flex flex-wrap gap-2.5 sm:gap-3 justify-center items-center">
+              {/* Vocal Bhajan Audio button */}
+              {bhajan.audioUrl && (
+                <button
+                  onClick={() => handleToggleAudio('bhajan')}
+                  className={`flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-medium transition-all text-xs sm:text-sm ${
+                    activeAudioMode === 'bhajan' && isPlaying
+                      ? 'bg-gold text-primary-foreground shadow-lg shadow-gold/20'
+                      : 'bg-gold/90 hover:bg-gold text-primary-foreground'
+                  }`}
+                >
+                  {activeAudioMode === 'bhajan' && isPlaying ? (
+                    <>
+                      <Pause className="w-4 h-4" /> {t('pauseAudio')}
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4" /> {t('playBhajan')}
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Karaoke Track button */}
+              {bhajan.karaokeUrl && (
+                <button
+                  onClick={() => handleToggleAudio('karaoke')}
+                  className={`flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-medium transition-all text-xs sm:text-sm ${
+                    activeAudioMode === 'karaoke' && isPlaying
+                      ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20'
+                      : 'bg-secondary text-secondary-foreground hover:bg-gold/20 border border-gold/30'
+                  }`}
+                >
+                  <Mic className="w-4 h-4 text-gold" />
+                  {activeAudioMode === 'karaoke' && isPlaying ? t('pauseAudio') : t('playKaraoke')}
+                </button>
+              )}
+
+              {/* Unavailable state if neither audio exists */}
+              {!bhajan.audioUrl && !bhajan.karaokeUrl && (
+                <div className="flex items-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-secondary text-muted-foreground">
+                  <VolumeX className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm">{t('audioUnavailable')}</span>
+                </div>
+              )}
+
+              {/* Roman Script toggle */}
+              <button
+                onClick={() => setShowRoman(!showRoman)}
+                className={`flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-medium transition-all text-xs sm:text-sm ${
+                  showRoman
+                    ? 'bg-gold text-primary-foreground'
+                    : 'bg-secondary text-secondary-foreground hover:bg-gold/20'
+                }`}
+              >
+                <Type className="w-4 h-4" />
+                {showRoman ? t('hideRomanScript') : t('romanScript')}
               </button>
-            ) : (
-              <div className="flex items-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-secondary text-muted-foreground">
-                <VolumeX className="w-4 h-4 flex-shrink-0" />
-                <span className="text-xs sm:text-sm">{t('audioUnavailable')}</span>
+
+              <button
+                onClick={handleCopy}
+                className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-gold/20 transition-colors text-xs sm:text-sm"
+              >
+                {copied ? <Check className="w-4 h-4 text-gold" /> : <Copy className="w-4 h-4" />}
+                <span>{copied ? t('copied') : t('copyVerse')}</span>
+              </button>
+
+              <button
+                onClick={handlePdfDownload}
+                className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-gold/20 transition-colors text-xs sm:text-sm"
+              >
+                <Download className="w-4 h-4" />
+                <span>{t('downloadPdf')}</span>
+              </button>
+            </div>
+
+            {/* Embedded Native Audio Player Bar if an audio track is selected */}
+            {currentAudioSource && (
+              <div className="w-full max-w-md mt-4 p-3 rounded-2xl bg-card border border-gold/30 shadow-md">
+                <div className="flex items-center justify-between text-xs text-muted-foreground mb-2 px-1">
+                  <span className="flex items-center gap-1.5 font-medium text-gold">
+                    <Music className="w-3.5 h-3.5" />
+                    {activeAudioMode === 'karaoke' ? `${bhajan.title} (${t('karaoke')})` : bhajan.title}
+                  </span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-gold/10 text-gold font-medium">
+                    {activeAudioMode === 'karaoke' ? t('karaoke') : t('bhajan')}
+                  </span>
+                </div>
+                <audio
+                  ref={audioRef}
+                  src={currentAudioSource}
+                  controls
+                  className="w-full h-9 rounded-lg"
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  onEnded={() => setIsPlaying(false)}
+                />
               </div>
             )}
-
-            {/* Roman Script toggle */}
-            <button
-              onClick={() => setShowRoman(!showRoman)}
-              className={`flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-medium transition-all text-xs sm:text-sm ${
-                showRoman
-                  ? 'bg-gold text-primary-foreground'
-                  : 'bg-secondary text-secondary-foreground hover:bg-gold/20'
-              }`}
-            >
-              <Type className="w-4 h-4" />
-              {showRoman ? t('hideRomanScript') : t('romanScript')}
-            </button>
-
-            <button
-              onClick={handleCopy}
-              className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-gold/20 transition-colors text-xs sm:text-sm"
-            >
-              {copied ? <Check className="w-4 h-4 text-gold" /> : <Copy className="w-4 h-4" />}
-              <span>{copied ? t('copied') : t('copyVerse')}</span>
-            </button>
-
-            <button
-              onClick={handlePdfDownload}
-              className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-gold/20 transition-colors text-xs sm:text-sm"
-            >
-              <Download className="w-4 h-4" />
-              <span>{t('downloadPdf')}</span>
-            </button>
           </motion.div>
 
           {/* Lyrics: 95% on mobile, 80% on wide screens */}

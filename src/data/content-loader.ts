@@ -14,6 +14,7 @@ export interface BhajanData {
   tags: string[];
   lyrics: string;
   audioUrl?: string;
+  karaokeUrl?: string;
 }
 
 export interface SubdivisionData {
@@ -116,20 +117,67 @@ function parseFrontmatter(raw: string): { metadata: Record<string, string>; cont
 
 const bhajanFiles = import.meta.glob('../content/bhajans/**/*.txt', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
+// Automatically discover audio and karaoke files from content/bhajans/ subdirectories
+const audioAssetFiles = import.meta.glob('../content/bhajans/**/*.{mp3,wav,ogg,m4a,aac,flac,webm}', {
+  eager: true,
+  import: 'default'
+}) as Record<string, string>;
+
+function buildAudioMaps(): { audioMap: Map<string, string>; karaokeMap: Map<string, string> } {
+  const audioMap = new Map<string, string>();
+  const karaokeMap = new Map<string, string>();
+
+  for (const [filePath, fileUrl] of Object.entries(audioAssetFiles)) {
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    const match = normalizedPath.match(/\/content\/bhajans\/([^/]+)\/([^/]+)\/([^/]+)\.[a-zA-Z0-9]+$/);
+    if (!match) continue;
+
+    const subdivision = match[1].toLowerCase();
+    const subfolder = match[2].toLowerCase();
+    const baseName = match[3];
+    const romanSlug = getRomanizedSlug(baseName);
+    const targetMap = subfolder.includes('karaoke') ? karaokeMap : audioMap;
+
+    targetMap.set(`${subdivision}/${baseName}`, fileUrl);
+    targetMap.set(`${subdivision}/${romanSlug}`, fileUrl);
+    targetMap.set(`${subdivision}/${baseName.toLowerCase()}`, fileUrl);
+    targetMap.set(`${subdivision}/${romanSlug.toLowerCase()}`, fileUrl);
+  }
+
+  return { audioMap, karaokeMap };
+}
+
+const { audioMap, karaokeMap } = buildAudioMaps();
+
 function buildBhajans(): BhajanData[] {
   const results: BhajanData[] = [];
 
   for (const [filePath, rawContent] of Object.entries(bhajanFiles)) {
-    const pathMatch = filePath.match(/\/content\/bhajans\/([^/]+)\/([^/]+)\.txt$/);
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    const pathMatch = normalizedPath.match(/\/content\/bhajans\/([^/]+)(?:\/[^/]+)?\/([^/]+)\.txt$/);
     if (!pathMatch) continue;
 
-    const subdivision = pathMatch[1];
+    const subdivision = pathMatch[1].toLowerCase();
     const originalSlug = pathMatch[2];
     const romanizedSlug = getRomanizedSlug(originalSlug);
     
     const { metadata, content } = parseFrontmatter(rawContent);
     const title = metadata.title || generateTitleFromFilename(originalSlug);
     const tags = extractTags(content);
+
+    const audioUrl = metadata.audioUrl ||
+      audioMap.get(`${subdivision}/${originalSlug}`) ||
+      audioMap.get(`${subdivision}/${romanizedSlug}`) ||
+      audioMap.get(`${subdivision}/${originalSlug.toLowerCase()}`) ||
+      audioMap.get(`${subdivision}/${romanizedSlug.toLowerCase()}`) ||
+      undefined;
+
+    const karaokeUrl = metadata.karaokeUrl ||
+      karaokeMap.get(`${subdivision}/${originalSlug}`) ||
+      karaokeMap.get(`${subdivision}/${romanizedSlug}`) ||
+      karaokeMap.get(`${subdivision}/${originalSlug.toLowerCase()}`) ||
+      karaokeMap.get(`${subdivision}/${romanizedSlug.toLowerCase()}`) ||
+      undefined;
 
     results.push({
       id: `${subdivision}/${romanizedSlug}`,
@@ -139,7 +187,8 @@ function buildBhajans(): BhajanData[] {
       singer: metadata.singer,
       tags,
       lyrics: content,
-      audioUrl: undefined,
+      audioUrl,
+      karaokeUrl,
     });
   }
 
