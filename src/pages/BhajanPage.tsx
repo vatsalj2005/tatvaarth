@@ -75,101 +75,111 @@ function useDynamicBhajanFontSize(
       ruler.style.fontSize = '16px';
       document.body.appendChild(ruler);
 
-      // Safe target width so text doesn't touch card borders or get clipped
-      const targetWidth = Math.max(rawWidth - 28, 100);
+      try {
+        // Safe target width so text doesn't touch card borders or get clipped
+        const targetWidth = Math.max(rawWidth - 28, 100);
 
-      // 1. Measure all lines with refrains combined on same line
-      let maxCombinedWidth = 0;
-      let longestCombinedLine = '';
-      let hasAnyRefrain = false;
+        // 1. Measure all lines with refrains combined on same line
+        let maxCombinedWidth = 0;
+        let longestCombinedLine = '';
+        let hasAnyRefrain = false;
 
-      // 2. Measure with refrains split onto the next line
-      let maxSplitWidth = 0;
-      let longestSplitLine = '';
+        // 2. Measure with refrains split onto the next line
+        let maxSplitWidth = 0;
+        let longestSplitLine = '';
 
-      for (const stanza of stanzas) {
-        for (const line of stanza.lines) {
-          if (line.type === 'verse_with_refrain' && line.after) {
-            hasAnyRefrain = true;
-            // Combined line: before + marker + after
-            const combinedText = [line.before, line.marker, line.after].filter(Boolean).join(' ').trim();
-            ruler.textContent = combinedText;
-            const combinedW = ruler.getBoundingClientRect().width;
-            if (combinedW > maxCombinedWidth) {
-              maxCombinedWidth = combinedW;
-              longestCombinedLine = combinedText;
-            }
+        for (const stanza of stanzas) {
+          for (const line of stanza.lines) {
+            if (line.type === 'verse_with_refrain' && line.after) {
+              hasAnyRefrain = true;
+              // Combined line: before + marker + after
+              const combinedText = [line.before, line.marker, line.after].filter(Boolean).join(' ').trim();
+              ruler.textContent = combinedText;
+              const combinedW = ruler.getBoundingClientRect().width;
+              if (combinedW > maxCombinedWidth) {
+                maxCombinedWidth = combinedW;
+                longestCombinedLine = combinedText;
+              }
 
-            // Split line 1: before + marker
-            const splitPart1 = [line.before, line.marker].filter(Boolean).join(' ').trim();
-            ruler.textContent = splitPart1;
-            const splitW1 = ruler.getBoundingClientRect().width;
-            if (splitW1 > maxSplitWidth) {
-              maxSplitWidth = splitW1;
-              longestSplitLine = splitPart1;
-            }
+              // Split line 1: before + marker
+              const splitPart1 = [line.before, line.marker].filter(Boolean).join(' ').trim();
+              ruler.textContent = splitPart1;
+              const splitW1 = ruler.getBoundingClientRect().width;
+              if (splitW1 > maxSplitWidth) {
+                maxSplitWidth = splitW1;
+                longestSplitLine = splitPart1;
+              }
 
-            // Split line 2: after
-            const splitPart2 = (line.after || '').trim();
-            ruler.textContent = splitPart2;
-            const splitW2 = ruler.getBoundingClientRect().width;
-            if (splitW2 > maxSplitWidth) {
-              maxSplitWidth = splitW2;
-              longestSplitLine = splitPart2;
-            }
-          } else {
-            const text = (line.text || [line.before, line.marker].filter(Boolean).join(' ')).trim();
-            if (!text) continue;
-            ruler.textContent = text;
-            const w = ruler.getBoundingClientRect().width;
-            if (w > maxCombinedWidth) {
-              maxCombinedWidth = w;
-              longestCombinedLine = text;
-            }
-            if (w > maxSplitWidth) {
-              maxSplitWidth = w;
-              longestSplitLine = text;
+              // Split line 2: after
+              const splitPart2 = (line.after || '').trim();
+              ruler.textContent = splitPart2;
+              const splitW2 = ruler.getBoundingClientRect().width;
+              if (splitW2 > maxSplitWidth) {
+                maxSplitWidth = splitW2;
+                longestSplitLine = splitPart2;
+              }
+            } else {
+              const text = (line.text || [line.before, line.marker].filter(Boolean).join(' ')).trim();
+              if (!text) continue;
+              ruler.textContent = text;
+              const w = ruler.getBoundingClientRect().width;
+              if (w > maxCombinedWidth) {
+                maxCombinedWidth = w;
+                longestCombinedLine = text;
+              }
+              if (w > maxSplitWidth) {
+                maxSplitWidth = w;
+                longestSplitLine = text;
+              }
             }
           }
         }
-      }
 
-      let shouldSplit = false;
-      let calculatedSize = 16;
-      let chosenLongestLine = '';
+        let shouldSplit = false;
+        let calculatedSize = 16;
+        let chosenLongestLine = '';
 
-      if (maxCombinedWidth > 0) {
-        const combinedSize = 16 * (targetWidth / maxCombinedWidth);
-        // If keeping refrain combined would force font size below 18.5px (or if combined width overflows targetWidth at 18.5px),
-        // split the refrain onto the next line so font size remains comfortably large and doesn't wrap awkwardly.
-        if (hasAnyRefrain && combinedSize < 18.5 && maxSplitWidth > 0) {
-          shouldSplit = true;
-          calculatedSize = 16 * (targetWidth / maxSplitWidth);
-          chosenLongestLine = longestSplitLine;
-        } else {
-          shouldSplit = false;
-          calculatedSize = combinedSize;
-          chosenLongestLine = longestCombinedLine;
+        if (maxCombinedWidth > 0) {
+          const combinedSize = 16 * (targetWidth / maxCombinedWidth);
+          // If keeping refrain combined would force font size below 18.5px (or if combined width overflows targetWidth at 18.5px),
+          // split the refrain onto the next line so font size remains comfortably large and doesn't wrap awkwardly.
+          if (hasAnyRefrain && combinedSize < 18.5 && maxSplitWidth > 0) {
+            shouldSplit = true;
+            calculatedSize = 16 * (targetWidth / maxSplitWidth);
+            chosenLongestLine = longestSplitLine;
+          } else {
+            shouldSplit = false;
+            calculatedSize = combinedSize;
+            chosenLongestLine = longestCombinedLine;
+          }
+        }
+
+        // Verification pass at calculatedSize
+        if (chosenLongestLine && calculatedSize > 0) {
+          ruler.style.fontSize = `${calculatedSize}px`;
+          ruler.textContent = chosenLongestLine;
+          const actualWidth = ruler.getBoundingClientRect().width;
+          if (actualWidth > targetWidth) {
+            calculatedSize = calculatedSize * (targetWidth / actualWidth);
+          }
+        }
+
+        const finalSize = Math.max(10, Math.min(calculatedSize, 25));
+        const roundedSize = Math.round(finalSize * 10) / 10;
+        setResult(prev => {
+          if (prev.fontSize === roundedSize && prev.shouldSplitRefrain === shouldSplit) {
+            return prev;
+          }
+          return {
+            fontSize: roundedSize,
+            shouldSplitRefrain: shouldSplit,
+          };
+        });
+      } finally {
+        if (ruler.parentNode) {
+          ruler.parentNode.removeChild(ruler);
         }
       }
-
-      // Verification pass at calculatedSize
-      if (chosenLongestLine && calculatedSize > 0) {
-        ruler.style.fontSize = `${calculatedSize}px`;
-        ruler.textContent = chosenLongestLine;
-        const actualWidth = ruler.getBoundingClientRect().width;
-        if (actualWidth > targetWidth) {
-          calculatedSize = calculatedSize * (targetWidth / actualWidth);
-        }
-      }
-
-      document.body.removeChild(ruler);
-
-      const finalSize = Math.max(10, Math.min(calculatedSize, 25));
-      setResult({
-        fontSize: Math.round(finalSize * 10) / 10,
-        shouldSplitRefrain: shouldSplit,
-      });
     };
 
     measureAndFit();
@@ -180,13 +190,17 @@ function useDynamicBhajanFontSize(
       document.fonts.ready.then(measureAndFit);
     }
 
-    const resizeObserver = new ResizeObserver(() => {
-      measureAndFit();
+    let lastObservedWidth = containerEl.clientWidth;
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const newWidth = entry.contentRect.width;
+        if (Math.abs(newWidth - lastObservedWidth) > 3) {
+          lastObservedWidth = newWidth;
+          measureAndFit();
+        }
+      }
     });
     resizeObserver.observe(containerEl);
-    if (containerEl.parentElement) {
-      resizeObserver.observe(containerEl.parentElement);
-    }
 
     window.addEventListener('resize', measureAndFit);
 
