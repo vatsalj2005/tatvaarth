@@ -211,14 +211,42 @@ for (const b of bhajans) {
   } else {
     bhajansBySubdivisionMap.set(b.subdivision, [b]);
   }
+  // Index by slug and normalized variants
   bhajanByIdMap.set(`${b.subdivision}/${b.slug}`, b);
+  bhajanByIdMap.set(`${b.subdivision}/${b.slug.toLowerCase()}`, b);
+  bhajanByIdMap.set(`${b.subdivision}/${b.title}`, b);
+  const romanTitle = getRomanizedSlug(b.title);
+  if (romanTitle) {
+    bhajanByIdMap.set(`${b.subdivision}/${romanTitle}`, b);
+    bhajanByIdMap.set(`${b.subdivision}/${romanTitle.toLowerCase()}`, b);
+  }
 }
 
 export const getBhajansBySubdivision = (subdivisionId: string) =>
   bhajansBySubdivisionMap.get(subdivisionId) || [];
 
-export const getBhajanById = (subdivisionId: string, bhajanSlug: string) =>
-  bhajanByIdMap.get(`${subdivisionId}/${bhajanSlug}`);
+export const getBhajanById = (subdivisionId: string, bhajanSlug: string): BhajanData | undefined => {
+  if (!subdivisionId || !bhajanSlug) return undefined;
+  
+  const rawKey = `${subdivisionId}/${bhajanSlug}`;
+  if (bhajanByIdMap.has(rawKey)) return bhajanByIdMap.get(rawKey);
+
+  let decoded = bhajanSlug;
+  try {
+    decoded = decodeURIComponent(bhajanSlug).trim();
+  } catch {}
+
+  const decodedKey = `${subdivisionId}/${decoded}`;
+  if (bhajanByIdMap.has(decodedKey)) return bhajanByIdMap.get(decodedKey);
+
+  const lowerKey = `${subdivisionId}/${decoded.toLowerCase()}`;
+  if (bhajanByIdMap.has(lowerKey)) return bhajanByIdMap.get(lowerKey);
+
+  const romanKey = `${subdivisionId}/${getRomanizedSlug(decoded)}`;
+  if (bhajanByIdMap.has(romanKey)) return bhajanByIdMap.get(romanKey);
+
+  return undefined;
+};
 
 export const getRelatedBhajans = (bhajan: BhajanData, limit = 4): BhajanData[] => {
   if (!bhajan.tags.length) {

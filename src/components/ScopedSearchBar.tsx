@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '@/contexts/AppContext';
 import { scopedSiteSearch, ScopedSearchOptions } from '@/lib/smart-search';
@@ -95,12 +95,15 @@ export const ScopedSearchBar = ({
             <div className="border-t border-border/30" />
             {searchResults.length > 0 ? (
               searchResults.map(s => (
-                <button
+                <Link
                   key={s.id}
+                  to={s.url}
                   onMouseDown={(e) => {
                     e.preventDefault();
-                    navigate(s.url);
+                  }}
+                  onClick={() => {
                     setSearchQuery('');
+                    setIsFocused(false);
                   }}
                   className={`w-full text-left px-4 py-2.5 hover:bg-secondary/80 transition-colors text-sm flex items-center justify-between gap-3 border-b border-border/20 last:border-b-0 group ${
                     s.type === 'directory' ? 'bg-gold/5' : ''
@@ -134,7 +137,7 @@ export const ScopedSearchBar = ({
                       )}
                     </div>
                   </div>
-                </button>
+                </Link>
               ))
             ) : (
               <div className="px-4 py-3 text-sm text-muted-foreground">

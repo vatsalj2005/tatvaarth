@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { siteWideSearch, UnifiedSearchResult } from '@/lib/smart-search';
 
 // Dynamically import all hero images from the assets folder
@@ -128,13 +128,16 @@ const HeroSection = () => {
               >
                 <div className="border-t border-border/30" />
                 {suggestions.map(s => (
-                  <button
+                  <Link
                     key={s.id}
+                    to={s.url}
                     onMouseDown={(e) => {
                       e.preventDefault();
-                      navigate(s.url);
+                    }}
+                    onClick={() => {
                       setSearchQuery('');
                       setSuggestions([]);
+                      setIsFocused(false);
                     }}
                     className={`w-full text-left px-4 py-2.5 hover:bg-secondary/80 transition-colors text-sm flex items-center justify-between gap-3 border-b border-border/20 last:border-b-0 group ${
                       s.type === 'directory' ? 'bg-gold/5' : ''
@@ -170,7 +173,7 @@ const HeroSection = () => {
                         )}
                       </div>
                     </div>
-                  </button>
+                  </Link>
                 ))}
               </motion.div>
             )}

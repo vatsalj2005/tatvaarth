@@ -21,7 +21,25 @@ const SubdivisionPage = () => {
     label: subdivision ? (language === 'hi' ? subdivision.nameHi : subdivision.nameEn) : subdivisionId
   }), [subdivisionId, subdivision, language]);
 
-  if (!subdivision) return null;
+  if (!subdivision) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="pt-32 pb-16 px-4 text-center max-w-md mx-auto">
+          <p className="text-xl text-muted-foreground mb-4">
+            {language === 'hi' ? 'श्रेणी नहीं मिली' : 'Category Not Found'}
+          </p>
+          <Link
+            to="/bhajan"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gold text-primary-foreground font-medium"
+          >
+            {language === 'hi' ? 'सभी भजन श्रेणियाँ' : 'All Bhajan Categories'}
+          </Link>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

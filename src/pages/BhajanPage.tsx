@@ -210,19 +210,20 @@ const BhajanPage = () => {
   const [hindiContainerEl, setHindiContainerEl] = useState<HTMLDivElement | null>(null);
   const [romanContainerEl, setRomanContainerEl] = useState<HTMLDivElement | null>(null);
 
-  const bhajan = getBhajanById(subdivisionId || '', bhajanId || '');
-  if (!bhajan) return null;
-
   const [activeAudioMode, setActiveAudioMode] = useState<'bhajan' | 'karaoke' | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const subdivision = subdivisions.find(s => s.id === bhajan.subdivision);
-  const related = getRelatedBhajans(bhajan, 4);
+  const bhajan = getBhajanById(subdivisionId || '', bhajanId || '');
+  const lyricsText = bhajan?.lyrics || '';
 
-  const currentAudioSource = activeAudioMode === 'karaoke' ? bhajan.karaokeUrl : bhajan.audioUrl;
+  const subdivision = bhajan ? subdivisions.find(s => s.id === bhajan.subdivision) : undefined;
+  const related = bhajan ? getRelatedBhajans(bhajan, 4) : [];
+
+  const currentAudioSource = activeAudioMode === 'karaoke' ? bhajan?.karaokeUrl : bhajan?.audioUrl;
 
   const handleToggleAudio = (mode: 'bhajan' | 'karaoke') => {
+    if (!bhajan) return;
     const targetUrl = mode === 'karaoke' ? bhajan.karaokeUrl : bhajan.audioUrl;
     if (!targetUrl) return;
 
@@ -248,8 +249,8 @@ const BhajanPage = () => {
 
   // Generate romanized text only when roman script is toggled on
   const romanizedLyrics = useMemo(() => {
-    return showRoman ? transliterateText(bhajan.lyrics) : '';
-  }, [showRoman, bhajan.lyrics]);
+    return showRoman && lyricsText ? transliterateText(lyricsText) : '';
+  }, [showRoman, lyricsText]);
 
   const parseBhajanLyrics = (rawText: string): ParsedStanza[] => {
     if (!rawText) return [];
@@ -292,19 +293,21 @@ const BhajanPage = () => {
     });
   };
 
-  const parsedHindi = useMemo(() => parseBhajanLyrics(bhajan.lyrics), [bhajan.lyrics]);
+  const parsedHindi = useMemo(() => parseBhajanLyrics(lyricsText), [lyricsText]);
   const hindiSizing = useDynamicBhajanFontSize(parsedHindi, hindiContainerEl, false);
 
   const parsedRoman = useMemo(() => (showRoman ? parseBhajanLyrics(romanizedLyrics) : []), [showRoman, romanizedLyrics]);
   const romanSizing = useDynamicBhajanFontSize(parsedRoman, romanContainerEl, true);
 
   const handleCopy = () => {
+    if (!bhajan) return;
     navigator.clipboard.writeText(bhajan.lyrics);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handlePdfDownload = async () => {
+    if (!bhajan) return;
     const { generateBhajanPdf } = await import('@/lib/pdf-generator');
     await generateBhajanPdf({
       title: bhajan.title,
@@ -314,6 +317,31 @@ const BhajanPage = () => {
       theme,
     });
   };
+
+  if (!bhajan) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="pt-32 pb-16 px-4 text-center max-w-md mx-auto">
+          <h1 className="text-2xl md:text-3xl font-heading text-gradient-gold mb-3">
+            {language === 'hi' ? 'भजन नहीं मिला' : 'Bhajan Not Found'}
+          </h1>
+          <p className="text-muted-foreground mb-6">
+            {language === 'hi'
+              ? 'यह भजन उपलब्ध नहीं है या इसका लिंक बदल गया है।'
+              : 'This bhajan is not available or the link has changed.'}
+          </p>
+          <Link
+            to="/bhajan"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gold text-primary-foreground font-medium hover:opacity-90 transition-opacity"
+          >
+            {language === 'hi' ? 'भजन संग्रह पर लौटें' : 'Back to Bhajans'}
+          </Link>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   const renderLyricsBlock = (
     parsed: ParsedStanza[],
