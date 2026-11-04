@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { useLocation, useNavigate, Link } from 'react-router-dom';
+import React from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAudioPlayer } from '@/contexts/AudioPlayerContext';
 import { useApp } from '@/contexts/AppContext';
@@ -16,7 +16,6 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
-  GripHorizontal,
   Music,
 } from 'lucide-react';
 
@@ -30,7 +29,6 @@ export default function FloatingAudioController() {
     isMuted,
     isLooping,
     isMinimized,
-    hasUserMoved,
     togglePlayPause,
     seek,
     skip,
@@ -39,29 +37,31 @@ export default function FloatingAudioController() {
     toggleLoop,
     stopAndClose,
     toggleMinimize,
-    setHasUserMoved,
   } = useAudioPlayer();
 
   const { language, t } = useApp();
   const location = useLocation();
   const navigate = useNavigate();
-  const constraintsRef = useRef<HTMLDivElement>(null);
 
   // If no track is active, don't render anything
   if (!activeTrack) return null;
 
-  // Hide the floating controller if user is already on this bhajan's page
-  const isCurrentBhajanPage =
-    location.pathname === activeTrack.pageUrl ||
-    location.pathname.endsWith(`/${activeTrack.bhajanId}`) ||
-    (location.pathname.includes('/bhajan/') && location.pathname.includes(activeTrack.bhajanId));
+  // Check if user is on the exact, matching bhajan page for the active track
+  const decodedPath = decodeURIComponent(location.pathname).replace(/\/+$/, '');
+  const decodedTrackPage = decodeURIComponent(activeTrack.pageUrl).replace(/\/+$/, '');
 
-  if (isCurrentBhajanPage) return null;
+  const pathParts = decodedPath.split('/').filter(Boolean);
+  const isExactCurrentBhajan =
+    decodedPath === decodedTrackPage ||
+    (pathParts.length >= 3 &&
+      pathParts[0] === 'bhajan' &&
+      pathParts[1].toLowerCase() === activeTrack.subdivisionId.toLowerCase() &&
+      (pathParts[2] === activeTrack.bhajanId ||
+        pathParts[2] === activeTrack.title ||
+        pathParts.slice(2).join('/') === activeTrack.bhajanId));
 
-  // Check if current route is a Shastra/Granth page
-  const isShastraPage =
-    location.pathname.startsWith('/shastra') ||
-    location.pathname.startsWith('/granth');
+  // The console is removed ONLY when on the correct bhajan page
+  if (isExactCurrentBhajan) return null;
 
   const formatTime = (secs: number) => {
     if (isNaN(secs) || secs < 0) return '0:00';
@@ -82,79 +82,63 @@ export default function FloatingAudioController() {
     navigate(activeTrack.pageUrl);
   };
 
-  // Automatic positioning classes if the user hasn't manually dragged it yet
-  const defaultPositionClasses = !hasUserMoved
-    ? isShastraPage
-      ? 'bottom-6 right-4 sm:right-6'
-      : 'bottom-6 left-1/2 -translate-x-1/2'
-    : '';
-
   return (
     <div
-      ref={constraintsRef}
-      className="fixed inset-0 pointer-events-none z-50 overflow-hidden"
+      className="fixed z-50 pointer-events-auto cursor-default select-none
+        bottom-4 left-1/2 -translate-x-1/2
+        sm:bottom-6 sm:right-6 sm:left-auto sm:translate-x-0"
     >
-      <motion.div
-        drag
-        dragMomentum={false}
-        dragConstraints={constraintsRef}
-        onDragStart={() => setHasUserMoved(true)}
-        initial={{ opacity: 0, scale: 0.9, y: 30 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.8, y: 20 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className={`pointer-events-auto fixed select-none cursor-grab active:cursor-grabbing ${defaultPositionClasses}`}
-      >
-        <AnimatePresence mode="wait">
-          {isMinimized ? (
-            /* MINIMIZED PILL VIEW */
-            <motion.div
-              key="minimized"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="flex items-center gap-2 px-3 py-2 rounded-full bg-card/95 backdrop-blur-xl border border-gold/40 shadow-2xl shadow-gold/15 text-foreground hover:border-gold transition-colors"
-            >
-              {/* Disc / Music Note Icon with Audio Wave */}
-              <button
-                onClick={handleGoToBhajan}
-                className="flex items-center gap-1.5 text-gold hover:text-gold-light transition-colors"
-                title={language === 'hi' ? 'भजन पर जाएँ' : 'Take me to Bhajan'}
-              >
-                <div className="relative w-7 h-7 rounded-full bg-gold/15 border border-gold/30 flex items-center justify-center">
-                  <Music className={`w-3.5 h-3.5 text-gold ${isPlaying ? 'animate-pulse' : ''}`} />
-                  {isPlaying && (
-                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-                  )}
-                </div>
-              </button>
-
-              {/* Title & Equalizer bars */}
-              <div
-                onClick={handleGoToBhajan}
-                className="cursor-pointer flex items-center gap-2 max-w-[140px] sm:max-w-[200px]"
-                title={activeTrack.title}
-              >
-                <span className="text-xs font-semibold truncate text-foreground/90">
-                  {activeTrack.title}
-                </span>
-
+      <AnimatePresence mode="wait">
+        {isMinimized ? (
+          /* TRIMMED / MINIMIZED HORIZONTAL PILL VIEW */
+          <motion.div
+            key="minimized"
+            initial={{ opacity: 0, scale: 0.9, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 10 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+            className="w-[94vw] sm:w-auto sm:min-w-[400px] sm:max-w-[480px] flex items-center justify-between gap-2.5 px-3.5 py-1.5 sm:py-2 rounded-full bg-card/95 backdrop-blur-xl border border-gold/40 shadow-2xl shadow-gold/15 text-foreground hover:border-gold transition-colors cursor-default"
+          >
+            {/* Left: Music badge + Title + Singer + Equalizer */}
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="relative w-6 h-6 rounded-full bg-gold/15 border border-gold/30 flex items-center justify-center flex-shrink-0">
+                <Music className={`w-3 h-3 text-gold ${isPlaying ? 'animate-pulse' : ''}`} />
                 {isPlaying && (
-                  <div className="flex items-end gap-0.5 h-3 flex-shrink-0">
-                    <span className="w-0.5 h-2 bg-gold rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-0.5 h-3 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-0.5 h-1.5 bg-gold rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
+                  <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
                 )}
               </div>
 
+              <div className="flex items-center gap-1.5 min-w-0 truncate">
+                <span className="text-xs font-semibold truncate text-foreground/90">
+                  {activeTrack.title}
+                </span>
+                {activeTrack.singer && (
+                  <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">
+                    • {activeTrack.singer}
+                  </span>
+                )}
+              </div>
+
+              {isPlaying && (
+                <div className="flex items-end gap-0.5 h-2.5 flex-shrink-0">
+                  <span className="w-0.5 h-2 bg-gold rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-0.5 h-2.5 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-0.5 h-1.5 bg-gold rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              )}
+            </div>
+
+            {/* Right: Time badge + Play/Pause + Go to Bhajan + Expand + Close */}
+            <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+              {/* Current time display */}
+              <span className="font-mono text-[10px] text-gold/90 px-1.5 py-0.5 rounded bg-gold/10 hidden sm:inline">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </span>
+
               {/* Mini Play / Pause */}
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  togglePlayPause();
-                }}
-                className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-600 to-gold text-primary-foreground flex items-center justify-center shadow-md shadow-gold/20 hover:scale-105 active:scale-95 transition-transform"
+                onClick={togglePlayPause}
+                className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-600 to-gold text-primary-foreground flex items-center justify-center shadow-md shadow-gold/20 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
                 title={isPlaying ? t('pauseAudio') : t('playBhajan')}
               >
                 {isPlaying ? (
@@ -164,13 +148,19 @@ export default function FloatingAudioController() {
                 )}
               </button>
 
+              {/* Go to Bhajan Icon Button */}
+              <button
+                onClick={handleGoToBhajan}
+                className="p-1 rounded-full text-muted-foreground hover:text-gold hover:bg-gold/10 transition-colors cursor-pointer"
+                title={language === 'hi' ? 'भजन पर जाएँ' : 'Take me to Bhajan'}
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+              </button>
+
               {/* Expand button */}
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleMinimize();
-                }}
-                className="p-1 rounded-full text-muted-foreground hover:text-gold hover:bg-gold/10 transition-colors"
+                onClick={toggleMinimize}
+                className="p-1 rounded-full text-muted-foreground hover:text-gold hover:bg-gold/10 transition-colors cursor-pointer"
                 title={language === 'hi' ? 'बड़ा करें' : 'Expand Controller'}
               >
                 <ChevronUp className="w-3.5 h-3.5" />
@@ -178,113 +168,101 @@ export default function FloatingAudioController() {
 
               {/* Stop & Remove */}
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  stopAndClose();
-                }}
-                className="p-1 rounded-full text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                onClick={stopAndClose}
+                className="p-1 rounded-full text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
                 title={language === 'hi' ? 'बंद करें और हटाएं' : 'Stop and Remove'}
               >
                 <X className="w-3.5 h-3.5" />
               </button>
-            </motion.div>
-          ) : (
-            /* EXPANDED FLOATING WIDGET */
-            <motion.div
-              key="expanded"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="w-[92vw] sm:w-[390px] p-3.5 sm:p-4 rounded-2xl bg-card/95 backdrop-blur-2xl border border-gold/40 shadow-2xl shadow-gold/20 flex flex-col gap-2.5 text-foreground"
-            >
-              {/* Drag Handle & Top Header Row */}
-              <div className="flex items-center justify-between gap-2 border-b border-border/40 pb-2">
-                <div className="flex items-center gap-1.5 text-muted-foreground cursor-grab">
-                  <GripHorizontal className="w-4 h-4 text-gold/60" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-gold animate-pulse" />
-                  <span className="text-[11px] font-semibold text-gold uppercase tracking-wider">
-                    {language === 'hi' ? 'भजन बैकग्राउंड में चालू' : 'Playing in Background'}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  {/* Take me to Bhajan Button */}
-                  <button
-                    onClick={handleGoToBhajan}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all border border-gold/30"
-                    title={language === 'hi' ? 'भजन पृष्ठ पर जाएँ' : 'Take me to Bhajan page'}
-                  >
-                    <span>{language === 'hi' ? 'भजन पर जाएँ' : 'Go to Bhajan'}</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </button>
-
-                  {/* Minimize Button */}
-                  <button
-                    onClick={toggleMinimize}
-                    className="p-1 rounded-lg text-muted-foreground hover:text-gold hover:bg-gold/10 transition-colors"
-                    title={language === 'hi' ? 'छोटा करें' : 'Minimize Controller'}
-                  >
-                    <ChevronDown className="w-4 h-4" />
-                  </button>
-
-                  {/* Stop & Remove Controller */}
-                  <button
-                    onClick={stopAndClose}
-                    className="p-1 rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
-                    title={language === 'hi' ? 'बंद करें और हटाएं' : 'Stop & Close'}
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Title & Singer */}
-              <div className="flex items-center justify-between gap-2">
-                <div
-                  onClick={handleGoToBhajan}
-                  className="cursor-pointer min-w-0 flex-1 hover:text-gold transition-colors"
-                >
-                  <h4 className="text-sm font-semibold truncate devanagari-safe">{activeTrack.title}</h4>
-                  {activeTrack.singer && (
-                    <p className="text-[11px] text-muted-foreground truncate">🎤 {activeTrack.singer}</p>
+            </div>
+          </motion.div>
+        ) : (
+          /* EXPANDED HORIZONTAL SPOTIFY-STYLE CONSOLE (REDUCED VERTICAL HEIGHT, INCREASED WIDTH) */
+          <motion.div
+            key="expanded"
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 15 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+            className="w-[95vw] sm:w-[520px] md:w-[570px] p-2.5 sm:p-3 rounded-2xl bg-card/95 backdrop-blur-2xl border border-gold/40 shadow-2xl shadow-gold/20 flex flex-col gap-1.5 text-foreground cursor-default"
+          >
+            {/* Row 1: Track Info (Left) | Center Controls | Volume & Actions (Right) */}
+            <div className="flex items-center justify-between gap-2">
+              {/* Left: Track badge, Title & Singer */}
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className="relative w-8 h-8 rounded-full bg-gold/15 border border-gold/30 flex items-center justify-center flex-shrink-0">
+                  <Music className={`w-3.5 h-3.5 text-gold ${isPlaying ? 'animate-pulse' : ''}`} />
+                  {isPlaying && (
+                    <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
                   )}
                 </div>
 
-                {/* Equalizer animation */}
+                <div className="min-w-0 flex-1 cursor-default">
+                  <h4 className="text-xs sm:text-sm font-semibold truncate devanagari-safe leading-tight">{activeTrack.title}</h4>
+                  {activeTrack.singer && (
+                    <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate leading-tight">🎤 {activeTrack.singer}</p>
+                  )}
+                </div>
+
                 {isPlaying && (
-                  <div className="flex items-end gap-0.5 h-4 px-1.5">
-                    <span className="w-0.5 h-3 bg-gold rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-0.5 h-4 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '120ms' }} />
-                    <span className="w-0.5 h-2 bg-gold rounded-full animate-bounce" style={{ animationDelay: '240ms' }} />
-                    <span className="w-0.5 h-3.5 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '180ms' }} />
+                  <div className="hidden sm:flex items-end gap-0.5 h-3 px-0.5 flex-shrink-0">
+                    <span className="w-0.5 h-2 bg-gold rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-0.5 h-3 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '120ms' }} />
+                    <span className="w-0.5 h-1.5 bg-gold rounded-full animate-bounce" style={{ animationDelay: '240ms' }} />
                   </div>
                 )}
               </div>
 
-              {/* Progress Scrubber + Time */}
-              <div className="flex flex-col gap-1">
-                <input
-                  type="range"
-                  min={0}
-                  max={duration || 100}
-                  step={0.1}
-                  value={currentTime}
-                  onChange={handleSeek}
-                  className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-gold hover:accent-gold-light focus:outline-none"
-                />
-                <div className="flex justify-between items-center text-[10px] text-muted-foreground font-mono px-0.5">
-                  <span>{formatTime(currentTime)}</span>
-                  <span>{formatTime(duration)}</span>
-                </div>
+              {/* Center: Playback Controls (Rewind 10s, Glowing Play/Pause, Forward 10s, Repeat) */}
+              <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                <button
+                  onClick={() => skip(-10)}
+                  className="p-1 sm:p-1.5 rounded-lg text-muted-foreground hover:text-gold hover:bg-gold/10 transition-colors cursor-pointer"
+                  title="Rewind 10s"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  onClick={togglePlayPause}
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-tr from-amber-600 via-gold to-yellow-300 text-primary-foreground flex items-center justify-center shadow-md shadow-gold/25 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+                  title={isPlaying ? t('pauseAudio') : t('playBhajan')}
+                >
+                  {isPlaying ? (
+                    <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-current" />
+                  ) : (
+                    <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-current translate-x-0.5" />
+                  )}
+                </button>
+
+                <button
+                  onClick={() => skip(10)}
+                  className="p-1 sm:p-1.5 rounded-lg text-muted-foreground hover:text-gold hover:bg-gold/10 transition-colors cursor-pointer"
+                  title="Forward 10s"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  onClick={toggleLoop}
+                  className={`p-1 sm:p-1.5 rounded-lg border transition-all cursor-pointer ${
+                    isLooping
+                      ? 'bg-gold/20 text-gold border-gold/50 shadow-sm shadow-gold/20'
+                      : 'text-muted-foreground border-transparent hover:text-gold hover:bg-gold/10'
+                  }`}
+                  title={isLooping ? (language === 'hi' ? 'दोहराना चालू (Repeat On)' : 'Repeat On') : (language === 'hi' ? 'दोहराना बंद (Repeat Off)' : 'Repeat Off')}
+                >
+                  <Repeat className="w-3.5 h-3.5" />
+                </button>
               </div>
 
-              {/* Bottom Controls Row: Volume (Left) | Rewind + Play + Forward (Center) | Repeat (Right) */}
-              <div className="flex items-center justify-between pt-0.5 gap-2">
-                {/* Volume Control */}
-                <div className="flex items-center gap-1 min-w-[70px] sm:min-w-[90px]">
+              {/* Right: Volume & Actions (Go to Bhajan, Minimize, Close) */}
+              <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+                {/* Volume slider on sm+ screens */}
+                <div className="hidden sm:flex items-center gap-1">
                   <button
                     onClick={toggleMute}
-                    className="p-1 rounded-lg text-muted-foreground hover:text-gold transition-colors flex-shrink-0"
+                    className="p-1 rounded-lg text-muted-foreground hover:text-gold transition-colors flex-shrink-0 cursor-pointer"
                     title={isMuted ? 'Unmute' : 'Mute'}
                   >
                     {isMuted || volume === 0 ? (
@@ -302,61 +280,63 @@ export default function FloatingAudioController() {
                     step={0.01}
                     value={isMuted ? 0 : volume}
                     onChange={handleVolumeChange}
-                    className="w-12 sm:w-16 h-1 bg-secondary rounded-lg appearance-none cursor-pointer accent-gold hover:accent-gold-light focus:outline-none"
+                    className="w-14 h-1 bg-secondary rounded-lg appearance-none cursor-pointer accent-gold hover:accent-gold-light focus:outline-none"
                   />
                 </div>
 
-                {/* Center Playback Controls */}
-                <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                  <button
-                    onClick={() => skip(-10)}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-gold hover:bg-gold/10 transition-colors"
-                    title="Rewind 10s"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                  </button>
+                <div className="w-[1px] h-3.5 bg-border/40 hidden sm:block mx-0.5" />
 
-                  <button
-                    onClick={togglePlayPause}
-                    className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-600 via-gold to-yellow-300 text-primary-foreground flex items-center justify-center shadow-lg shadow-gold/25 hover:scale-105 active:scale-95 transition-transform"
-                    title={isPlaying ? t('pauseAudio') : t('playBhajan')}
-                  >
-                    {isPlaying ? (
-                      <Pause className="w-4 h-4 fill-current" />
-                    ) : (
-                      <Play className="w-4 h-4 fill-current translate-x-0.5" />
-                    )}
-                  </button>
+                {/* Go to Bhajan */}
+                <button
+                  onClick={handleGoToBhajan}
+                  className="p-1 sm:px-2 sm:py-0.5 rounded-lg text-[11px] font-medium bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all border border-gold/30 flex items-center gap-1 cursor-pointer"
+                  title={language === 'hi' ? 'भजन पृष्ठ पर जाएँ' : 'Take me to Bhajan page'}
+                >
+                  <span className="hidden md:inline">{language === 'hi' ? 'भजन' : 'Bhajan'}</span>
+                  <ExternalLink className="w-3 h-3" />
+                </button>
 
-                  <button
-                    onClick={() => skip(10)}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-gold hover:bg-gold/10 transition-colors"
-                    title="Forward 10s"
-                  >
-                    <RotateCw className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                {/* Minimize Button */}
+                <button
+                  onClick={toggleMinimize}
+                  className="p-1 rounded-lg text-muted-foreground hover:text-gold hover:bg-gold/10 transition-colors cursor-pointer"
+                  title={language === 'hi' ? 'छोटा करें' : 'Minimize Controller'}
+                >
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
 
-                {/* Repeat / Loop Toggle */}
-                <div className="flex items-center justify-end min-w-[70px] sm:min-w-[90px]">
-                  <button
-                    onClick={toggleLoop}
-                    className={`p-1.5 rounded-lg border transition-all ${
-                      isLooping
-                        ? 'bg-gold/20 text-gold border-gold/50 shadow-sm shadow-gold/20'
-                        : 'text-muted-foreground border-transparent hover:text-gold hover:bg-gold/10'
-                    }`}
-                    title={isLooping ? (language === 'hi' ? 'दोहराना चालू (Repeat On)' : 'Repeat On') : (language === 'hi' ? 'दोहराना बंद (Repeat Off)' : 'Repeat Off')}
-                  >
-                    <Repeat className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                {/* Stop & Remove Controller */}
+                <button
+                  onClick={stopAndClose}
+                  className="p-1 rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                  title={language === 'hi' ? 'बंद करें और हटाएं' : 'Stop & Close'}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+            </div>
+
+            {/* Row 2: Thin Inline Scrubber with Timestamps */}
+            <div className="flex items-center gap-2 px-1 pt-0.5">
+              <span className="text-[10px] text-muted-foreground font-mono w-7 text-right flex-shrink-0 cursor-default">
+                {formatTime(currentTime)}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={duration || 100}
+                step={0.1}
+                value={currentTime}
+                onChange={handleSeek}
+                className="flex-1 h-1 bg-secondary rounded-lg appearance-none cursor-pointer accent-gold hover:accent-gold-light focus:outline-none"
+              />
+              <span className="text-[10px] text-muted-foreground font-mono w-7 text-left flex-shrink-0 cursor-default">
+                {formatTime(duration)}
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
-
