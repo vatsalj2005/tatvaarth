@@ -1,8 +1,10 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AppProvider } from "@/contexts/AppContext";
+import { AudioPlayerProvider } from "@/contexts/AudioPlayerContext";
 import ScrollToTop from "./components/ScrollToTop";
 import ErrorBoundary from "./components/ErrorBoundary";
+import FloatingAudioController from "./components/FloatingAudioController";
 
 // Core routes directly imported for instant 0ms navigation without chunk load failures
 import Index from "./pages/Index";
@@ -27,27 +29,30 @@ export default function App() {
     <ErrorBoundary>
       <AppProvider>
         <BrowserRouter basename="/tatvaarth">
-          <ScrollToTop />
-          <Suspense fallback={<PageFallback />}>
-            <Routes>
-              <Route path="/" element={<Index />} />
+          <AudioPlayerProvider>
+            <ScrollToTop />
+            <Suspense fallback={<PageFallback />}>
+              <Routes>
+                <Route path="/" element={<Index />} />
 
-              <Route path="/bhajan" element={<BhajanLanding />} />
-              <Route path="/bhajan/:subdivisionId" element={<SubdivisionPage />} />
-              <Route path="/bhajan/:subdivisionId/:bhajanId" element={<BhajanPage />} />
+                <Route path="/bhajan" element={<BhajanLanding />} />
+                <Route path="/bhajan/:subdivisionId" element={<SubdivisionPage />} />
+                <Route path="/bhajan/:subdivisionId/:bhajanId" element={<BhajanPage />} />
 
-              <Route path="/shastra" element={<ShastraLanding />} />
-              <Route path="/shastra/:categorySlug" element={<ShastraLanding />} />
-              <Route path="/shastra/:categorySlug/:shastraSlug" element={<ShastraReader />} />
+                <Route path="/shastra" element={<ShastraLanding />} />
+                <Route path="/shastra/:categorySlug" element={<ShastraLanding />} />
+                <Route path="/shastra/:categorySlug/:shastraSlug" element={<ShastraReader />} />
 
-              <Route path="/pooja" element={<ComingSoon title="पूजा | Pooja" />} />
-              <Route path="/granth" element={<ShastraLanding />} />
-              <Route path="/teeka" element={<ShastraLanding />} />
-              <Route path="/paath" element={<ComingSoon title="पाठ | Paath" />} />
+                <Route path="/pooja" element={<ComingSoon title="पूजा | Pooja" />} />
+                <Route path="/granth" element={<ShastraLanding />} />
+                <Route path="/teeka" element={<ShastraLanding />} />
+                <Route path="/paath" element={<ComingSoon title="पाठ | Paath" />} />
 
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+            <FloatingAudioController />
+          </AudioPlayerProvider>
         </BrowserRouter>
       </AppProvider>
     </ErrorBoundary>

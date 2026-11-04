@@ -2,11 +2,12 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useApp } from '@/contexts/AppContext';
+import { useAudioPlayer } from '@/contexts/AudioPlayerContext';
 import { getBhajanById, getRelatedBhajans, subdivisions } from '@/data/content-loader';
 import { transliterateText } from '@/lib/transliterate';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { Play, Pause, Copy, Check, Volume2, VolumeX, Download, Music, Type, Mic, RotateCcw, RotateCw } from 'lucide-react';
+import { Play, Pause, Copy, Check, Volume2, Volume1, VolumeX, Download, Music, Type, Mic, RotateCcw, RotateCw, Repeat } from 'lucide-react';
 
 /**
  * Extracts all flattened line strings as rendered in the bhajan.
@@ -230,23 +231,47 @@ const BhajanPage = () => {
   const subdivision = bhajan ? subdivisions.find(s => s.id === bhajan.subdivision) : undefined;
   const related = bhajan ? getRelatedBhajans(bhajan, 4) : [];
 
-  const defaultMode = bhajan?.audioUrl ? 'bhajan' : bhajan?.karaokeUrl ? 'karaoke' : null;
-  const [activeAudioMode, setActiveAudioMode] = useState<'bhajan' | 'karaoke' | null>(defaultMode);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isMuted, setIsMuted] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const {
+    activeTrack,
+    activeAudioMode: globalAudioMode,
+    isPlaying: isGlobalPlaying,
+    currentTime: globalCurrentTime,
+    duration: globalDuration,
+    volume,
+    isMuted,
+    isLooping,
+    downloadState: globalDownloadState,
+    downloadProgress: globalDownloadProgress,
+    playTrack,
+    togglePlayPause,
+    seek,
+    skip,
+    setVolume,
+    toggleMute,
+    toggleLoop,
+    selectAudioMode,
+    downloadAudio,
+  } = useAudioPlayer();
 
-  useEffect(() => {
-    const nextMode = bhajan?.audioUrl ? 'bhajan' : bhajan?.karaokeUrl ? 'karaoke' : null;
-    setActiveAudioMode(nextMode);
-    setIsPlaying(false);
-    setCurrentTime(0);
-    setDuration(0);
-  }, [bhajan?.id]);
+  const isThisBhajanActive =
+    activeTrack !== null &&
+    (activeTrack.bhajanId === bhajan?.slug ||
+      activeTrack.bhajanId === bhajan?.id ||
+      activeTrack.title === bhajan?.title);
 
-  const currentAudioSource = activeAudioMode === 'karaoke' ? bhajan?.karaokeUrl : bhajan?.audioUrl;
+  const [localAudioMode, setLocalAudioMode] = useState<'bhajan' | 'karaoke'>(() => {
+    return bhajan?.audioUrl ? 'bhajan' : bhajan?.karaokeUrl ? 'karaoke' : 'bhajan';
+  });
+
+  const activeAudioMode = isThisBhajanActive ? globalAudioMode : localAudioMode;
+  const isPlaying = isThisBhajanActive && isGlobalPlaying;
+  const currentTime = isThisBhajanActive ? globalCurrentTime : 0;
+  const duration = isThisBhajanActive ? globalDuration : 0;
+  const downloadState = isThisBhajanActive ? globalDownloadState : 'idle';
+  const downloadProgress = isThisBhajanActive ? globalDownloadProgress : 0;
+
+  const currentAudioSource =
+    activeAudioMode === 'karaoke' ? bhajan?.karaokeUrl : bhajan?.audioUrl;
 
   const formatTime = (secs: number) => {
     if (isNaN(secs) || secs < 0) return '0:00';
@@ -256,49 +281,53 @@ const BhajanPage = () => {
   };
 
   const handlePlayPause = () => {
-    if (!audioRef.current || !currentAudioSource) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
+    if (!bhajan || !currentAudioSource) return;
+    if (isThisBhajanActive) {
+      togglePlayPause();
     } else {
-      audioRef.current.play().catch(console.error);
-      setIsPlaying(true);
+      playTrack(bhajan, activeAudioMode, true);
     }
   };
 
   const handleSelectAudioMode = (mode: 'bhajan' | 'karaoke') => {
-    if (activeAudioMode === mode) return;
-    setActiveAudioMode(mode);
-    setIsPlaying(true);
-    setCurrentTime(0);
-    setTimeout(() => {
-      if (audioRef.current) {
-        audioRef.current.load();
-        audioRef.current.play().catch(console.error);
-      }
-    }, 50);
+    setLocalAudioMode(mode);
+    if (!bhajan) return;
+    if (isThisBhajanActive) {
+      selectAudioMode(mode);
+    } else {
+      playTrack(bhajan, mode, true);
+    }
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(e.target.value);
-    setCurrentTime(newTime);
-    if (audioRef.current) {
-      audioRef.current.currentTime = newTime;
+    if (isThisBhajanActive) {
+      seek(newTime);
     }
   };
 
   const handleSkip = (seconds: number) => {
-    if (!audioRef.current) return;
-    const newTime = Math.max(0, Math.min(duration || 0, audioRef.current.currentTime + seconds));
-    audioRef.current.currentTime = newTime;
-    setCurrentTime(newTime);
+    if (isThisBhajanActive) {
+      skip(seconds);
+    }
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setVolume(parseFloat(e.target.value));
   };
 
   const handleToggleMute = () => {
-    if (!audioRef.current) return;
-    const nextMuted = !isMuted;
-    audioRef.current.muted = nextMuted;
-    setIsMuted(nextMuted);
+    toggleMute();
+  };
+
+  const handleDownloadAudio = () => {
+    if (!bhajan || !currentAudioSource) return;
+    if (isThisBhajanActive) {
+      downloadAudio();
+    } else {
+      playTrack(bhajan, activeAudioMode, false);
+      setTimeout(() => downloadAudio(), 100);
+    }
   };
 
   // Generate romanized text only when roman script is toggled on
@@ -552,23 +581,6 @@ const BhajanPage = () => {
             transition={{ delay: 0.2 }}
             className="w-full flex flex-col items-center mb-8"
           >
-            {/* Hidden native audio element for sound playback */}
-            {currentAudioSource && (
-              <audio
-                ref={audioRef}
-                src={currentAudioSource}
-                onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime || 0)}
-                onLoadedMetadata={() => setDuration(audioRef.current?.duration || 0)}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                onEnded={() => {
-                  setIsPlaying(false);
-                  setCurrentTime(0);
-                }}
-                className="hidden"
-              />
-            )}
-
             {/* Custom Devotional Audio Player Card (renders when audio exists) */}
             {currentAudioSource ? (
               <div className="w-full max-w-lg mb-4 p-4 sm:p-5 rounded-2xl bg-card/90 backdrop-blur-md border border-gold/30 shadow-lg shadow-gold/5 flex flex-col gap-3.5">
@@ -629,11 +641,37 @@ const BhajanPage = () => {
                   </div>
                 </div>
 
-                {/* Main Audio Controls: Rewind 10s | Single Gold Play-Pause | Forward 10s | Mute */}
-                <div className="flex items-center justify-between pt-1 px-2">
-                  <div className="w-8" />
+                {/* Main Audio Controls: Volume (Left) | Rewind 10s + Gold Play/Pause + Forward 10s (Center) | Repeat & Download (Right) */}
+                <div className="flex items-center justify-between pt-1 px-1 sm:px-2 gap-2">
+                  {/* Left: Volume Mute Toggle + Slider */}
+                  <div className="flex items-center gap-1 sm:gap-1.5 min-w-[76px] sm:min-w-[120px]">
+                    <button
+                      onClick={handleToggleMute}
+                      className="p-1.5 sm:p-2 rounded-xl text-muted-foreground hover:text-gold hover:bg-gold/10 transition-colors flex-shrink-0"
+                      title={isMuted ? (language === 'hi' ? 'आवाज़ खोलें' : 'Unmute') : (language === 'hi' ? 'म्यूट करें' : 'Mute')}
+                    >
+                      {isMuted || volume === 0 ? (
+                        <VolumeX className="w-4 h-4 text-amber-500" />
+                      ) : volume < 0.5 ? (
+                        <Volume1 className="w-4 h-4" />
+                      ) : (
+                        <Volume2 className="w-4 h-4" />
+                      )}
+                    </button>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={isMuted ? 0 : volume}
+                      onChange={handleVolumeChange}
+                      className="w-12 sm:w-20 h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-gold hover:accent-gold-light focus:outline-none transition-all"
+                      title={`${language === 'hi' ? 'वॉल्यूम' : 'Volume'}: ${Math.round((isMuted ? 0 : volume) * 100)}%`}
+                    />
+                  </div>
 
-                  <div className="flex items-center gap-3 sm:gap-4">
+                  {/* Center: Rewind 10s | Single Glowing Gold Play-Pause | Forward 10s */}
+                  <div className="flex items-center gap-2.5 sm:gap-4 flex-shrink-0">
                     {/* Rewind 10s */}
                     <button
                       onClick={() => handleSkip(-10)}
@@ -666,18 +704,77 @@ const BhajanPage = () => {
                     </button>
                   </div>
 
-                  {/* Mute/Volume Toggle */}
-                  <button
-                    onClick={handleToggleMute}
-                    className="p-2 rounded-xl text-muted-foreground hover:text-gold hover:bg-gold/10 transition-colors"
-                    title={isMuted ? "Unmute" : "Mute"}
-                  >
-                    {isMuted ? (
-                      <VolumeX className="w-4 h-4 text-amber-500" />
+                  {/* Right: Repeat Toggle & Audio Download Button */}
+                  <div className="flex items-center justify-end gap-1 sm:gap-1.5 min-w-[76px] sm:min-w-[120px]">
+                    {/* Repeat Button */}
+                    <button
+                      onClick={toggleLoop}
+                      className={`p-2 rounded-xl border transition-all ${
+                        isLooping
+                          ? 'bg-gold/20 text-gold border-gold/50 shadow-sm shadow-gold/20'
+                          : 'text-muted-foreground border-transparent hover:text-gold hover:bg-gold/10'
+                      }`}
+                      title={isLooping ? (language === 'hi' ? 'दोहराना चालू (Repeat On)' : 'Repeat On') : (language === 'hi' ? 'दोहराना बंद (Repeat Off)' : 'Repeat Off')}
+                    >
+                      <Repeat className="w-4 h-4" />
+                    </button>
+
+                    {/* Download Button */}
+                    {downloadState === 'downloading' ? (
+                      <div
+                        className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-gold/10 border border-gold/20"
+                        title={downloadProgress > 0 ? `${downloadProgress}%` : (language === 'hi' ? 'डाउनलोड हो रहा है...' : 'Downloading...')}
+                      >
+                        <svg className="w-7 h-7 -rotate-90 text-gold" viewBox="0 0 36 36">
+                          <circle
+                            className="text-border/40"
+                            strokeWidth="3"
+                            stroke="currentColor"
+                            fill="transparent"
+                            r="14"
+                            cx="18"
+                            cy="18"
+                          />
+                          <circle
+                            className="text-gold transition-all duration-150"
+                            strokeWidth="3"
+                            strokeDasharray={88}
+                            strokeDashoffset={88 - (88 * (downloadProgress || 20)) / 100}
+                            strokeLinecap="round"
+                            stroke="currentColor"
+                            fill="transparent"
+                            r="14"
+                            cx="18"
+                            cy="18"
+                          />
+                        </svg>
+                        <motion.div
+                          className="absolute"
+                          animate={{ y: [-1.5, 1.5, -1.5] }}
+                          transition={{ repeat: Infinity, duration: 0.9, ease: 'easeInOut' }}
+                        >
+                          <Download className="w-3.5 h-3.5 text-gold" />
+                        </motion.div>
+                      </div>
+                    ) : downloadState === 'completed' ? (
+                      <motion.div
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="p-2 rounded-xl text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center"
+                        title={language === 'hi' ? 'डाउनलोड पूरा हुआ' : 'Downloaded'}
+                      >
+                        <Check className="w-4 h-4" />
+                      </motion.div>
                     ) : (
-                      <Volume2 className="w-4 h-4" />
+                      <button
+                        onClick={handleDownloadAudio}
+                        className="p-2 rounded-xl text-muted-foreground hover:text-gold hover:bg-gold/10 border border-transparent hover:border-gold/20 transition-all"
+                        title={t('downloadAudio')}
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
                     )}
-                  </button>
+                  </div>
                 </div>
               </div>
             ) : (

@@ -32,8 +32,6 @@ const consonants: Record<string, string> = {
   'ड़': 'da', 'ढ़': 'dha', 'फ़': 'fa',
   '\u0958': 'qa', '\u0959': 'kha', '\u095a': 'ga', '\u095b': 'za',
   '\u095c': 'da', '\u095d': 'dha', '\u095e': 'fa', '\u095f': 'ya',
-  '\u0915\u093c': 'qa', '\u0916\u093c': 'kha', '\u0917\u093c': 'ga', '\u091c\u093c': 'za',
-  '\u0921\u093c': 'da', '\u0922\u093c': 'dha', '\u092b\u093c': 'fa', '\u092f\u093c': 'ya',
   'ळ': 'la', 'क्ष': 'ksha', 'ज्ञ': 'gya',
 };
 
