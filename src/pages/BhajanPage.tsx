@@ -6,7 +6,7 @@ import { getBhajanById, getRelatedBhajans, subdivisions } from '@/data/content-l
 import { transliterateText } from '@/lib/transliterate';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { Play, Pause, Copy, Check, VolumeX, Download, Music, Type, Mic } from 'lucide-react';
+import { Play, Pause, Copy, Check, Volume2, VolumeX, Download, Music, Type, Mic, RotateCcw, RotateCw } from 'lucide-react';
 
 /**
  * Extracts all flattened line strings as rendered in the bhajan.
@@ -224,41 +224,81 @@ const BhajanPage = () => {
   const [hindiContainerEl, setHindiContainerEl] = useState<HTMLDivElement | null>(null);
   const [romanContainerEl, setRomanContainerEl] = useState<HTMLDivElement | null>(null);
 
-  const [activeAudioMode, setActiveAudioMode] = useState<'bhajan' | 'karaoke' | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
   const bhajan = getBhajanById(subdivisionId || '', bhajanId || '');
   const lyricsText = bhajan?.lyrics || '';
 
   const subdivision = bhajan ? subdivisions.find(s => s.id === bhajan.subdivision) : undefined;
   const related = bhajan ? getRelatedBhajans(bhajan, 4) : [];
 
+  const defaultMode = bhajan?.audioUrl ? 'bhajan' : bhajan?.karaokeUrl ? 'karaoke' : null;
+  const [activeAudioMode, setActiveAudioMode] = useState<'bhajan' | 'karaoke' | null>(defaultMode);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const nextMode = bhajan?.audioUrl ? 'bhajan' : bhajan?.karaokeUrl ? 'karaoke' : null;
+    setActiveAudioMode(nextMode);
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+  }, [bhajan?.id]);
+
   const currentAudioSource = activeAudioMode === 'karaoke' ? bhajan?.karaokeUrl : bhajan?.audioUrl;
 
-  const handleToggleAudio = (mode: 'bhajan' | 'karaoke') => {
-    if (!bhajan) return;
-    const targetUrl = mode === 'karaoke' ? bhajan.karaokeUrl : bhajan.audioUrl;
-    if (!targetUrl) return;
+  const formatTime = (secs: number) => {
+    if (isNaN(secs) || secs < 0) return '0:00';
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
 
-    if (activeAudioMode === mode) {
-      if (isPlaying) {
-        audioRef.current?.pause();
-        setIsPlaying(false);
-      } else {
-        audioRef.current?.play().catch(console.error);
-        setIsPlaying(true);
-      }
+  const handlePlayPause = () => {
+    if (!audioRef.current || !currentAudioSource) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
     } else {
-      setActiveAudioMode(mode);
+      audioRef.current.play().catch(console.error);
       setIsPlaying(true);
-      setTimeout(() => {
-        if (audioRef.current) {
-          audioRef.current.load();
-          audioRef.current.play().catch(console.error);
-        }
-      }, 50);
     }
+  };
+
+  const handleSelectAudioMode = (mode: 'bhajan' | 'karaoke') => {
+    if (activeAudioMode === mode) return;
+    setActiveAudioMode(mode);
+    setIsPlaying(true);
+    setCurrentTime(0);
+    setTimeout(() => {
+      if (audioRef.current) {
+        audioRef.current.load();
+        audioRef.current.play().catch(console.error);
+      }
+    }, 50);
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTime = parseFloat(e.target.value);
+    setCurrentTime(newTime);
+    if (audioRef.current) {
+      audioRef.current.currentTime = newTime;
+    }
+  };
+
+  const handleSkip = (seconds: number) => {
+    if (!audioRef.current) return;
+    const newTime = Math.max(0, Math.min(duration || 0, audioRef.current.currentTime + seconds));
+    audioRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
+  const handleToggleMute = () => {
+    if (!audioRef.current) return;
+    const nextMuted = !isMuted;
+    audioRef.current.muted = nextMuted;
+    setIsMuted(nextMuted);
   };
 
   // Generate romanized text only when roman script is toggled on
@@ -512,105 +552,172 @@ const BhajanPage = () => {
             transition={{ delay: 0.2 }}
             className="w-full flex flex-col items-center mb-8"
           >
-            <div className="flex flex-wrap gap-2.5 sm:gap-3 justify-center items-center">
-              {/* Vocal Bhajan Audio button */}
-              {bhajan.audioUrl && (
-                <button
-                  onClick={() => handleToggleAudio('bhajan')}
-                  className={`flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-medium transition-all text-xs sm:text-sm ${
-                    activeAudioMode === 'bhajan' && isPlaying
-                      ? 'bg-gold text-primary-foreground shadow-lg shadow-gold/20'
-                      : 'bg-gold/90 hover:bg-gold text-primary-foreground'
-                  }`}
-                >
-                  {activeAudioMode === 'bhajan' && isPlaying ? (
-                    <>
-                      <Pause className="w-4 h-4" /> {t('pauseAudio')}
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-4 h-4" /> {t('playBhajan')}
-                    </>
+            {/* Hidden native audio element for sound playback */}
+            {currentAudioSource && (
+              <audio
+                ref={audioRef}
+                src={currentAudioSource}
+                onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime || 0)}
+                onLoadedMetadata={() => setDuration(audioRef.current?.duration || 0)}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onEnded={() => {
+                  setIsPlaying(false);
+                  setCurrentTime(0);
+                }}
+                className="hidden"
+              />
+            )}
+
+            {/* Custom Devotional Audio Player Card (renders when audio exists) */}
+            {currentAudioSource ? (
+              <div className="w-full max-w-lg mb-4 p-4 sm:p-5 rounded-2xl bg-card/90 backdrop-blur-md border border-gold/30 shadow-lg shadow-gold/5 flex flex-col gap-3.5">
+                {/* Top header row: Mode selector / Track info */}
+                <div className="flex items-center justify-between gap-2 border-b border-border/40 pb-2.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-gold animate-pulse flex-shrink-0" />
+                    <span className="text-xs font-semibold text-gold tracking-wide uppercase truncate">
+                      {activeAudioMode === 'karaoke' ? `${t('karaoke')} Track` : `${t('playBhajan')}`}
+                    </span>
+                  </div>
+
+                  {/* Vocal / Karaoke Segmented Selector if both tracks exist */}
+                  {bhajan.audioUrl && bhajan.karaokeUrl && (
+                    <div className="flex items-center bg-secondary/80 p-0.5 rounded-lg border border-border/50 text-xs">
+                      <button
+                        onClick={() => handleSelectAudioMode('bhajan')}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md font-medium transition-all ${
+                          activeAudioMode === 'bhajan'
+                            ? 'bg-gold text-primary-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <Music className="w-3 h-3" />
+                        <span>भजन</span>
+                      </button>
+                      <button
+                        onClick={() => handleSelectAudioMode('karaoke')}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md font-medium transition-all ${
+                          activeAudioMode === 'karaoke'
+                            ? 'bg-amber-600 text-white shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <Mic className="w-3 h-3" />
+                        <span>कराओके</span>
+                      </button>
+                    </div>
                   )}
-                </button>
-              )}
-
-              {/* Karaoke Track button */}
-              {bhajan.karaokeUrl && (
-                <button
-                  onClick={() => handleToggleAudio('karaoke')}
-                  className={`flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-medium transition-all text-xs sm:text-sm ${
-                    activeAudioMode === 'karaoke' && isPlaying
-                      ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20'
-                      : 'bg-secondary text-secondary-foreground hover:bg-gold/20 border border-gold/30'
-                  }`}
-                >
-                  <Mic className="w-4 h-4 text-gold" />
-                  {activeAudioMode === 'karaoke' && isPlaying ? t('pauseAudio') : t('playKaraoke')}
-                </button>
-              )}
-
-              {/* Unavailable state if neither audio exists */}
-              {!bhajan.audioUrl && !bhajan.karaokeUrl && (
-                <div className="flex items-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-secondary text-muted-foreground">
-                  <VolumeX className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs sm:text-sm">{t('audioUnavailable')}</span>
                 </div>
-              )}
 
-              {/* Roman Script toggle */}
+                {/* Progress bar + time timestamps */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="relative w-full flex items-center">
+                    <input
+                      type="range"
+                      min={0}
+                      max={duration || 100}
+                      step={0.1}
+                      value={currentTime}
+                      onChange={handleSeek}
+                      className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-gold hover:accent-gold-light focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex justify-between items-center text-[11px] text-muted-foreground font-mono px-0.5">
+                    <span>{formatTime(currentTime)}</span>
+                    <span>{formatTime(duration)}</span>
+                  </div>
+                </div>
+
+                {/* Main Audio Controls: Rewind 10s | Single Gold Play-Pause | Forward 10s | Mute */}
+                <div className="flex items-center justify-between pt-1 px-2">
+                  <div className="w-8" />
+
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    {/* Rewind 10s */}
+                    <button
+                      onClick={() => handleSkip(-10)}
+                      className="p-2 rounded-xl text-muted-foreground hover:text-gold hover:bg-gold/10 transition-colors"
+                      title="Rewind 10s"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
+
+                    {/* Single Main Glowing Gold Play/Pause Button */}
+                    <button
+                      onClick={handlePlayPause}
+                      className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-tr from-amber-600 via-gold to-yellow-300 text-primary-foreground flex items-center justify-center shadow-lg shadow-gold/25 hover:scale-105 active:scale-95 transition-all"
+                      title={isPlaying ? t('pauseAudio') : t('playBhajan')}
+                    >
+                      {isPlaying ? (
+                        <Pause className="w-5 h-5 sm:w-6 sm:h-6 fill-current" />
+                      ) : (
+                        <Play className="w-5 h-5 sm:w-6 sm:h-6 fill-current translate-x-0.5" />
+                      )}
+                    </button>
+
+                    {/* Forward 10s */}
+                    <button
+                      onClick={() => handleSkip(10)}
+                      className="p-2 rounded-xl text-muted-foreground hover:text-gold hover:bg-gold/10 transition-colors"
+                      title="Forward 10s"
+                    >
+                      <RotateCw className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Mute/Volume Toggle */}
+                  <button
+                    onClick={handleToggleMute}
+                    className="p-2 rounded-xl text-muted-foreground hover:text-gold hover:bg-gold/10 transition-colors"
+                    title={isMuted ? "Unmute" : "Mute"}
+                  >
+                    {isMuted ? (
+                      <VolumeX className="w-4 h-4 text-amber-500" />
+                    ) : (
+                      <Volume2 className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* When no audio file is uploaded/linked for this bhajan */
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary/70 text-muted-foreground text-xs mb-4 border border-border/30">
+                <VolumeX className="w-4 h-4" />
+                <span>{t('audioUnavailable')}</span>
+              </div>
+            )}
+
+            {/* Utility actions: Roman Script | Copy Verse | Download PDF */}
+            <div className="flex flex-wrap gap-2 sm:gap-2.5 justify-center items-center">
               <button
                 onClick={() => setShowRoman(!showRoman)}
-                className={`flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-medium transition-all text-xs sm:text-sm ${
+                className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl font-medium transition-all text-xs sm:text-sm ${
                   showRoman
-                    ? 'bg-gold text-primary-foreground'
-                    : 'bg-secondary text-secondary-foreground hover:bg-gold/20'
+                    ? 'bg-gold text-primary-foreground shadow-sm'
+                    : 'bg-secondary text-secondary-foreground hover:bg-gold/20 border border-border/40'
                 }`}
               >
-                <Type className="w-4 h-4" />
-                {showRoman ? t('hideRomanScript') : t('romanScript')}
+                <Type className="w-3.5 h-3.5" />
+                <span>{showRoman ? t('hideRomanScript') : t('romanScript')}</span>
               </button>
 
               <button
                 onClick={handleCopy}
-                className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-gold/20 transition-colors text-xs sm:text-sm"
+                className="flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-secondary text-secondary-foreground hover:bg-gold/20 border border-border/40 transition-colors text-xs sm:text-sm"
               >
-                {copied ? <Check className="w-4 h-4 text-gold" /> : <Copy className="w-4 h-4" />}
+                {copied ? <Check className="w-3.5 h-3.5 text-gold" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>{copied ? t('copied') : t('copyVerse')}</span>
               </button>
 
               <button
                 onClick={handlePdfDownload}
-                className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-gold/20 transition-colors text-xs sm:text-sm"
+                className="flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-secondary text-secondary-foreground hover:bg-gold/20 border border-border/40 transition-colors text-xs sm:text-sm"
               >
-                <Download className="w-4 h-4" />
+                <Download className="w-3.5 h-3.5" />
                 <span>{t('downloadPdf')}</span>
               </button>
             </div>
-
-            {/* Embedded Native Audio Player Bar if an audio track is selected */}
-            {currentAudioSource && (
-              <div className="w-full max-w-md mt-4 p-3 rounded-2xl bg-card border border-gold/30 shadow-md">
-                <div className="flex items-center justify-between text-xs text-muted-foreground mb-2 px-1">
-                  <span className="flex items-center gap-1.5 font-medium text-gold">
-                    <Music className="w-3.5 h-3.5" />
-                    {activeAudioMode === 'karaoke' ? `${bhajan.title} (${t('karaoke')})` : bhajan.title}
-                  </span>
-                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-gold/10 text-gold font-medium">
-                    {activeAudioMode === 'karaoke' ? t('karaoke') : t('bhajan')}
-                  </span>
-                </div>
-                <audio
-                  ref={audioRef}
-                  src={currentAudioSource}
-                  controls
-                  className="w-full h-9 rounded-lg"
-                  onPlay={() => setIsPlaying(true)}
-                  onPause={() => setIsPlaying(false)}
-                  onEnded={() => setIsPlaying(false)}
-                />
-              </div>
-            )}
           </motion.div>
 
           {/* Lyrics: 95% on mobile, 80% on wide screens */}
