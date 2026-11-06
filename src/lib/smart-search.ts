@@ -81,7 +81,7 @@ const hinglishToHindi: Record<string, string[]> = {
   'charitra': ['चारित्र', 'चरित्र'],
   'siddh': ['सिद्ध'], 'siddha': ['सिद्ध'],
   'arihant': ['अरिहंत'], 'acharya': ['आचार्य'], 'upadhyay': ['उपाध्याय'],
-  'sadhu': ['साधु'], 'sadhvi': ['साध्वी'], 'muni': ['मुनि'],
+  'sadhu': ['साधु'], 'sadhvi': ['साध्वी'], 'muni': ['मुनि', 'मुनिवर'], 'munivar': ['मुनिवर'], 'munivara': ['मुनिवर'],
   'tyag': ['त्याग'], 'tyaag': ['त्याग'],
   'vairagya': ['वैराग्य'], 'vairaag': ['वैराग्य'],
   'param': ['परम'], 'atma': ['आत्मा'], 'aatma': ['आत्मा'],
@@ -112,18 +112,36 @@ const hinglishToHindi: Record<string, string[]> = {
   'mujhe': ['मुझे'], 'mujhko': ['मुझको'],
   'tum': ['तुम'], 'hum': ['हम'],
   'bin': ['बिन', 'बिना'],
+  'aise': ['ऐसे'], 'aese': ['ऐसे'],
+  'kaise': ['कैसे'], 'kaese': ['कैसे'],
+  'jaise': ['जैसे'], 'jaese': ['जैसे'],
+  'vaise': ['वैसे'], 'vaese': ['वैसे'],
+  'dekhe': ['देखे', 'देखें'], 'dekhen': ['देखें', 'देखे'],
+  'ashariri': ['अशरीरी'], 'ashareeri': ['अशरीरी'],
 };
 
 // ─── Normalization & Distance Helpers ─────────────────────────────────────────
 
-function normalizeVowelLength(str: string): string {
+export function normalizeHinglish(str: string): string {
+  if (!str) return '';
   return str
     .toLowerCase()
+    .replace(/ae/g, 'ai')
+    .replace(/ou/g, 'au')
+    .replace(/w/g, 'v')
     .replace(/aa/g, 'a')
     .replace(/ee/g, 'i')
     .replace(/oo/g, 'u')
     .replace(/ii/g, 'i')
-    .replace(/uu/g, 'u');
+    .replace(/uu/g, 'u')
+    .replace(/sh/g, 's')
+    .replace(/[^\w\s\u0900-\u097F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeVowelLength(str: string): string {
+  return normalizeHinglish(str);
 }
 
 function phoneticNormalize(str: string): string {
@@ -140,11 +158,91 @@ function phoneticNormalize(str: string): string {
     .replace(/aa/g, 'a')
     .replace(/ee/g, 'i')
     .replace(/oo/g, 'u')
+    .replace(/ae/g, 'e')
     .replace(/ai/g, 'e')
+    .replace(/ou/g, 'o')
     .replace(/au/g, 'o')
+    .replace(/w/g, 'v')
     .replace(/(.)\1+/g, '$1')
     .replace(/[aeiou]/g, '')
     .trim();
+}
+
+/**
+ * Matches an array of query tokens against target item words (Devanagari, Roman, Normalized).
+ * Returns true if ALL query tokens find a match in the target.
+ */
+function matchQueryTokens(
+  qTokens: string[],
+  titleDevWords: string[],
+  titleRomanWords: string[],
+  titleNormWords: string[]
+): { matchedAll: boolean; score: number } {
+  if (qTokens.length === 0 || titleNormWords.length === 0) return { matchedAll: false, score: 0 };
+  let matchedCount = 0;
+  let totalScore = 0;
+
+  for (const q of qTokens) {
+    if (!q) continue;
+    const qNorm = normalizeHinglish(q);
+    const syns = hinglishToHindi[q] || [];
+    let bestTokenScore = 0;
+
+    for (let i = 0; i < titleNormWords.length; i++) {
+      const dev = titleDevWords[i] || '';
+      const rom = titleRomanWords[i] || '';
+      const norm = titleNormWords[i] || '';
+
+      // Direct synonym match
+      if (syns.some(s => dev.includes(s) || s.includes(dev))) {
+        bestTokenScore = Math.max(bestTokenScore, 1.0);
+        break;
+      }
+      // Exact word match
+      if (rom === q || norm === qNorm || dev === q) {
+        bestTokenScore = Math.max(bestTokenScore, 1.0);
+        break;
+      }
+      // Prefix match
+      if (rom.startsWith(q) || norm.startsWith(qNorm) || dev.startsWith(q)) {
+        bestTokenScore = Math.max(bestTokenScore, 0.95);
+        continue;
+      }
+      // Substring match
+      if (norm.includes(qNorm) || (qNorm.length >= 3 && qNorm.includes(norm))) {
+        bestTokenScore = Math.max(bestTokenScore, 0.88);
+        continue;
+      }
+      // Typo tolerance
+      if (qNorm.length >= 4 && Math.abs(qNorm.length - norm.length) <= 1) {
+        const d = levenshtein(qNorm, norm);
+        if (d <= 1) {
+          bestTokenScore = Math.max(bestTokenScore, 0.80);
+        }
+      }
+    }
+
+    if (bestTokenScore > 0) {
+      matchedCount++;
+      totalScore += bestTokenScore;
+    }
+  }
+
+  const matchedAll = matchedCount === qTokens.length;
+  if (matchedAll) {
+    return {
+      matchedAll: true,
+      score: 0.92 + (totalScore / qTokens.length) * 0.06,
+    };
+  }
+  if (qTokens.length > 1 && matchedCount >= qTokens.length - 1 && matchedCount > 0) {
+    return {
+      matchedAll: false,
+      score: 0.75 + (totalScore / qTokens.length) * 0.1,
+    };
+  }
+
+  return { matchedAll: false, score: 0 };
 }
 
 function levenshtein(a: string, b: string): number {
@@ -220,6 +318,7 @@ interface ShastraIndexEntry {
   shastra: ShastraMetadata;
   titleLower: string;
   titleWords: string[];
+  titleWordsNorm: string[];
   romanTitle: string;
   romanWords: string[];
   romanTitleNorm: string;
@@ -228,6 +327,7 @@ interface ShastraIndexEntry {
   idLower: string;
   authorLower: string;
   authorWords: string[];
+  authorWordsNorm: string[];
   romanAuthor: string;
   romanAuthorWords: string[];
   romanAuthorNorm: string;
@@ -247,21 +347,27 @@ function getShastraSearchIndex(): ShastraIndexEntry[] {
     const romanTitleNorm = normalizeVowelLength(romanTitle);
     const authorLower = s.author.toLowerCase();
     const romanAuthor = transliterateText(s.author).toLowerCase();
+    const titleWords = titleLower.split(/[\s\-_/]+/).filter(Boolean);
+    const romanWords = romanTitle.split(/[\s\-_/]+/).filter(Boolean);
+    const authorWords = authorLower.split(/[\s\-_/]+/).filter(Boolean);
+    const romanAuthorWords = romanAuthor.split(/[\s\-_/]+/).filter(Boolean);
 
     return {
       shastra: s,
       titleLower,
-      titleWords: titleLower.split(/[\s\-_/]+/).filter(Boolean),
+      titleWords,
+      titleWordsNorm: romanWords.map(w => normalizeVowelLength(w)),
       romanTitle,
-      romanWords: romanTitle.split(/[\s\-_/]+/).filter(Boolean),
+      romanWords,
       romanTitleNorm,
       romanTitlePhonetic: phoneticNormalize(romanTitle),
       slugLower: s.shastraSlug.toLowerCase(),
       idLower: s.id.toLowerCase(),
       authorLower,
-      authorWords: authorLower.split(/[\s\-_/]+/).filter(Boolean),
+      authorWords,
+      authorWordsNorm: romanAuthorWords.map(w => normalizeVowelLength(w)),
       romanAuthor,
-      romanAuthorWords: romanAuthor.split(/[\s\-_/]+/).filter(Boolean),
+      romanAuthorWords,
       romanAuthorNorm: normalizeVowelLength(romanAuthor),
       url: `/shastra/${s.categorySlug}/${s.shastraSlug}`,
       subtitle: `📚 ${s.author} • ${s.categoryHi} (${s.gathaCount} गाथाएं)`,
@@ -316,6 +422,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
   const queryNorm = normalizeVowelLength(queryLower);
   const romanQueryNorm = normalizeVowelLength(romanQuery);
   const queryPhonetic = phoneticNormalize(queryLower);
+  const queryTokens = queryLower.split(/[\s\-_/]+/).filter(Boolean);
   const limit = options.limit ?? 10;
 
   const results = new Map<string, UnifiedSearchResult>();
@@ -473,7 +580,14 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
   // 2. SHASTRAS (Scriptures)
   for (const s of getShastraSearchIndex()) {
     // Priority 1: Exact Absolute Match
-    if (s.titleLower === queryLower || s.romanTitle === queryLower || s.slugLower === queryLower || s.idLower === queryLower || s.romanTitle === romanQuery) {
+    if (
+      s.titleLower === queryLower ||
+      s.romanTitle === queryLower ||
+      s.slugLower === queryLower ||
+      s.idLower === queryLower ||
+      s.romanTitle === romanQuery ||
+      s.romanTitleNorm === queryNorm
+    ) {
       addResult({
         id: `shastra-${s.shastra.id}`,
         title: s.shastra.title,
@@ -494,7 +608,8 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       s.romanTitle.startsWith(queryLower) ||
       (romanQuery && s.romanTitle.startsWith(romanQuery)) ||
       s.slugLower.startsWith(queryLower) ||
-      s.idLower.startsWith(queryLower);
+      s.idLower.startsWith(queryLower) ||
+      (queryNorm.length >= 3 && s.romanTitleNorm.startsWith(queryNorm));
 
     if (isDirectTitlePrefix) {
       addResult({
@@ -511,10 +626,55 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       continue;
     }
 
+    // Multi-token match across Shastra title and author words
+    if (queryTokens.length > 1) {
+      const titleMatch = matchQueryTokens(
+        queryTokens,
+        s.titleWords,
+        s.romanWords,
+        s.titleWordsNorm
+      );
+      if (titleMatch.matchedAll) {
+        addResult({
+          id: `shastra-${s.shastra.id}`,
+          title: s.shastra.title,
+          subtitle: s.subtitle,
+          type: 'shastra',
+          url: s.url,
+          score: titleMatch.score,
+          badge: 'Shastra',
+          icon: '📚',
+          matchedAs: 'exact'
+        });
+        continue;
+      }
+
+      // Check across combined title and author words
+      const combinedDev = [...s.titleWords, ...s.authorWords];
+      const combinedRom = [...s.romanWords, ...s.romanAuthorWords];
+      const combinedNorm = [...s.titleWordsNorm, ...s.authorWordsNorm];
+      const combinedMatch = matchQueryTokens(queryTokens, combinedDev, combinedRom, combinedNorm);
+      if (combinedMatch.matchedAll) {
+        addResult({
+          id: `shastra-${s.shastra.id}`,
+          title: s.shastra.title,
+          subtitle: s.subtitle,
+          type: 'shastra',
+          url: s.url,
+          score: combinedMatch.score - 0.05,
+          badge: 'Shastra',
+          icon: '📚',
+          matchedAs: 'exact'
+        });
+        continue;
+      }
+    }
+
     // Priority 3: Title Word-Initial Match (any subsequent word starts with query)
     const isTitleWordMatch =
       s.titleWords.some(w => w.startsWith(queryLower)) ||
-      s.romanWords.some(w => w.startsWith(queryLower) || (romanQuery && w.startsWith(romanQuery)));
+      s.romanWords.some(w => w.startsWith(queryLower) || (romanQuery && w.startsWith(romanQuery))) ||
+      (queryNorm.length >= 3 && s.titleWordsNorm.some(w => w.startsWith(queryNorm)));
 
     if (isTitleWordMatch) {
       addResult({
@@ -569,7 +729,8 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       s.authorLower.startsWith(queryLower) ||
       s.romanAuthor.startsWith(queryLower) ||
       s.authorWords.some(w => w.startsWith(queryLower)) ||
-      s.romanAuthorWords.some(w => w.startsWith(queryLower));
+      s.romanAuthorWords.some(w => w.startsWith(queryLower)) ||
+      (queryNorm.length >= 3 && s.authorWordsNorm.some(w => w.startsWith(queryNorm)));
 
     if (isAuthorPrefix) {
       addResult({
@@ -623,7 +784,12 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
 
     // Priority 6: Partial Substring Match (ONLY for queries >= 3 characters)
     if (queryLower.length >= 3) {
-      if (s.titleLower.includes(queryLower) || s.romanTitle.includes(queryLower) || (romanQuery && s.romanTitle.includes(romanQuery))) {
+      if (
+        s.titleLower.includes(queryLower) ||
+        s.romanTitle.includes(queryLower) ||
+        (romanQuery && s.romanTitle.includes(romanQuery)) ||
+        s.romanTitleNorm.includes(queryNorm)
+      ) {
         addResult({
           id: `shastra-${s.shastra.id}`,
           title: s.shastra.title,
@@ -638,7 +804,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
         continue;
       }
 
-      if (s.authorLower.includes(queryLower) || s.romanAuthor.includes(queryLower)) {
+      if (s.authorLower.includes(queryLower) || s.romanAuthor.includes(queryLower) || s.romanAuthorNorm.includes(queryNorm)) {
         addResult({
           id: `shastra-${s.shastra.id}`,
           title: s.shastra.title,
@@ -664,7 +830,13 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
     const subtitle = `🎵 ${b.subdivision.charAt(0).toUpperCase() + b.subdivision.slice(1)} Bhajan${singerStr}`;
 
     // Priority 1: Exact Absolute String Match on Bhajan Title
-    if (entry.titleLower === queryLower || entry.romanTitle === queryLower || (romanQuery && entry.romanTitle === romanQuery)) {
+    if (
+      entry.titleLower === queryLower ||
+      entry.romanTitle === queryLower ||
+      (romanQuery && entry.romanTitle === romanQuery) ||
+      entry.romanTitleNorm === queryNorm ||
+      (romanQueryNorm && entry.romanTitleNorm === romanQueryNorm)
+    ) {
       addResult({
         id: `bhajan-${b.id}`,
         title: b.title,
@@ -683,7 +855,9 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
     const isDirectBhajanPrefix =
       entry.titleLower.startsWith(queryLower) ||
       entry.romanTitle.startsWith(queryLower) ||
-      (romanQuery && entry.romanTitle.startsWith(romanQuery));
+      (romanQuery && entry.romanTitle.startsWith(romanQuery)) ||
+      (queryNorm.length >= 3 && entry.romanTitleNorm.startsWith(queryNorm)) ||
+      (romanQueryNorm.length >= 3 && entry.romanTitleNorm.startsWith(romanQueryNorm));
 
     if (isDirectBhajanPrefix) {
       addResult({
@@ -692,7 +866,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
         subtitle,
         type: 'bhajan',
         url,
-        score: 0.95,
+        score: 0.96,
         badge: 'Bhajan',
         icon: '🎵',
         matchedAs: 'exact'
@@ -700,10 +874,35 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       continue;
     }
 
+    // Multi-token match across Bhajan title words (e.g. "aese muni" -> "ऐसे मुनिवर देखें", "aese sadhu" -> "ऐसे साधु सुगुरु कब")
+    if (queryTokens.length > 1) {
+      const tokenMatch = matchQueryTokens(
+        queryTokens,
+        entry.titleWords,
+        entry.romanWords,
+        entry.titleWordsNorm
+      );
+      if (tokenMatch.matchedAll) {
+        addResult({
+          id: `bhajan-${b.id}`,
+          title: b.title,
+          subtitle,
+          type: 'bhajan',
+          url,
+          score: tokenMatch.score,
+          badge: 'Bhajan',
+          icon: '🎵',
+          matchedAs: 'exact'
+        });
+        continue;
+      }
+    }
+
     // Priority 3: Title Word-Initial Match (any subsequent word starts with query)
     const isBhajanWordMatch =
       entry.titleWords.some(w => w.startsWith(queryLower)) ||
-      entry.romanWords.some(w => w.startsWith(queryLower) || (romanQuery && w.startsWith(romanQuery)));
+      entry.romanWords.some(w => w.startsWith(queryLower) || (romanQuery && w.startsWith(romanQuery))) ||
+      (queryNorm.length >= 3 && entry.titleWordsNorm.some(w => w.startsWith(queryNorm)));
 
     if (isBhajanWordMatch) {
       addResult({
@@ -720,14 +919,14 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       continue;
     }
 
-    // Priority 4: Closest Absolute String in Title Words (min 3 chars) / Phonetic
+    // Priority 4: Closest Absolute String in Title Words (min 3 chars) / Phonetic / Full Normalized Substring
     if (queryNorm.length >= 3) {
       const isWordMatch = entry.titleWordsNorm.some((wNorm, idx) => {
         if (wNorm === queryNorm || (romanQueryNorm && wNorm === romanQueryNorm)) return true;
         return queryPhonetic.length >= 3 && entry.titleWordsPhonetic[idx] === queryPhonetic;
       });
 
-      if (isWordMatch) {
+      if (isWordMatch || entry.romanTitleNorm.includes(queryNorm)) {
         addResult({
           id: `bhajan-${b.id}`,
           title: b.title,
@@ -770,9 +969,14 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       }
     }
 
-    // Priority 5: Partial Substring in Title or Tags (ONLY if queryLower.length >= 3)
+    // Priority 6: Partial Substring in Title or Tags (ONLY if queryLower.length >= 3)
     if (queryLower.length >= 3) {
-      if (entry.titleLower.includes(queryLower) || entry.romanTitle.includes(queryLower) || (romanQuery && entry.romanTitle.includes(romanQuery))) {
+      if (
+        entry.titleLower.includes(queryLower) ||
+        entry.romanTitle.includes(queryLower) ||
+        (romanQuery && entry.romanTitle.includes(romanQuery)) ||
+        entry.romanTitleNorm.includes(queryNorm)
+      ) {
         addResult({
           id: `bhajan-${b.id}`,
           title: b.title,
@@ -787,7 +991,7 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
         continue;
       }
 
-      if (entry.tagsLower.some(t => t.includes(queryLower))) {
+      if (entry.tagsLower.some(t => t.includes(queryLower) || t.includes(queryNorm))) {
         addResult({
           id: `bhajan-${b.id}`,
           title: b.title,
@@ -803,7 +1007,11 @@ export function siteWideSearch(query: string, options: { limit?: number } = {}):
       }
 
       // Lyrics Match (min 4 chars)
-      if (entry.lyricsLower.includes(queryLower) || (queryLower.length >= 4 && entry.romanLyrics.includes(queryLower))) {
+      if (
+        entry.lyricsLower.includes(queryLower) ||
+        (queryLower.length >= 4 && entry.romanLyrics.includes(queryLower)) ||
+        (queryNorm.length >= 4 && entry.romanLyricsNorm.includes(queryNorm))
+      ) {
         addResult({
           id: `bhajan-${b.id}`,
           title: b.title,

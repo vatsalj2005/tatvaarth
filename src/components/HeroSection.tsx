@@ -34,7 +34,7 @@ const HeroSection = () => {
     }
   }, [searchQuery]);
 
-  const showDropdown = isFocused && suggestions.length > 0;
+  const showDropdown = isFocused && searchQuery.trim().length > 1;
 
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center pt-16 pb-24">
@@ -127,54 +127,63 @@ const HeroSection = () => {
                 className="absolute left-0 right-0 z-30 bg-card border border-gold/50 border-t-0 rounded-b-xl shadow-lg shadow-gold/5 overflow-hidden max-h-[320px] overflow-y-auto scrollbar-thin"
               >
                 <div className="border-t border-border/30" />
-                {suggestions.map(s => (
-                  <Link
-                    key={s.id}
-                    to={s.url}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                    }}
-                    onClick={() => {
-                      setSearchQuery('');
-                      setSuggestions([]);
-                      setIsFocused(false);
-                    }}
-                    className={`w-full text-left px-4 py-2.5 hover:bg-secondary/80 transition-colors text-sm flex items-center justify-between gap-3 border-b border-border/20 last:border-b-0 group ${
-                      s.type === 'directory' ? 'bg-gold/5' : ''
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <span className="text-base flex-shrink-0 w-5 text-center">
-                        {s.icon || (s.type === 'directory' ? '📂' : s.type === 'shastra' ? '📚' : '🎵')}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-foreground/90 font-medium truncate devanagari-safe">
-                            {s.title}
-                          </span>
-                          {s.badge && (
-                            <span
-                              className={`text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${
-                                s.type === 'directory'
-                                  ? 'bg-gold/20 text-gold border border-gold/40'
-                                  : s.type === 'shastra'
-                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                  : 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
-                              }`}
-                            >
-                              {s.badge}
+                {suggestions.length > 0 ? (
+                  suggestions.map(s => (
+                    <Link
+                      key={s.id}
+                      to={s.url}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                      }}
+                      onClick={() => {
+                        setSearchQuery('');
+                        setSuggestions([]);
+                        setIsFocused(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 hover:bg-secondary/80 transition-colors text-sm flex items-center justify-between gap-3 border-b border-border/20 last:border-b-0 group ${
+                        s.type === 'directory' ? 'bg-gold/5' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <span className="text-base flex-shrink-0 w-5 text-center">
+                          {s.icon || (s.type === 'directory' ? '📂' : s.type === 'shastra' ? '📚' : '🎵')}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-foreground/90 font-medium truncate devanagari-safe">
+                              {s.title}
                             </span>
+                            {s.badge && (
+                              <span
+                                className={`text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${
+                                  s.type === 'directory'
+                                    ? 'bg-gold/20 text-gold border border-gold/40'
+                                    : s.type === 'shastra'
+                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                    : 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                                }`}
+                              >
+                                {s.badge}
+                              </span>
+                            )}
+                          </div>
+                          {s.subtitle && (
+                            <p className="text-xs text-muted-foreground/60 truncate devanagari-safe mt-0.5">
+                              {s.subtitle}
+                            </p>
                           )}
                         </div>
-                        {s.subtitle && (
-                          <p className="text-xs text-muted-foreground/60 truncate devanagari-safe mt-0.5">
-                            {s.subtitle}
-                          </p>
-                        )}
                       </div>
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  ))
+                ) : (
+                  <div className="px-4 py-4 text-center text-sm text-muted-foreground/80 devanagari-safe">
+                    <span>&ldquo;{searchQuery.trim()}&rdquo; के लिए कोई परिणाम नहीं मिला</span>
+                    <span className="block text-xs text-muted-foreground/50 mt-1">
+                      No results found. Try another spelling or term.
+                    </span>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
