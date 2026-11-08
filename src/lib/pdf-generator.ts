@@ -175,7 +175,7 @@ export async function generateBhajanPdf({ title, slug, singer, lyrics, theme }: 
 
       while (index < options.lines.length) {
         const line = options.lines[index];
-        const step = line ? options.bodyLineHeight : options.bodyLineHeight * 0.75;
+        const step = line ? options.bodyLineHeight : options.bodyLineHeight * 1.5;
         if (y + step > pageHeight - marginBottom) {
           break;
         }
@@ -199,7 +199,7 @@ export async function generateBhajanPdf({ title, slug, singer, lyrics, theme }: 
     lines: hindiLines,
     fontSetter: useHindiFont,
     bodyFontSize: 14,
-    bodyLineHeight: 8,
+    bodyLineHeight: 7,
   });
 
   doc.addPage();
@@ -211,7 +211,7 @@ export async function generateBhajanPdf({ title, slug, singer, lyrics, theme }: 
     lines: romanLines,
     fontSetter: useRomanFont,
     bodyFontSize: 13,
-    bodyLineHeight: 7,
+    bodyLineHeight: 6.2,
   });
 
   const totalPages = doc.getNumberOfPages();

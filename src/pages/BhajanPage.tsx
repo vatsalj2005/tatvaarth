@@ -441,7 +441,7 @@ const BhajanPage = () => {
             return (
               <div 
                 key={`stanza-${sIdx}`}
-                className="mb-6 last:mb-0 text-center space-y-1"
+                className="mb-8 sm:mb-10 last:mb-0 text-center space-y-0.5"
               >
                 {stanza.lines.map((line, lIdx) => {
                   const lineText = line.type === 'verse_with_refrain'
@@ -451,7 +451,7 @@ const BhajanPage = () => {
                   return (
                     <p 
                       key={lIdx}
-                      className="font-semibold text-amber-700 dark:text-amber-400 leading-normal devanagari-safe drop-shadow-[0_1px_3px_rgba(212,175,55,0.25)] break-words"
+                      className="font-semibold text-amber-700 dark:text-amber-400 leading-[1.3] !py-0 devanagari-safe drop-shadow-[0_1px_3px_rgba(212,175,55,0.25)] break-words"
                       style={{ fontSize: `${fontSize}px` }}
                     >
                       {lineText}
@@ -465,7 +465,7 @@ const BhajanPage = () => {
           return (
             <div 
               key={`stanza-${sIdx}`}
-              className="mb-6 last:mb-0 text-center space-y-1"
+              className="mb-8 sm:mb-10 last:mb-0 text-center space-y-0.5"
             >
               {stanza.lines.map((line, lIdx) => {
                 if (line.type === 'verse_with_refrain') {
@@ -473,7 +473,7 @@ const BhajanPage = () => {
                     return (
                       <div key={lIdx} className="space-y-0.5">
                         <p 
-                          className="leading-normal devanagari-safe break-words"
+                          className="leading-[1.3] !py-0 devanagari-safe break-words"
                           style={{ fontSize: `${fontSize}px` }}
                         >
                           {line.before && (
@@ -488,7 +488,7 @@ const BhajanPage = () => {
                           )}
                         </p>
                         <p 
-                          className="font-semibold text-amber-700 dark:text-amber-400 drop-shadow-[0_1px_3px_rgba(212,175,55,0.25)] leading-normal devanagari-safe break-words"
+                          className="font-semibold text-amber-700 dark:text-amber-400 drop-shadow-[0_1px_3px_rgba(212,175,55,0.25)] leading-[1.3] !py-0 devanagari-safe break-words"
                           style={{ fontSize: `${fontSize}px` }}
                         >
                           {line.after}
@@ -500,7 +500,7 @@ const BhajanPage = () => {
                   return (
                     <p 
                       key={lIdx}
-                      className="leading-normal devanagari-safe break-words"
+                      className="leading-[1.3] !py-0 devanagari-safe break-words"
                       style={{ fontSize: `${fontSize}px` }}
                     >
                       {line.before && (
@@ -525,7 +525,7 @@ const BhajanPage = () => {
                 return (
                   <p 
                     key={lIdx}
-                    className="text-teal-800 dark:text-teal-300 leading-normal devanagari-safe break-words"
+                    className="text-teal-800 dark:text-teal-300 leading-[1.3] !py-0 devanagari-safe break-words"
                     style={{ fontSize: `${fontSize}px` }}
                   >
                     {line.text}
