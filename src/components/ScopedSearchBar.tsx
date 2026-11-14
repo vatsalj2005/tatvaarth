@@ -16,7 +16,7 @@ export const ScopedSearchBar = ({
   scope,
   placeholder,
   className = 'mb-10 max-w-xl mx-auto relative',
-  limit = 10,
+  limit = 20,
 }: ScopedSearchBarProps) => {
   const { language } = useApp();
   const navigate = useNavigate();
@@ -76,7 +76,7 @@ export const ScopedSearchBar = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute left-0 right-0 z-30 bg-card border border-gold/50 border-t-0 rounded-b-xl shadow-lg shadow-gold/5 overflow-hidden max-h-[380px] overflow-y-auto scrollbar-thin"
+            className="absolute left-0 right-0 z-30 bg-card border border-gold/50 border-t-0 rounded-b-xl shadow-lg shadow-gold/5 overflow-hidden max-h-[440px] overflow-y-auto scrollbar-thin"
           >
             {/* Fallback Banner if zero matches in scope */}
             {searchResponse?.isFallback && (

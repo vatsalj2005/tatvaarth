@@ -27,7 +27,7 @@ const HeroSection = () => {
 
   useEffect(() => {
     if (searchQuery.trim().length > 1) {
-      const results = siteWideSearch(searchQuery.trim(), { limit: 10 });
+      const results = siteWideSearch(searchQuery.trim(), { limit: 20 });
       setSuggestions(results);
     } else {
       setSuggestions([]);
@@ -124,7 +124,7 @@ const HeroSection = () => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute left-0 right-0 z-30 bg-card border border-gold/50 border-t-0 rounded-b-xl shadow-lg shadow-gold/5 overflow-hidden max-h-[320px] overflow-y-auto scrollbar-thin"
+                className="absolute left-0 right-0 z-30 bg-card border border-gold/50 border-t-0 rounded-b-xl shadow-lg shadow-gold/5 overflow-hidden max-h-[440px] overflow-y-auto scrollbar-thin"
               >
                 <div className="border-t border-border/30" />
                 {suggestions.length > 0 ? (
